@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;family=Manrope:wght@200;300;400;500;600;700;800&amp;family=Lexend:wght@100;200;300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-fixed-dim": "#c8c6c5",
+              "error-container": "#ffdad6",
+              "on-secondary-fixed": "#1c1b1b",
+              "on-surface": "#1b1c18",
+              "primary-container": "#2d3f2a",
+              "on-background": "#1b1c18",
+              "on-tertiary-fixed": "#1f1c0d",
+              "primary": "#182916",
+              "on-error-container": "#93000a",
+              "surface-container-lowest": "#ffffff",
+              "error": "#ba1a1a",
+              "on-tertiary-fixed-variant": "#4b4735",
+              "on-secondary-fixed-variant": "#474746",
+              "surface": "#fbf9f2",
+              "surface-tint": "#50634c",
+              "surface-container": "#f0eee7",
+              "on-primary-fixed-variant": "#394c36",
+              "tertiary": "#282515",
+              "surface-container-highest": "#e4e2dc",
+              "primary-fixed-dim": "#b7cdb0",
+              "surface-container-high": "#eae8e1",
+              "inverse-primary": "#b7cdb0",
+              "on-error": "#ffffff",
+              "inverse-on-surface": "#f3f1ea",
+              "outline-variant": "#c4c8bf",
+              "outline": "#747870",
+              "background": "#fbf9f2",
+              "on-tertiary": "#ffffff",
+              "surface-container-low": "#f5f4ed",
+              "tertiary-container": "#3e3a29",
+              "secondary-fixed": "#e5e2e1",
+              "surface-dim": "#dcdad3",
+              "primary-fixed": "#d3e9cb",
+              "surface-variant": "#e4e2dc",
+              "surface-bright": "#fbf9f2",
+              "tertiary-fixed": "#eae2cb",
+              "on-secondary": "#ffffff",
+              "on-primary": "#ffffff",
+              "on-tertiary-container": "#aaa48e",
+              "on-primary-fixed": "#0e1f0d",
+              "on-secondary-container": "#636262",
+              "inverse-surface": "#30312c",
+              "tertiary-fixed-dim": "#cdc6af",
+              "secondary": "#5f5e5e",
+              "on-surface-variant": "#444841",
+              "on-primary-container": "#95aa8f",
+              "secondary-container": "#e2dfde"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Manrope"],
+              "label": ["Lexend"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+            animation: {
+              'float': 'float 6s ease-in-out infinite',
+              'kinetic-slide': 'kinetic-slide 20s linear infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-20px)' },
+              },
+              'kinetic-slide': {
+                '0%': { transform: 'translateX(0) skewX(-12deg)' },
+                '100%': { transform: 'translateX(-50%) skewX(-12deg)' },
+              }
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .kinetic-overlay {
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 20px,
+          rgba(183, 205, 176, 0.03) 20px,
+          rgba(183, 205, 176, 0.03) 40px
+        );
+      }
+      .text-glow {
+        text-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+      }
+      .grid-pattern {
+        background-image: radial-gradient(#182916 0.5px, transparent 0.5px);
+        background-size: 24px 24px;
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-[#fbf9f2]/90 dark:bg-stone-900/90 backdrop-blur-md">
+<nav class="flex justify-between items-center w-full px-8 py-4 max-w-7xl mx-auto">
+<div class="text-2xl font-black text-[#182916] dark:text-emerald-500 tracking-tighter font-headline flex items-center">
+<img alt="Velocity Logo" class="h-10 w-auto mr-3 inline-block" src="https://lh3.googleusercontent.com/aida/ADBb0uh3ZE7MyDSIXVrH4wEurM-BCLoSHOAu6XRNPv7Hd_Vbxitg0mOl8SSicVemvmXsPTHSbQe9VFDm0WxSSgB3H0I5qVamnlFw1jSanMW2Oxfp0DkmGO_8tckV0TJXdRfSQvRrhLrjwdRYYPY5bAwVISp1ICJ0sCBKK8sYHpdVHkbXruYw3kwdSFMRzA2_4xRw3ErvuF48h-U_SLyA8xLgbompY69Q6LKLlqiJAbL7diMW18tHZEuktuGYOabOLKc0p_SlM4MrX7eMsgU"/>
+                Velocity
+            </div>
+<div class="hidden md:flex items-center gap-10">
+<a class="text-stone-500 dark:text-stone-400 font-medium hover:text-[#182916] transition-colors font-headline tracking-tight uppercase text-sm" href="#services">Services</a>
+<a class="text-stone-500 dark:text-stone-400 font-medium hover:text-[#182916] transition-colors font-headline tracking-tight uppercase text-sm" href="#booking">Book Now</a>
+<a class="text-stone-500 dark:text-stone-400 font-medium hover:text-[#182916] transition-colors font-headline tracking-tight uppercase text-sm" href="#facility">Facility</a>
+<a class="text-stone-500 dark:text-stone-400 font-medium hover:text-[#182916] transition-colors font-headline tracking-tight uppercase text-sm" href="#community">Community</a>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-md font-label text-sm font-bold tracking-wide transition-all duration-300 hover:bg-primary-container">
+                Reserve Now
+            </button>
+</nav>
+</header>
+<main class="pt-24">
+<!-- Hero Section -->
+<section class="max-w-7xl mx-auto px-8 mb-20">
+<div class="relative overflow-hidden bg-primary rounded-[2rem] min-h-[600px] flex items-center group">
+<div class="absolute inset-0 z-0">
+<img alt="Professional Pickleball Courts" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0ujgUjZ4vpAeLoKy-PGL3pgg2-K5Jf57KNEvrM1x5_om2UWxjPJsx_DRg2Qf6I9FhAxJGykxQHUQ_Wh1knt4j-jQTa8kHSIf7_6_vVT24V5Yn0WAemq9wlhnbYAxhVRUQHvtdOdfmfIGkhP1QO68Ko8aa2d5ijP3RuCGktwq-thbtImJOej9rpUirR3tjC-UJqJlYU2ySy-ZvIQTEI49bfqkXyIcZ4adq3IUdCP9j4JKyK8OJ9p0Q-PEvQKs6Vdvknijh6SooV04eQQ"/>
+<div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
+<div class="absolute inset-0 kinetic-overlay"></div>
+<div class="absolute -right-20 -top-20 w-96 h-96 bg-primary-container/20 rounded-full blur-[100px] animate-pulse"></div>
+</div>
+<div class="relative z-10 w-full px-12 md:px-20 py-20 flex flex-col lg:flex-row items-center gap-12">
+<div class="flex-1 text-center lg:text-left">
+<div class="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 mb-8">
+<img alt="Logo Mark" class="w-5 h-5 invert" src="https://lh3.googleusercontent.com/aida/ADBb0uh3ZE7MyDSIXVrH4wEurM-BCLoSHOAu6XRNPv7Hd_Vbxitg0mOl8SSicVemvmXsPTHSbQe9VFDm0WxSSgB3H0I5qVamnlFw1jSanMW2Oxfp0DkmGO_8tckV0TJXdRfSQvRrhLrjwdRYYPY5bAwVISp1ICJ0sCBKK8sYHpdVHkbXruYw3kwdSFMRzA2_4xRw3ErvuF48h-U_SLyA8xLgbompY69Q6LKLlqiJAbL7diMW18tHZEuktuGYOabOLKc0p_SlM4MrX7eMsgU"/>
+<span class="font-label uppercase text-[10px] font-bold tracking-[0.3em] text-primary-fixed-dim">Kinetic Precision</span>
+</div>
+<h1 class="font-headline text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] text-white mb-8 text-glow">
+                            RESERVE<br/>
+<span class="text-primary-fixed-dim italic">YOUR COURT.</span><br/>
+<span class="text-transparent bg-clip-text bg-gradient-to-r from-white to-white/60">MAXIMIZE VELOCITY.</span>
+</h1>
+<p class="font-body text-xl text-white/90 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                            Elite indoor courts engineered for peak performance in Cebu. Join the fastest growing pickleball community in the Philippines.
+                        </p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+<a class="bg-primary-fixed text-on-primary-fixed px-8 py-4 rounded-lg font-label font-bold uppercase tracking-widest hover:bg-white transition-all text-center" href="#booking">Book a Court</a>
+<a class="bg-white/10 backdrop-blur-md text-white border border-white/20 px-8 py-4 rounded-lg font-label font-bold uppercase tracking-widest hover:bg-white/20 transition-all text-center" href="#services">Our Services</a>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 1. What They Offer (Services) -->
+<section class="max-w-7xl mx-auto px-8 py-24 border-b border-outline-variant/10" id="services">
+<div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
+<div>
+<span class="font-label text-xs uppercase tracking-[0.3em] text-primary font-bold mb-4 block">Engineered for Play</span>
+<h2 class="font-headline text-4xl md:text-5xl font-black tracking-tight uppercase">Elite Court Services</h2>
+</div>
+<p class="font-body text-on-surface-variant max-w-md">Everything you need to master the game, from professional court rentals to elite coaching sessions.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+<div class="group bg-surface-container-low p-8 rounded-xl border border-outline-variant/5 hover:border-primary/20 transition-all duration-500">
+<div class="w-14 h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">sports_tennis</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4">Court Rentals</h3>
+<p class="font-body text-on-surface-variant text-sm leading-relaxed mb-6">World-class indoor courts with pro-level lighting and surfacing. Available for private bookings.</p>
+<a class="font-label text-xs font-bold uppercase tracking-widest text-primary inline-flex items-center gap-2 group-hover:gap-4 transition-all" href="#">View Rates <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+</div>
+<div class="group bg-surface-container-low p-8 rounded-xl border border-outline-variant/5 hover:border-primary/20 transition-all duration-500">
+<div class="w-14 h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">groups</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4">Open Play</h3>
+<p class="font-body text-on-surface-variant text-sm leading-relaxed mb-6">Join our social sessions. Meet new players, rotate in, and experience the community spirit.</p>
+<a class="font-label text-xs font-bold uppercase tracking-widest text-primary inline-flex items-center gap-2 group-hover:gap-4 transition-all" href="#">Check Schedule <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+</div>
+<div class="group bg-surface-container-low p-8 rounded-xl border border-outline-variant/5 hover:border-primary/20 transition-all duration-500">
+<div class="w-14 h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">fitness_center</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4">Coaching</h3>
+<p class="font-body text-on-surface-variant text-sm leading-relaxed mb-6">Expert instruction for all levels. Private lessons or group clinics to sharpen your skills.</p>
+<a class="font-label text-xs font-bold uppercase tracking-widest text-primary inline-flex items-center gap-2 group-hover:gap-4 transition-all" href="#">Meet Coaches <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+</div>
+<div class="group bg-surface-container-low p-8 rounded-xl border border-outline-variant/5 hover:border-primary/20 transition-all duration-500">
+<div class="w-14 h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">emoji_events</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-4">Tournaments</h3>
+<p class="font-body text-on-surface-variant text-sm leading-relaxed mb-6">Competitive leagues and seasonal tournaments. Test your velocity against the best.</p>
+<a class="font-label text-xs font-bold uppercase tracking-widest text-primary inline-flex items-center gap-2 group-hover:gap-4 transition-all" href="#">Register Now <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+</div>
+</div>
+</section>
+<!-- 2. Book a Court (Key Section) -->
+<section class="max-w-7xl mx-auto px-8 py-24 scroll-mt-20" id="booking">
+<div class="bg-primary text-on-primary rounded-[2rem] overflow-hidden flex flex-col lg:flex-row shadow-2xl">
+<div class="flex-1 p-12 md:p-16 border-b lg:border-b-0 lg:border-r border-white/10 relative overflow-hidden">
+<div class="absolute inset-0 grid-pattern opacity-10 pointer-events-none"></div>
+<div class="relative z-10">
+<h2 class="font-headline text-4xl md:text-5xl font-black mb-6 uppercase tracking-tight">Instant Booking</h2>
+<p class="font-body text-primary-fixed-dim text-lg mb-10 opacity-90">Secure your elite court time in seconds. Choose your slot and get playing.</p>
+<div class="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 mb-8">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary-fixed-dim">calendar_today</span>
+<span class="font-label font-bold uppercase tracking-widest text-sm">October 24, 2024</span>
+</div>
+<button class="text-xs font-bold uppercase tracking-tighter border-b border-primary-fixed-dim pb-1 hover:text-white transition-colors">Change Date</button>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+<button class="py-3 bg-white/10 rounded-lg text-xs font-label font-bold border border-white/10 hover:bg-white/20 transition-all">08:00 AM</button>
+<button class="py-3 bg-white/10 rounded-lg text-xs font-label font-bold border border-white/10 hover:bg-white/20 transition-all">09:30 AM</button>
+<button class="py-3 bg-primary-fixed text-on-primary-fixed rounded-lg text-xs font-label font-bold ring-4 ring-primary-fixed/20">11:00 AM</button>
+<button class="py-3 bg-white/10 rounded-lg text-xs font-label font-bold border border-white/10 hover:bg-white/20 transition-all">12:30 PM</button>
+<button class="py-3 opacity-30 bg-white/5 rounded-lg text-xs font-label font-bold cursor-not-allowed line-through">02:00 PM</button>
+<button class="py-3 bg-white/10 rounded-lg text-xs font-label font-bold border border-white/10 hover:bg-white/20 transition-all">03:30 PM</button>
+<button class="py-3 bg-white/10 rounded-lg text-xs font-label font-bold border border-white/10 hover:bg-white/20 transition-all">05:00 PM</button>
+<button class="py-3 bg-white/10 rounded-lg text-xs font-label font-bold border border-white/10 hover:bg-white/20 transition-all">06:30 PM</button>
+</div>
+</div>
+<div class="flex flex-col sm:flex-row gap-6 items-center">
+<button class="w-full sm:w-auto bg-primary-fixed text-on-primary-fixed px-10 py-5 rounded-xl font-label font-black uppercase tracking-[0.2em] shadow-lg hover:translate-y-[-2px] hover:shadow-xl transition-all">Reserve Now</button>
+<a class="flex items-center gap-3 text-primary-fixed-dim hover:text-white transition-colors group" href="https://wa.me/velocityph">
+<span class="material-symbols-outlined bg-white/10 p-2 rounded-full group-hover:scale-110 transition-transform">chat</span>
+<span class="font-label font-bold uppercase tracking-widest text-sm">Message on WhatsApp</span>
+</a>
+</div>
+</div>
+</div>
+<div class="lg:w-1/3 bg-primary-container p-12 md:p-16 flex flex-col justify-center">
+<div class="space-y-8">
+<div>
+<span class="font-label text-[10px] uppercase tracking-widest text-primary-fixed-dim mb-2 block">Standard Rate</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline text-5xl font-black text-white">PHP 500</span>
+<span class="font-body text-primary-fixed-dim opacity-60">/hour</span>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-fixed-dim mt-1">check_circle</span>
+<p class="text-sm font-body text-white/80">Premium Pro-Turf Surfacing</p>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-fixed-dim mt-1">check_circle</span>
+<p class="text-sm font-body text-white/80">Complimentary Paddle Rental</p>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary-fixed-dim mt-1">check_circle</span>
+<p class="text-sm font-body text-white/80">Filtered Water &amp; Lounge Access</p>
+</div>
+</div>
+<div class="pt-6 border-t border-white/10">
+<p class="text-[10px] font-label uppercase tracking-widest text-primary-fixed-dim/60 italic leading-relaxed">Cancel for free up to 24 hours before your match. Membership discounts apply automatically at checkout.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. Facility Preview (The Place) -->
+<section class="py-24 bg-surface-container-low overflow-hidden" id="facility">
+<div class="max-w-7xl mx-auto px-8 mb-16 flex flex-col md:flex-row justify-between items-end gap-6">
+<h2 class="font-headline text-4xl md:text-5xl font-black uppercase tracking-tight leading-none">The Arena</h2>
+<p class="font-body text-on-surface-variant max-w-sm italic">"Precision in every corner, performance in every bounce."</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 px-8 max-w-7xl mx-auto">
+<div class="md:col-span-8 h-[500px] rounded-2xl overflow-hidden group relative">
+<img alt="Main Courts" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" src="https://lh3.googleusercontent.com/aida/ADBb0ujgUjZ4vpAeLoKy-PGL3pgg2-K5Jf57KNEvrM1x5_om2UWxjPJsx_DRg2Qf6I9FhAxJGykxQHUQ_Wh1knt4j-jQTa8kHSIf7_6_vVT24V5Yn0WAemq9wlhnbYAxhVRUQHvtdOdfmfIGkhP1QO68Ko8aa2d5ijP3RuCGktwq-thbtImJOej9rpUirR3tjC-UJqJlYU2ySy-ZvIQTEI49bfqkXyIcZ4adq3IUdCP9j4JKyK8OJ9p0Q-PEvQKs6Vdvknijh6SooV04eQQ"/>
+<div class="absolute bottom-8 left-8">
+<span class="bg-primary/90 text-white px-4 py-2 rounded-lg font-label font-bold text-xs uppercase tracking-widest backdrop-blur-md">Professional Courts</span>
+</div>
+</div>
+<div class="md:col-span-4 grid grid-rows-2 gap-6">
+<div class="rounded-2xl overflow-hidden group relative">
+<div class="absolute inset-0 bg-primary/40 flex flex-col justify-end p-8 text-white z-10">
+<h4 class="font-headline text-xl font-bold uppercase">Pro Lighting</h4>
+<p class="text-xs opacity-80 mt-2">No-glare LED engineering</p>
+</div>
+<img alt="Lighting Detail" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUy94cny_tdRLwAUxQCst2ObT2V8pw23sZ6YDlvj2mC22MGwQGa5mRtDiuOVLWcdVcTlhE6j5ylgPqTt82-P_ppDnK6BnNHJawWlD35liOpumVgp1cOA7EleNcMEi4ONLwWQWff-ULhbcCT4fRg_yopCZ8YkobjZoH_CQMd0hoB0OIc55iWXoIF2nOkVPzsZPiQZm6InEw9MrKyKx65SiPu8toC0m_66tCQ2vx1XLu-LbLUDcei2Fb4SNJMxXBg44Vj0Oh9qjtmUOG"/>
+</div>
+<div class="bg-primary-container rounded-2xl p-8 flex flex-col justify-between group">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary-fixed-dim text-4xl">weekend</span>
+<span class="font-label text-[10px] text-white/40 uppercase tracking-widest">Amenities</span>
+</div>
+<div>
+<h4 class="font-headline text-xl font-bold text-white uppercase mb-2">Social Lounge</h4>
+<p class="text-xs text-primary-fixed-dim leading-relaxed">Ergonomic seating areas designed for post-match recovery and community building.</p>
+</div>
+</div>
+</div>
+<div class="md:col-span-12 h-64 bg-white rounded-2xl border border-outline-variant/10 flex items-center justify-around px-8 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all">
+<!-- Brand logos/Icons for Premium Equipment -->
+<div class="flex flex-col items-center gap-3">
+<span class="material-symbols-outlined text-4xl text-primary">new_releases</span>
+<span class="font-label text-xs font-bold uppercase tracking-widest">Selkirk Pro Gear</span>
+</div>
+<div class="flex flex-col items-center gap-3">
+<span class="material-symbols-outlined text-4xl text-primary">high_quality</span>
+<span class="font-label text-xs font-bold uppercase tracking-widest">Joola Authorized</span>
+</div>
+<div class="flex flex-col items-center gap-3">
+<span class="material-symbols-outlined text-4xl text-primary">verified</span>
+<span class="font-label text-xs font-bold uppercase tracking-widest">PPA Certified</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. Community / Social Proof -->
+<section class="max-w-7xl mx-auto px-8 py-24" id="community">
+<div class="text-center mb-20">
+<h2 class="font-headline text-5xl md:text-6xl font-black uppercase tracking-tighter mb-6">Join 500+ Players in Cebu</h2>
+<p class="font-body text-on-surface-variant max-w-2xl mx-auto italic text-lg">"Velocity isn't just a court, it's where the community finds its rhythm."</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+<div class="bg-surface p-8 rounded-xl border border-outline-variant/20 shadow-sm relative">
+<div class="flex gap-1 mb-6">
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+</div>
+<p class="font-body text-on-surface italic mb-8">"The best indoor courts in the city. The surface is consistent and the vibe is always electric."</p>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-fixed overflow-hidden">
+<img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvp-7hq0e-D6ex2n9WBlJks-Ju9r_MMveFWCsfhIMHFlNp2bgSLm9grjASxwYRJwy8dZpuAu2kdBvS2dHtyfNEWAz95Ra5L_iiFsELWyc12kFHmb5LcBHkUyysxbaiIYwIEqgC1akv-XOkg0dchhzOEncCHaQOMRYCudIepobN7vfilA2xHyz5kcMwmNDaLfrBWoV24NL3CshfsBwmOYzhd93xcNyZgbAm3p7Caxh_xvS_UwhBBFu6agXVe9mXNmC0-k2sMdkLpzW1"/>
+</div>
+<div>
+<h5 class="font-headline font-bold text-sm">Carlo Santos</h5>
+<p class="text-[10px] font-label uppercase tracking-widest opacity-50">Local Member</p>
+</div>
+</div>
+</div>
+<div class="bg-surface p-8 rounded-xl border border-outline-variant/20 shadow-sm relative">
+<div class="flex gap-1 mb-6">
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+</div>
+<p class="font-body text-on-surface italic mb-8">"I started as a total beginner. The drills clinics here completely transformed my game in just a month."</p>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-fixed overflow-hidden">
+<img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvp-7hq0e-D6ex2n9WBlJks-Ju9r_MMveFWCsfhIMHFlNp2bgSLm9grjASxwYRJwy8dZpuAu2kdBvS2dHtyfNEWAz95Ra5L_iiFsELWyc12kFHmb5LcBHkUyysxbaiIYwIEqgC1akv-XOkg0dchhzOEncCHaQOMRYCudIepobN7vfilA2xHyz5kcMwmNDaLfrBWoV24NL3CshfsBwmOYzhd93xcNyZgbAm3p7Caxh_xvS_UwhBBFu6agXVe9mXNmC0-k2sMdkLpzW1"/>
+</div>
+<div>
+<h5 class="font-headline font-bold text-sm">Maya Rodriguez</h5>
+<p class="text-[10px] font-label uppercase tracking-widest opacity-50">Clinic Regular</p>
+</div>
+</div>
+</div>
+<div class="bg-surface p-8 rounded-xl border border-outline-variant/20 shadow-sm relative">
+<div class="flex gap-1 mb-6">
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+<span class="material-symbols-outlined text-primary text-sm" data-weight="fill">star</span>
+</div>
+<p class="font-body text-on-surface italic mb-8">"Professional setup, great lighting, and the community is super welcoming. My favorite place to play."</p>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-fixed overflow-hidden">
+<img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvp-7hq0e-D6ex2n9WBlJks-Ju9r_MMveFWCsfhIMHFlNp2bgSLm9grjASxwYRJwy8dZpuAu2kdBvS2dHtyfNEWAz95Ra5L_iiFsELWyc12kFHmb5LcBHkUyysxbaiIYwIEqgC1akv-XOkg0dchhzOEncCHaQOMRYCudIepobN7vfilA2xHyz5kcMwmNDaLfrBWoV24NL3CshfsBwmOYzhd93xcNyZgbAm3p7Caxh_xvS_UwhBBFu6agXVe9mXNmC0-k2sMdkLpzW1"/>
+</div>
+<div>
+<h5 class="font-headline font-bold text-sm">James Tan</h5>
+<p class="text-[10px] font-label uppercase tracking-widest opacity-50">Weekend Warrior</p>
+</div>
+</div>
+</div>
+</div>
+<div class="flex justify-center">
+<a class="inline-flex items-center gap-4 px-8 py-4 bg-primary text-on-primary rounded-lg font-label font-bold uppercase tracking-widest hover:bg-primary-container transition-all" href="#">
+                    Follow us on Instagram <span class="material-symbols-outlined">link</span>
+</a>
+</div>
+</section>
+<!-- 5. Events & Tournaments -->
+<section class="bg-primary text-on-primary py-24 overflow-hidden relative">
+<div class="absolute inset-0 kinetic-overlay"></div>
+<div class="max-w-7xl mx-auto px-8 relative z-10">
+<div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
+<div>
+<span class="font-label text-xs uppercase tracking-[0.3em] text-primary-fixed-dim font-bold mb-4 block">Competition Schedule</span>
+<h2 class="font-headline text-4xl md:text-5xl font-black uppercase tracking-tight leading-none">The Calendar</h2>
+</div>
+<button class="bg-white/10 backdrop-blur-sm border border-white/20 px-6 py-3 rounded font-label text-xs font-bold uppercase tracking-widest hover:bg-white/20 transition-all">View Full Schedule</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Event Card -->
+<div class="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10 group hover:bg-white/10 transition-all">
+<div class="flex justify-between items-start mb-6">
+<span class="bg-primary-fixed text-on-primary-fixed px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest">Oct 28</span>
+<span class="material-symbols-outlined text-primary-fixed-dim">event</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-2">Beginner Fundamentals</h3>
+<p class="font-body text-white/70 text-sm mb-6">Master the basics: serves, returns, and kitchen play. 2-hour session with Coach Marcus.</p>
+<button class="w-full py-3 border border-white/20 rounded font-label text-xs font-bold uppercase tracking-widest group-hover:bg-white group-hover:text-primary transition-all">Register Now</button>
+</div>
+<!-- Event Card -->
+<div class="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10 group hover:bg-white/10 transition-all">
+<div class="flex justify-between items-start mb-6">
+<span class="bg-error text-white px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest">Nov 04</span>
+<span class="material-symbols-outlined text-primary-fixed-dim">emoji_events</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-2">Winter Open Doubles</h3>
+<p class="font-body text-white/70 text-sm mb-6">Cebu's premier amateur tournament. Mixed categories from 3.0 to 4.5+ DUPR.</p>
+<button class="w-full py-3 border border-white/20 rounded font-label text-xs font-bold uppercase tracking-widest group-hover:bg-white group-hover:text-primary transition-all">Registration Closed</button>
+</div>
+<!-- Event Card -->
+<div class="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10 group hover:bg-white/10 transition-all">
+<div class="flex justify-between items-start mb-6">
+<span class="bg-primary-fixed text-on-primary-fixed px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest">Weekly</span>
+<span class="material-symbols-outlined text-primary-fixed-dim">groups</span>
+</div>
+<h3 class="font-headline text-2xl font-bold mb-2">Velocity League</h3>
+<p class="font-body text-white/70 text-sm mb-6">Join our Tuesday night ladder league. Consistent competition for all skill levels.</p>
+<button class="w-full py-3 border border-white/20 rounded font-label text-xs font-bold uppercase tracking-widest group-hover:bg-white group-hover:text-primary transition-all">Join Waitlist</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 6. Location & Hours -->
+<section class="max-w-7xl mx-auto px-8 py-24">
+<div class="flex flex-col lg:flex-row gap-16 items-center">
+<div class="flex-1 w-full h-[400px] bg-surface-container-highest rounded-[2rem] overflow-hidden border border-outline-variant/10 relative group">
+<!-- Placeholder Map -->
+<div class="absolute inset-0 grid-pattern opacity-20 group-hover:opacity-40 transition-opacity"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="text-center">
+<span class="material-symbols-outlined text-6xl text-primary animate-bounce">location_on</span>
+<p class="font-headline font-black text-2xl mt-4 uppercase">IT Park, Cebu City</p>
+</div>
+</div>
+<!-- Strategic Gradient for UI overlay if needed -->
+<div class="absolute bottom-6 right-6">
+<button class="bg-white text-primary px-6 py-3 rounded-lg font-label font-bold text-xs shadow-lg flex items-center gap-2 hover:bg-primary hover:text-white transition-all">
+                            Open in Maps <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+</div>
+</div>
+<div class="lg:w-1/3 space-y-12">
+<div>
+<h2 class="font-headline text-4xl font-black uppercase tracking-tight mb-6">Locate Velocity</h2>
+<p class="font-body text-on-surface-variant leading-relaxed mb-8">Located in the heart of Cebu, our facility is easily accessible with ample parking for all players.</p>
+<div class="space-y-6">
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary">location_on</span>
+<div>
+<h5 class="font-headline font-bold uppercase text-sm">Address</h5>
+<p class="text-on-surface-variant text-sm font-body">Velocity Hub, Unit 4B, Central Bloc IT Park, Cebu City, Philippines</p>
+</div>
+</div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary">schedule</span>
+<div>
+<h5 class="font-headline font-bold uppercase text-sm">Opening Hours</h5>
+<p class="text-on-surface-variant text-sm font-body">Monday – Sunday: 06:00 AM – 11:00 PM</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Updated Footer -->
+<footer class="bg-[#282515] text-white pt-24 pb-12">
+<div class="max-w-7xl mx-auto px-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-20 border-b border-white/10 pb-20">
+<div class="space-y-6">
+<div class="text-2xl font-black text-white tracking-tighter font-headline flex items-center">
+<img alt="Velocity Logo" class="h-8 w-auto mr-3 invert opacity-90" src="https://lh3.googleusercontent.com/aida/ADBb0uh3ZE7MyDSIXVrH4wEurM-BCLoSHOAu6XRNPv7Hd_Vbxitg0mOl8SSicVemvmXsPTHSbQe9VFDm0WxSSgB3H0I5qVamnlFw1jSanMW2Oxfp0DkmGO_8tckV0TJXdRfSQvRrhLrjwdRYYPY5bAwVISp1ICJ0sCBKK8sYHpdVHkbXruYw3kwdSFMRzA2_4xRw3ErvuF48h-U_SLyA8xLgbompY69Q6LKLlqiJAbL7diMW18tHZEuktuGYOabOLKc0p_SlM4MrX7eMsgU"/>
+                        Velocity
+                    </div>
+<p class="font-body text-sm text-stone-400 leading-relaxed max-w-xs">Cebu's premier indoor pickleball destination. Built for performance, designed for community.</p>
+<div class="flex gap-4">
+<a class="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white hover:text-primary transition-all" href="#"><span class="material-symbols-outlined text-lg">facebook</span></a>
+<a class="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white hover:text-primary transition-all" href="#"><span class="material-symbols-outlined text-lg">public</span></a>
+<a class="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white hover:text-primary transition-all" href="#"><span class="material-symbols-outlined text-lg">chat</span></a>
+</div>
+</div>
+<div>
+<h5 class="font-headline font-bold uppercase tracking-widest text-xs mb-8">Quick Links</h5>
+<ul class="space-y-4">
+<li><a class="font-body text-sm text-stone-400 hover:text-white transition-colors" href="#booking">Book a Court</a></li>
+<li><a class="font-body text-sm text-stone-400 hover:text-white transition-colors" href="#services">Membership Rates</a></li>
+<li><a class="font-body text-sm text-stone-400 hover:text-white transition-colors" href="#">Event Schedule</a></li>
+<li><a class="font-body text-sm text-stone-400 hover:text-white transition-colors" href="#">Pro Shop</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-headline font-bold uppercase tracking-widest text-xs mb-8">Contact</h5>
+<ul class="space-y-4">
+<li class="flex gap-3 font-body text-sm text-stone-400">
+<span class="material-symbols-outlined text-sm">phone</span>
+                            +63 912 345 6789
+                        </li>
+<li class="flex gap-3 font-body text-sm text-stone-400">
+<span class="material-symbols-outlined text-sm">mail</span>
+                            play@velocitypickleball.ph
+                        </li>
+</ul>
+</div>
+<div>
+<h5 class="font-headline font-bold uppercase tracking-widest text-xs mb-8">Newsletter</h5>
+<p class="font-body text-xs text-stone-400 mb-6 leading-relaxed">Get the latest tournament news and member-only court access codes.</p>
+<div class="flex">
+<input class="bg-white/5 border border-white/10 rounded-l px-4 py-2 text-xs w-full focus:outline-none focus:border-primary-fixed-dim transition-colors" placeholder="Email Address" type="email"/>
+<button class="bg-primary-fixed text-on-primary-fixed px-4 py-2 rounded-r font-label text-[10px] font-bold uppercase">Join</button>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row justify-between items-center gap-6">
+<p class="text-[10px] font-label uppercase tracking-widest text-stone-500">© 2024 Velocity Pickleball Hub. Kinetic Precision Engineering.</p>
+<div class="flex gap-8">
+<a class="text-[10px] font-label uppercase tracking-widest text-stone-500 hover:text-white" href="#">Privacy Policy</a>
+<a class="text-[10px] font-label uppercase tracking-widest text-stone-500 hover:text-white" href="#">Terms of Play</a>
+</div>
+</div>
+</div>
+</footer>
+<!-- Sticky Mobile/Desktop Booking CTA -->
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-xs sm:max-w-md px-4 pointer-events-none">
+<div class="bg-white/95 backdrop-blur-md rounded-full shadow-2xl p-2 border border-outline-variant/20 flex items-center justify-between pointer-events-auto">
+<div class="flex items-center gap-3 pl-4">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<span class="font-label text-[10px] font-black uppercase tracking-widest text-primary">Live Availability</span>
+</div>
+<a class="bg-primary text-on-primary px-6 py-3 rounded-full font-label text-xs font-bold uppercase tracking-[0.2em] shadow-lg hover:scale-105 transition-transform" href="#booking">Book Now</a>
+</div>
+</div>
+</body></html>
