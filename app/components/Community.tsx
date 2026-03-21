@@ -79,14 +79,14 @@ function StatBlock({
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.8, delay: 0.1 + index * 0.1, ease }}
     >
-      <div className="flex flex-col items-center p-6 rounded-[2rem] bg-white/[0.02] border border-white/[0.05] transition-all duration-500 hover:bg-white/[0.04] hover:border-white/10">
-        <div className="mb-4 p-3 rounded-2xl bg-white/[0.03] text-white/40 group-hover:text-primary-fixed-dim transition-colors">
-          <stat.icon size={20} strokeWidth={1.5} />
+      <div className="flex flex-col items-center p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] bg-white/[0.02] border border-white/[0.05] transition-all duration-500 hover:bg-white/[0.04] hover:border-white/10">
+        <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-white/[0.03] text-white/40 group-hover:text-primary-fixed-dim transition-colors">
+          <stat.icon size={18} strokeWidth={1.5} className="sm:w-5 sm:h-5" />
         </div>
-        
+
         <div className="text-center">
           <div className="flex items-baseline justify-center gap-0.5 mb-1">
-            <span className="font-['Clash_Display'] text-4xl sm:text-5xl font-bold text-white tracking-tight">
+            <span className="font-['Clash_Display'] text-3xl sm:text-5xl font-bold text-white tracking-tight">
               <CountUp
                 to={stat.value}
                 from={0}
@@ -94,11 +94,11 @@ function StatBlock({
                 delay={0.4 + index * 0.1}
               />
             </span>
-            <span className="font-['Clash_Display'] text-2xl font-bold text-primary-fixed-dim">
+            <span className="font-['Clash_Display'] text-lg sm:text-2xl font-bold text-primary-fixed-dim">
               {stat.suffix}
             </span>
           </div>
-          <p className="font-[Poppins] text-[10px] uppercase tracking-[0.2em] text-white/30 font-medium">
+          <p className="font-[Poppins] text-[8px] sm:text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white/30 font-medium">
             {stat.label}
           </p>
         </div>
@@ -130,10 +130,10 @@ function TestimonialCarousel() {
       onMouseEnter={() => setIsAutoPlaying(false)}
       onMouseLeave={() => setIsAutoPlaying(true)}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 items-center">
         {/* Left: Image & Navigation */}
         <div className="lg:col-span-5 relative">
-          <div className="relative aspect-[4/5] rounded-[2.5rem] overflow-hidden group">
+          <div className="relative aspect-[3/4] sm:aspect-[4/5] rounded-2xl sm:rounded-[2.5rem] overflow-hidden group">
             <AnimatePresence mode="wait" custom={direction}>
               <motion.div
                 key={current}
@@ -154,23 +154,23 @@ function TestimonialCarousel() {
             </AnimatePresence>
 
             {/* Quote Icon Overlay */}
-            <div className="absolute top-8 left-8 w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
-              <Quote size={20} fill="currentColor" />
+            <div className="absolute top-5 left-5 sm:top-8 sm:left-8 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
+              <Quote size={16} className="sm:w-5 sm:h-5" fill="currentColor" />
             </div>
 
-            {/* Navigation Buttons (Desktop Internal) */}
-            <div className="absolute bottom-8 right-8 flex gap-2">
+            {/* Navigation Buttons */}
+            <div className="absolute bottom-5 right-5 sm:bottom-8 sm:right-8 flex gap-2">
               <button
                 onClick={() => go(-1)}
-                className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all active:scale-95"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all active:scale-95"
               >
-                <ArrowLeft size={20} />
+                <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
               </button>
               <button
                 onClick={() => go(1)}
-                className="w-12 h-12 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center hover:scale-105 transition-all active:scale-95"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center hover:scale-105 transition-all active:scale-95"
               >
-                <ArrowRight size={20} />
+                <ArrowRight size={18} className="sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>
@@ -194,17 +194,17 @@ function TestimonialCarousel() {
                   transition={{ duration: 0.8, delay: 0.2 }}
                   className="h-1 bg-primary-fixed-dim" 
                 />
-                <h3 className="font-['Clash_Display'] text-3xl md:text-5xl font-bold text-white leading-tight">
+                <h3 className="font-['Clash_Display'] text-2xl sm:text-3xl md:text-5xl font-bold text-white leading-tight">
                   &ldquo;{testimonial.title}&rdquo;
                 </h3>
               </div>
 
-              <p className="font-[Poppins] text-white/50 text-lg md:text-xl leading-relaxed font-light">
+              <p className="font-[Poppins] text-white/50 text-base sm:text-lg md:text-xl leading-relaxed font-light">
                 {testimonial.quote}
               </p>
 
-              <div className="flex items-center gap-5 pt-4">
-                <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-white/10">
+              <div className="flex items-center gap-4 sm:gap-5 pt-2 sm:pt-4">
+                <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-white/10">
                   <Image
                     src={testimonial.avatar}
                     alt={testimonial.name}
@@ -213,8 +213,8 @@ function TestimonialCarousel() {
                   />
                 </div>
                 <div>
-                  <p className="font-['Clash_Display'] text-xl font-bold text-white">{testimonial.name}</p>
-                  <p className="font-[Poppins] text-sm text-primary-fixed-dim font-medium uppercase tracking-wider">
+                  <p className="font-['Clash_Display'] text-base sm:text-xl font-bold text-white">{testimonial.name}</p>
+                  <p className="font-[Poppins] text-xs sm:text-sm text-primary-fixed-dim font-medium uppercase tracking-wider">
                     {testimonial.role}
                   </p>
                 </div>
@@ -223,7 +223,7 @@ function TestimonialCarousel() {
           </AnimatePresence>
 
           {/* Progress Indicators */}
-          <div className="flex gap-3 mt-12">
+          <div className="flex gap-3 mt-8 sm:mt-12">
             {TESTIMONIALS.map((_, i) => (
               <button
                 key={i}
@@ -266,7 +266,7 @@ export default function Community() {
     <section
       id="community"
       ref={sectionRef}
-      className="relative overflow-hidden bg-primary py-24 md:py-40"
+      className="relative overflow-hidden bg-primary py-16 sm:py-24 md:py-40"
     >
       {/* ── Background Elements ── */}
       <div className="absolute inset-0 pointer-events-none">
@@ -285,9 +285,9 @@ export default function Community() {
         </span>
       </motion.div>
 
-      <div className="relative z-10 px-6 sm:px-10 lg:px-16 max-w-7xl mx-auto">
+      <div className="relative z-10 px-5 sm:px-10 lg:px-16 max-w-7xl mx-auto">
         {/* ── Header Section ── */}
-        <div className="max-w-3xl mb-24">
+        <div className="max-w-3xl mb-12 sm:mb-24">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -316,7 +316,7 @@ export default function Community() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.3 }}
-            className="font-[Poppins] text-lg md:text-xl text-white/40 font-light leading-relaxed"
+            className="font-[Poppins] text-base sm:text-lg md:text-xl text-white/40 font-light leading-relaxed"
           >
             More than just a facility—it&apos;s a vibrant community where players of all 
             skill levels come together to elevate their game and build lasting connections.
@@ -324,7 +324,7 @@ export default function Community() {
         </div>
 
         {/* ── Stats Grid ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-32">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 md:gap-8 mb-16 sm:mb-32">
           {STATS.map((stat, i) => (
             <StatBlock key={stat.label} stat={stat} index={i} inView={inView} />
           ))}
