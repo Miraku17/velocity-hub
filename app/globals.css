@@ -175,6 +175,11 @@
     100% { background-position: -200% 50%; }
   }
 
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
   --font-heading: var(--font-sans);
 
   --font-sans: var(--font-sans);
