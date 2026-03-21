@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { useRef } from "react";
+import { useIsMobile } from "@/lib/hooks/useIsMobile";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
 export default function Booking() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   return (
     <section
@@ -26,10 +28,10 @@ export default function Booking() {
         <div className="absolute inset-0">
           {/* Base color gradient */}
           <div className="absolute inset-0 bg-linear-to-br from-[#2a6b3a] via-[#214d2e] to-[#1a3d24]" />
-          
+
           {/* Surface Texture (Grain) */}
           <div className="absolute inset-0 opacity-[0.15] mix-blend-overlay pointer-events-none grain-overlay" />
-          
+
           {/* Subtle Wear/Scuff Marks (Radial Gradients) */}
           <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/5 rounded-full blur-[80px] pointer-events-none" />
           <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-black/10 rounded-full blur-[100px] pointer-events-none" />
@@ -49,9 +51,9 @@ export default function Booking() {
           <div className="absolute left-4 sm:left-6 md:left-10 right-4 sm:right-6 md:right-10 top-1/2 -translate-y-1/2 flex items-center justify-center">
             {/* Net Shadow */}
             <div className="absolute inset-x-0 h-16 bg-black/15 blur-2xl translate-y-6" />
-            
+
             {/* The Net Line */}
-            <motion.div 
+            <motion.div
               initial={{ scaleX: 0 }}
               whileInView={{ scaleX: 1 }}
               transition={{ duration: 1.2, delay: 0.4, ease }}
@@ -60,7 +62,7 @@ export default function Booking() {
 
             {/* Net Mesh Texture (Center overlay) */}
             <div className="absolute inset-x-0 h-24 pointer-events-none opacity-20 overflow-hidden -translate-y-1/2">
-              <div 
+              <div
                 className="w-full h-full"
                 style={{
                   backgroundImage: `
@@ -74,14 +76,14 @@ export default function Booking() {
                 }}
               />
             </div>
-            
+
             {/* Net posts */}
             <div className="absolute -left-1 w-3 h-10 bg-white/95 rounded-sm shadow-xl z-20" />
             <div className="absolute -right-1 w-3 h-10 bg-white/95 rounded-sm shadow-xl z-20" />
           </div>
 
           {/* Non-Volley Zone (Kitchen) Lines */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             whileInView={{ opacity: 0.6, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
@@ -91,15 +93,15 @@ export default function Booking() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 0.6, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="absolute left-4 sm:left-6 md:left-10 right-4 sm:right-6 md:right-10 h-px bg-white/40" style={{ bottom: "32%" }} 
+            className="absolute left-4 sm:left-6 md:left-10 right-4 sm:right-6 md:right-10 h-px bg-white/40" style={{ bottom: "32%" }}
           />
 
           {/* Center service line */}
-          <motion.div 
+          <motion.div
             initial={{ scaleY: 0 }}
             whileInView={{ scaleY: 1 }}
             transition={{ duration: 1, delay: 0.5, ease }}
-            className="absolute top-4 sm:top-6 md:top-10 bottom-4 sm:bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 w-[2px] bg-white/20 origin-center" 
+            className="absolute top-4 sm:top-6 md:top-10 bottom-4 sm:bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 w-[2px] bg-white/20 origin-center"
           />
         </div>
 
@@ -136,17 +138,14 @@ export default function Booking() {
             transition={{ duration: 0.8, delay: 0.4, ease }}
             className="font-[Poppins] text-white/50 text-sm sm:text-lg md:text-xl mb-10 sm:mb-16 max-w-2xl leading-relaxed"
           >
-            Secure your spot at Cebu&apos;s premier pickleball facility. 
+            Secure your spot at Cebu&apos;s premier pickleball facility.
             Professional-grade courts, available for instant reservation.
           </motion.p>
 
           {/* ── Rates Grid ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-10 sm:mb-16 w-full max-w-4xl">
             {/* Covered Courts */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.5, ease }}
+            <div
               className="group relative bg-white/[0.03] backdrop-blur-md rounded-2xl sm:rounded-3xl border border-white/10 p-5 sm:p-8 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-500"
             >
               <div className="flex items-center justify-between mb-5 sm:mb-8">
@@ -182,13 +181,10 @@ export default function Booking() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Outdoor Courts */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.6, ease }}
+            <div
               className="group relative bg-white/[0.03] backdrop-blur-md rounded-2xl sm:rounded-3xl border border-white/10 p-5 sm:p-8 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-500"
             >
               <div className="absolute -top-3 right-6 sm:right-8">
@@ -229,7 +225,7 @@ export default function Booking() {
               <p className="text-[10px] text-white/30 mt-6 leading-relaxed italic text-center">
                 Pro-standard flooring. Enclosure work in progress.
               </p>
-            </motion.div>
+            </div>
           </div>
 
           {/* ── Call to Action ── */}
@@ -254,36 +250,38 @@ export default function Booking() {
 
         </div>
 
-        {/* ── Rally Ball ── */}
-        <motion.div
-          animate={{
-            x: [
-              "-35vw", "32vw",   // deep cross-court
-              "-20vw", "35vw",   // short return → deep drive
-              "-35vw", "15vw",   // deep → drop shot
-              "-10vw", "35vw",   // quick flick → deep smash
-              "-32vw", "28vw",   // wide backhand → forehand
-              "-25vw", "35vw",   // mid court → winner
-              "-35vw",           // reset
-            ],
-            y: [
-              80, -50,
-              -90, 70,
-              40, -20,
-              -60, 90,
-              -80, 30,
-              60, -90,
-              80,
-            ],
-          }}
-          transition={{
-            duration: 24,
-            repeat: Infinity,
-            ease: "easeInOut",
-            times: [0, 0.08, 0.16, 0.24, 0.33, 0.41, 0.5, 0.58, 0.66, 0.74, 0.83, 0.91, 1],
-          }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-primary-fixed opacity-40 pointer-events-none shadow-[0_0_12px_rgba(132,204,22,0.4)]"
-        />
+        {/* ── Rally Ball (desktop only) ── */}
+        {!isMobile && (
+          <motion.div
+            animate={{
+              x: [
+                "-35vw", "32vw",
+                "-20vw", "35vw",
+                "-35vw", "15vw",
+                "-10vw", "35vw",
+                "-32vw", "28vw",
+                "-25vw", "35vw",
+                "-35vw",
+              ],
+              y: [
+                80, -50,
+                -90, 70,
+                40, -20,
+                -60, 90,
+                -80, 30,
+                60, -90,
+                80,
+              ],
+            }}
+            transition={{
+              duration: 24,
+              repeat: Infinity,
+              ease: "easeInOut",
+              times: [0, 0.08, 0.16, 0.24, 0.33, 0.41, 0.5, 0.58, 0.66, 0.74, 0.83, 0.91, 1],
+            }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-primary-fixed opacity-40 pointer-events-none shadow-[0_0_12px_rgba(132,204,22,0.4)]"
+          />
+        )}
       </motion.div>
     </section>
   );
