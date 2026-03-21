@@ -92,7 +92,7 @@ export default function Services() {
           <span className="font-label text-xs uppercase tracking-[0.3em] text-primary font-bold mb-4 block">
             Engineered for Play
           </span>
-          <h2 className="font-headline text-4xl md:text-5xl font-black tracking-tight uppercase court-line">
+          <h2 className="font-['Clash_Display'] text-4xl md:text-5xl font-bold tracking-tight uppercase court-line">
             Elite Court Services
           </h2>
         </div>

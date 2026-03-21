@@ -2,139 +2,219 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { motion, useScroll, useTransform } from "motion/react";
+import RotatingText from "@/components/RotatingText";
 
 const HERO_IMAGE = "/hero.png";
 
-export default function Hero() {
-  const imageRef = useRef<HTMLDivElement>(null);
+const ease = [0.16, 1, 0.3, 1] as const;
+const d = (i: number) => 0.3 + i * 0.15;
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!imageRef.current) return;
-      const scrollY = window.scrollY;
-      const rate = scrollY * 0.15;
-      imageRef.current.style.transform = `scale(1.08) translateY(${rate}px)`;
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+export default function Hero() {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"],
+  });
+
+  const imgY = useTransform(scrollYProgress, [0, 1], ["0%", "15%"]);
+  const imgScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
+  const textY = useTransform(scrollYProgress, [0, 1], [0, 80]);
+  const fade = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   return (
-    <section className="px-3 sm:px-4 mb-24">
-      <div className="relative overflow-hidden bg-primary rounded-[1.8rem] min-h-[92vh] flex flex-col grain-overlay">
-        {/* Background with parallax */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <div ref={imageRef} className="absolute inset-[-8%] transition-transform duration-100 ease-out">
-            <Image
-              src={HERO_IMAGE}
-              alt="Professional Pickleball Courts"
-              fill
-              className="object-cover"
-              priority
+    <section ref={ref} className="relative min-h-screen overflow-hidden bg-primary">
+      {/* ── Full-bleed background ── */}
+      <div className="absolute inset-0">
+        <motion.div className="absolute inset-[-5%]" style={{ y: imgY, scale: imgScale }}>
+          <Image
+            src={HERO_IMAGE}
+            alt="Velocity Pickleball Courts"
+            fill
+            className="object-cover"
+            priority
+          />
+        </motion.div>
+        <div className="absolute inset-0 bg-primary/25 mix-blend-multiply" />
+        <div className="absolute inset-0 bg-linear-to-b from-black/70 via-black/20 to-black/80" />
+        <div className="absolute inset-0 bg-linear-to-r from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 grain-overlay" />
+      </div>
+
+      {/* ── Main grid layout ── */}
+      <div className="relative z-10 min-h-screen flex flex-col justify-between px-6 sm:px-10 lg:px-16 pt-32 pb-10">
+
+        {/* Top: Left-aligned content block */}
+        <div className="flex-1 flex flex-col justify-center max-w-3xl">
+
+          {/* Eyebrow */}
+          <motion.div
+            className="flex items-center gap-4 mb-8"
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: d(0), ease }}
+            style={{ y: textY }}
+          >
+            <motion.div
+              className="w-12 h-px bg-primary-fixed-dim/60"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 1, delay: d(0), ease }}
+              style={{ transformOrigin: "left" }}
             />
-          </div>
-          {/* Multi-layer gradient for cinematic depth */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/40" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/20" />
-          <div className="absolute inset-0 kinetic-overlay opacity-30" />
-
-          {/* Ambient glow */}
-          <div className="absolute -bottom-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary-fixed-dim/8 rounded-full blur-[120px]" />
-        </div>
-
-        {/* Top decorative label */}
-        <div className="relative z-10 flex justify-center pt-12 md:pt-16">
-          <div className="animate-reveal-up inline-flex items-center gap-3 bg-white/[0.07] backdrop-blur-xl px-6 py-2.5 rounded-full border border-white/[0.12]">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary-fixed-dim animate-pulse" />
-            <span className="font-label uppercase text-[10px] font-bold tracking-[0.35em] text-white/70">
+            <span className="font-[Poppins] text-[11px] uppercase tracking-[0.4em] text-white/50 font-medium">
               Cebu&apos;s Premier Pickleball Hub
             </span>
-          </div>
+          </motion.div>
+
+          {/* Title */}
+          <motion.div style={{ y: textY }}>
+            <motion.h1
+              className="font-['Clash_Display'] text-[clamp(3.5rem,12vw,9rem)] font-bold leading-[0.9] tracking-[-0.02em] text-white mb-6"
+              initial={{ opacity: 0, y: 60 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, delay: d(1), ease }}
+            >
+              VELO<span className="text-primary-fixed-dim">CITY</span>
+            </motion.h1>
+
+            {/* Tagline */}
+            <motion.p
+              className="font-[Poppins] text-lg sm:text-xl md:text-2xl text-white/40 font-light max-w-lg leading-relaxed"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: d(3), ease }}
+            >
+              Play at full{" "}
+              <RotatingText
+                texts={["velocity", "speed", "force", "intensity", "momentum"]}
+                mainClassName="inline-flex text-white font-medium"
+                staggerFrom="last"
+                staggerDuration={0.02}
+                rotationInterval={2500}
+                transition={{ type: "spring", damping: 30, stiffness: 400 }}
+              />
+              .{" "}
+              <span className="text-white/30">Never slow down.</span>
+            </motion.p>
+
+            {/* CTA row */}
+            <motion.div
+              className="flex flex-wrap items-center gap-4 mt-10"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: d(4), ease }}
+            >
+              <Link
+                href="#booking"
+                className="group relative px-9 py-4 bg-white text-primary font-[Poppins] font-semibold text-sm uppercase tracking-[0.12em] rounded-full overflow-hidden transition-all duration-500 hover:shadow-[0_0_50px_rgba(211,233,203,0.3)] hover:scale-[1.03] active:scale-[0.97]"
+              >
+                <span className="relative z-10 flex items-center gap-3">
+                  Book a Court
+                  <span className="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform duration-300">
+                    arrow_forward
+                  </span>
+                </span>
+                <div className="absolute inset-0 bg-primary-fixed scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500" />
+              </Link>
+
+              <Link
+                href="#services"
+                className="group flex items-center gap-2 px-1 py-3 font-[Poppins] font-medium text-sm uppercase tracking-[0.12em] text-white/50 hover:text-white transition-colors duration-300"
+              >
+                <span className="w-8 h-px bg-white/20 group-hover:w-12 group-hover:bg-white/50 transition-all duration-400" />
+                Explore
+                <span className="material-symbols-outlined text-sm opacity-40 group-hover:opacity-100 group-hover:rotate-45 transition-all duration-300">
+                  north_east
+                </span>
+              </Link>
+            </motion.div>
+          </motion.div>
         </div>
 
-        {/* Center: massive title */}
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 -mt-8">
-          {/* Decorative court line above title */}
-          <div className="w-[1px] h-12 bg-gradient-to-b from-transparent via-white/30 to-white/60 mb-8 animate-reveal-up" />
-
-          <h1 className="font-headline text-[clamp(4rem,15vw,13rem)] font-black tracking-[-0.05em] leading-[0.85] text-white text-center animate-reveal-up delay-100">
-            <span className="block text-glow">VELOCITY</span>
-          </h1>
-
-          {/* Decorative line + tagline */}
-          <div className="flex items-center gap-4 mt-6 mb-8 animate-reveal-up delay-200">
-            <span className="w-8 h-[1px] bg-primary-fixed-dim/60" />
-            <p className="font-body text-base sm:text-lg md:text-xl text-white/70 italic text-center">
-              Play better, move stronger, connect deeper.
-            </p>
-            <span className="w-8 h-[1px] bg-primary-fixed-dim/60" />
-          </div>
-
-          {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 animate-reveal-up delay-300">
-            <Link
-              href="#booking"
-              className="group relative bg-white text-primary px-10 py-4 rounded-xl font-label font-bold uppercase tracking-[0.15em] text-sm overflow-hidden transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.2)]"
-            >
-              <span className="relative z-10 flex items-center gap-3">
-                Book a Court
-                <span className="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform duration-300">arrow_forward</span>
-              </span>
-              <div className="absolute inset-0 bg-primary-fixed scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500" />
-              <span className="absolute inset-0 flex items-center justify-center gap-3 font-label font-bold uppercase tracking-[0.15em] text-sm text-on-primary-fixed scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 delay-75">
-                Book a Court
-                <span className="material-symbols-outlined text-base">arrow_forward</span>
-              </span>
-            </Link>
-            <Link
-              href="#services"
-              className="group bg-white/[0.06] backdrop-blur-lg text-white border border-white/[0.12] px-10 py-4 rounded-xl font-label font-bold uppercase tracking-[0.15em] text-sm hover:bg-white/[0.12] hover:border-white/25 transition-all duration-400 flex items-center justify-center gap-3"
-            >
-              Explore Services
-              <span className="material-symbols-outlined text-base opacity-50 group-hover:opacity-100 group-hover:rotate-45 transition-all duration-300">north_east</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Bottom bar: stats + scroll hint */}
-        <div className="relative z-10 px-6 sm:px-10 pb-8 sm:pb-10 flex items-end justify-between animate-reveal-up delay-500">
+        {/* Bottom bar */}
+        <motion.div
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pt-8 border-t border-white/8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: d(6), ease }}
+          style={{ opacity: fade }}
+        >
           {/* Stats */}
-          <div className="hidden sm:flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <span className="font-headline text-3xl font-black text-white">6</span>
-              <div className="flex flex-col">
-                <span className="font-label text-[9px] uppercase tracking-[0.2em] text-white/40 font-bold">Pro</span>
-                <span className="font-label text-[9px] uppercase tracking-[0.2em] text-white/40 font-bold">Courts</span>
-              </div>
-            </div>
-            <div className="w-[1px] h-8 bg-white/10" />
-            <div className="flex items-center gap-3">
-              <span className="font-headline text-3xl font-black text-white">500+</span>
-              <div className="flex flex-col">
-                <span className="font-label text-[9px] uppercase tracking-[0.2em] text-white/40 font-bold">Active</span>
-                <span className="font-label text-[9px] uppercase tracking-[0.2em] text-white/40 font-bold">Players</span>
-              </div>
-            </div>
-            <div className="w-[1px] h-8 bg-white/10" />
-            <div className="flex items-center gap-3">
-              <span className="font-headline text-3xl font-black text-white">24/7</span>
-              <div className="flex flex-col">
-                <span className="font-label text-[9px] uppercase tracking-[0.2em] text-white/40 font-bold">Open</span>
-                <span className="font-label text-[9px] uppercase tracking-[0.2em] text-white/40 font-bold">Daily</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-8 sm:gap-12">
+            {[
+              { num: "6", label: "Pro Courts" },
+              { num: "500+", label: "Active Players" },
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                className="flex items-baseline gap-2"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: d(7) + i * 0.1, ease }}
+              >
+                <span className="font-['Clash_Display'] text-3xl sm:text-4xl font-bold text-white">
+                  {stat.num}
+                </span>
+                <span className="font-[Poppins] text-[10px] uppercase tracking-[0.2em] text-white/30 font-medium">
+                  {stat.label}
+                </span>
+              </motion.div>
+            ))}
           </div>
 
-          {/* Right: open hours badge */}
-          <div className="ml-auto flex items-center gap-3 bg-white/[0.06] backdrop-blur-lg rounded-full px-5 py-2.5 border border-white/[0.1]">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="font-label text-[10px] uppercase tracking-[0.2em] text-white/60 font-bold">
-              Open Now
+          {/* Location pill */}
+          <motion.div
+            className="flex items-center gap-3 bg-white/5 backdrop-blur-xl rounded-full px-5 py-2.5 border border-white/8"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: d(8), ease }}
+          >
+            <motion.span
+              className="material-symbols-outlined text-primary-fixed-dim text-base"
+              animate={{ y: [0, -2, 0] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            >
+              location_on
+            </motion.span>
+            <span className="font-[Poppins] text-[10px] sm:text-xs uppercase tracking-[0.18em] text-white/45 font-medium">
+              Cebu City
             </span>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
+
+      {/* ── Right side vertical text (desktop) ── */}
+      <motion.div
+        className="hidden lg:flex absolute right-10 top-1/2 -translate-y-1/2 z-10 flex-col items-center gap-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1, delay: d(5) }}
+        style={{ opacity: fade }}
+      >
+        <div className="w-px h-20 bg-linear-to-b from-transparent to-white/20" />
+        <span className="font-[Poppins] text-[10px] uppercase tracking-[0.5em] text-white/25 font-medium [writing-mode:vertical-lr]">
+          Scroll to explore
+        </span>
+        <motion.div
+          className="w-px h-12 bg-white/15"
+          animate={{ scaleY: [0, 1, 0] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          style={{ transformOrigin: "top" }}
+        />
+      </motion.div>
+
+      {/* ── Corner accent lines ── */}
+      <motion.div
+        className="hidden md:block absolute top-28 right-16 z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1, delay: d(6) }}
+      >
+        <div className="w-20 h-px bg-white/10" />
+        <div className="w-px h-20 bg-white/10 mt-0" />
+      </motion.div>
     </section>
   );
 }

@@ -4,26 +4,29 @@ import Services from "./components/Services";
 import Booking from "./components/Booking";
 import Facility from "./components/Facility";
 import Community from "./components/Community";
-import Events from "./components/Events";
 import Location from "./components/Location";
 import Footer from "./components/Footer";
-import StickyBookingCTA from "./components/StickyBookingCTA";
-
+import ShotTerms from "./components/ShotTerms";
+import FlowingMenuSection from "./components/FlowingMenuSection";
+import CallToAction from "./components/CallToAction";
+import FAQ from "./components/FAQ";
 export default function Home() {
   return (
     <>
       <Header />
       <main className="pt-24">
         <Hero />
+        <ShotTerms />
         <Services />
         <Booking />
         <Facility />
         <Community />
-        <Events />
+        {/* <FlowingMenuSection /> */}
+        <FAQ />
         <Location />
+        <CallToAction />
       </main>
       <Footer />
-      <StickyBookingCTA />
     </>
   );
 }

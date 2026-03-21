@@ -2,6 +2,83 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@font-face {
+  font-family: "Perandory";
+  src: url("/font/PerandorySemiCondensed.otf") format("opentype");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("/font/ClashDisplay/ClashDisplay-Extralight.otf") format("opentype");
+  font-weight: 200;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("/font/ClashDisplay/ClashDisplay-Light.otf") format("opentype");
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("/font/ClashDisplay/ClashDisplay-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("/font/ClashDisplay/ClashDisplay-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("/font/ClashDisplay/ClashDisplay-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("/font/ClashDisplay/ClashDisplay-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/font/Poppins-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/font/Poppins-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/font/Poppins-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/font/Poppins-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -61,9 +138,10 @@
   --color-on-background: #1b1c18;
 
   /* ── Font Families ── */
-  --font-headline: var(--font-space-grotesk), "Space Grotesk", sans-serif;
-  --font-body: var(--font-manrope), "Manrope", sans-serif;
-  --font-label: var(--font-lexend), "Lexend", sans-serif;
+  --font-headline: "Perandory", var(--font-space-grotesk), "Space Grotesk", sans-serif;
+  --font-body: "Perandory", var(--font-manrope), "Manrope", sans-serif;
+  --font-label: "Perandory", var(--font-lexend), "Lexend", sans-serif;
+  --font-nav: "Poppins", sans-serif;
 
   /* ── Border Radius ── */
   --radius-sm: 0.125rem;
@@ -90,6 +168,11 @@
   @keyframes bounce-slow {
     0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
     50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 50%; }
+    100% { background-position: -200% 50%; }
   }
 
   --font-heading: var(--font-sans);
