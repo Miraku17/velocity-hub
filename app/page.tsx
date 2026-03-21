@@ -10,9 +10,55 @@ import ShotTerms from "./components/ShotTerms";
 import FlowingMenuSection from "./components/FlowingMenuSection";
 import CallToAction from "./components/CallToAction";
 import FAQ from "./components/FAQ";
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SportsActivityLocation",
+  name: "Velocity Pickleball Hub",
+  description:
+    "Premium pickleball courts in Cebu with 6 indoor and outdoor courts. No membership required — book online or walk in.",
+  url: "https://velocitypickleball.com",
+  logo: "https://velocitypickleball.com/logo.png",
+  image: "https://velocitypickleball.com/hero.png",
+  sport: "Pickleball",
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Cebu City",
+    addressRegion: "Cebu",
+    addressCountry: "PH",
+  },
+  geo: {
+    "@type": "GeoCoordinates",
+    latitude: 10.3157,
+    longitude: 123.8854,
+  },
+  openingHoursSpecification: {
+    "@type": "OpeningHoursSpecification",
+    dayOfWeek: [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ],
+    opens: "06:00",
+    closes: "22:00",
+  },
+  amenityFeature: [
+    { "@type": "LocationFeatureSpecification", name: "Indoor Courts", value: true },
+    { "@type": "LocationFeatureSpecification", name: "Outdoor Courts", value: true },
+    { "@type": "LocationFeatureSpecification", name: "Online Booking", value: true },
+  ],
+};
+
 export default function Home() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
       <main className="pt-24">
         <Hero />
