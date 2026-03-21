@@ -254,28 +254,36 @@ export default function Booking() {
 
         </div>
 
-        {/* ── Decorative Pickleballs ── */}
-        <motion.div 
-          animate={{ 
-            y: [0, -20, 0],
-            rotate: [0, 45, 0]
+        {/* ── Rally Ball ── */}
+        <motion.div
+          animate={{
+            x: [
+              "-35vw", "32vw",   // deep cross-court
+              "-20vw", "35vw",   // short return → deep drive
+              "-35vw", "15vw",   // deep → drop shot
+              "-10vw", "35vw",   // quick flick → deep smash
+              "-32vw", "28vw",   // wide backhand → forehand
+              "-25vw", "35vw",   // mid court → winner
+              "-35vw",           // reset
+            ],
+            y: [
+              80, -50,
+              -90, 70,
+              40, -20,
+              -60, 90,
+              -80, 30,
+              60, -90,
+              80,
+            ],
           }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-20 right-[15%] w-10 h-10 rounded-full border-2 border-white/10 flex items-center justify-center opacity-40 pointer-events-none"
-        >
-          <div className="w-6 h-6 rounded-full border border-white/5" />
-        </motion.div>
-
-        <motion.div 
-          animate={{ 
-            y: [0, 30, 0],
-            rotate: [0, -30, 0]
+          transition={{
+            duration: 24,
+            repeat: Infinity,
+            ease: "easeInOut",
+            times: [0, 0.08, 0.16, 0.24, 0.33, 0.41, 0.5, 0.58, 0.66, 0.74, 0.83, 0.91, 1],
           }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-40 left-[10%] w-14 h-14 rounded-full border-2 border-white/5 flex items-center justify-center opacity-30 pointer-events-none"
-        >
-          <div className="w-8 h-8 rounded-full border border-white/5" />
-        </motion.div>
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-primary-fixed opacity-40 pointer-events-none shadow-[0_0_12px_rgba(132,204,22,0.4)]"
+        />
       </motion.div>
     </section>
   );
