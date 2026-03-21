@@ -12,7 +12,7 @@ export default function Booking() {
   return (
     <section
       id="booking"
-      className="max-w-7xl mx-auto px-4 sm:px-8 py-24 scroll-mt-20 overflow-hidden"
+      className="max-w-7xl mx-auto px-4 sm:px-8 py-12 sm:py-24 scroll-mt-20 overflow-hidden"
     >
       <motion.div
         ref={containerRef}
@@ -20,7 +20,7 @@ export default function Booking() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-100px" }}
         transition={{ duration: 1, ease }}
-        className="relative bg-[#214d2e] rounded-[2.5rem] overflow-hidden shadow-[0_40px_100px_rgba(15,31,14,0.5)] border border-white/5"
+        className="relative bg-[#214d2e] rounded-2xl sm:rounded-[2.5rem] overflow-hidden shadow-[0_40px_100px_rgba(15,31,14,0.5)] border border-white/5"
       >
         {/* ── Court Background & Texture ── */}
         <div className="absolute inset-0">
@@ -38,15 +38,15 @@ export default function Booking() {
         {/* ── Court Lines (Animated) ── */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {/* Outer boundary */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             whileInView={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, delay: 0.2, ease }}
-            className="absolute inset-6 sm:inset-10 border-[3px] border-white/80 rounded-sm"
+            className="absolute inset-4 sm:inset-6 md:inset-10 border-2 sm:border-[3px] border-white/80 rounded-sm"
           />
 
           {/* Center net line / Kitchen area */}
-          <div className="absolute left-6 sm:left-10 right-6 sm:right-10 top-1/2 -translate-y-1/2 flex items-center justify-center">
+          <div className="absolute left-4 sm:left-6 md:left-10 right-4 sm:right-6 md:right-10 top-1/2 -translate-y-1/2 flex items-center justify-center">
             {/* Net Shadow */}
             <div className="absolute inset-x-0 h-16 bg-black/15 blur-2xl translate-y-6" />
             
@@ -85,13 +85,13 @@ export default function Booking() {
             initial={{ opacity: 0, y: -20 }}
             whileInView={{ opacity: 0.6, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="absolute left-10 right-10 h-px bg-white/40" style={{ top: "32%" }} 
+            className="absolute left-4 sm:left-6 md:left-10 right-4 sm:right-6 md:right-10 h-px bg-white/40" style={{ top: "32%" }}
           />
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 0.6, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="absolute left-10 right-10 h-px bg-white/40" style={{ bottom: "32%" }} 
+            className="absolute left-4 sm:left-6 md:left-10 right-4 sm:right-6 md:right-10 h-px bg-white/40" style={{ bottom: "32%" }} 
           />
 
           {/* Center service line */}
@@ -99,12 +99,12 @@ export default function Booking() {
             initial={{ scaleY: 0 }}
             whileInView={{ scaleY: 1 }}
             transition={{ duration: 1, delay: 0.5, ease }}
-            className="absolute top-10 bottom-10 left-1/2 -translate-x-1/2 w-[2px] bg-white/20 origin-center" 
+            className="absolute top-4 sm:top-6 md:top-10 bottom-4 sm:bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 w-[2px] bg-white/20 origin-center" 
           />
         </div>
 
         {/* ── Content ── */}
-        <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 sm:px-12 md:px-20 py-24 sm:py-32">
+        <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-8 md:px-12 lg:px-20 py-14 sm:py-24 md:py-32">
           {/* Eyebrow */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -113,7 +113,7 @@ export default function Booking() {
             className="flex items-center gap-3 mb-6"
           >
             <span className="w-8 h-px bg-primary-fixed-dim/40" />
-            <span className="font-[Poppins] text-[11px] uppercase tracking-[0.4em] text-primary-fixed-dim font-bold">
+            <span className="font-[Poppins] text-[9px] sm:text-[11px] uppercase tracking-[0.3em] sm:tracking-[0.4em] text-primary-fixed-dim font-bold">
               Instant Access
             </span>
             <span className="w-8 h-px bg-primary-fixed-dim/40" />
@@ -134,35 +134,35 @@ export default function Booking() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4, ease }}
-            className="font-[Poppins] text-white/50 text-lg sm:text-xl mb-16 max-w-2xl leading-relaxed"
+            className="font-[Poppins] text-white/50 text-sm sm:text-lg md:text-xl mb-10 sm:mb-16 max-w-2xl leading-relaxed"
           >
             Secure your spot at Cebu&apos;s premier pickleball facility. 
             Professional-grade courts, available for instant reservation.
           </motion.p>
 
           {/* ── Rates Grid ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 w-full max-w-4xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-10 sm:mb-16 w-full max-w-4xl">
             {/* Covered Courts */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.5, ease }}
-              className="group relative bg-white/[0.03] backdrop-blur-md rounded-3xl border border-white/10 p-8 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-500"
+              className="group relative bg-white/[0.03] backdrop-blur-md rounded-2xl sm:rounded-3xl border border-white/10 p-5 sm:p-8 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-500"
             >
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary-fixed/10 rounded-2xl flex items-center justify-center text-primary-fixed">
-                    <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>roofing</span>
+              <div className="flex items-center justify-between mb-5 sm:mb-8">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-fixed/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-primary-fixed">
+                    <span className="material-symbols-outlined text-xl sm:text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>roofing</span>
                   </div>
-                  <h3 className="font-['Clash_Display'] text-2xl font-semibold text-white">Covered</h3>
+                  <h3 className="font-['Clash_Display'] text-xl sm:text-2xl font-semibold text-white">Covered</h3>
                 </div>
-                <span className="bg-primary-fixed/10 text-primary-fixed text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-primary-fixed/20">
+                <span className="bg-primary-fixed/10 text-primary-fixed text-[8px] sm:text-[10px] font-bold uppercase tracking-widest px-2 sm:px-3 py-1 rounded-full border border-primary-fixed/20">
                   Most Popular
                 </span>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between bg-black/20 rounded-2xl p-5 border border-white/5 group-hover:border-white/10 transition-colors">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex items-center justify-between bg-black/20 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-white/5 group-hover:border-white/10 transition-colors">
                   <div className="text-left">
                     <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold mb-1">Daytime (7AM - 3PM)</p>
                     <p className="text-white font-medium">₱550 <span className="text-white/30 font-normal">/ hour</span></p>
@@ -172,7 +172,7 @@ export default function Booking() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between bg-black/20 rounded-2xl p-5 border border-white/5 group-hover:border-white/10 transition-colors">
+                <div className="flex items-center justify-between bg-black/20 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-white/5 group-hover:border-white/10 transition-colors">
                   <div className="text-left">
                     <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold mb-1">Evening (4PM - 12AM)</p>
                     <p className="text-white font-medium">₱600 <span className="text-white/30 font-normal">/ hour</span></p>
@@ -189,23 +189,23 @@ export default function Booking() {
               initial={{ opacity: 0, x: 20 }}
               whileInView={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.6, ease }}
-              className="group relative bg-white/[0.03] backdrop-blur-md rounded-3xl border border-white/10 p-8 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-500"
+              className="group relative bg-white/[0.03] backdrop-blur-md rounded-2xl sm:rounded-3xl border border-white/10 p-5 sm:p-8 hover:bg-white/[0.06] hover:border-white/20 transition-all duration-500"
             >
-              <div className="absolute -top-3 right-8">
+              <div className="absolute -top-3 right-6 sm:right-8">
                 <span className="bg-primary-fixed text-on-primary-fixed font-bold text-[9px] uppercase tracking-[0.2em] px-4 py-1.5 rounded-full shadow-xl">
                   Opening Soon
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 mb-8 text-left">
-                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white/60">
-                  <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>park</span>
+              <div className="flex items-center gap-2 sm:gap-3 mb-5 sm:mb-8 text-left">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/5 rounded-xl sm:rounded-2xl flex items-center justify-center text-white/60">
+                  <span className="material-symbols-outlined text-xl sm:text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>park</span>
                 </div>
-                <h3 className="font-['Clash_Display'] text-2xl font-semibold text-white/80">Outdoor</h3>
+                <h3 className="font-['Clash_Display'] text-xl sm:text-2xl font-semibold text-white/80">Outdoor</h3>
               </div>
 
-              <div className="space-y-4 opacity-60 grayscale-[0.5]">
-                <div className="flex items-center justify-between bg-black/20 rounded-2xl p-5 border border-white/5">
+              <div className="space-y-3 sm:space-y-4 opacity-60 grayscale-[0.5]">
+                <div className="flex items-center justify-between bg-black/20 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-white/5">
                   <div className="text-left">
                     <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold mb-1">Daytime (7AM - 3PM)</p>
                     <p className="text-white font-medium">₱450 <span className="text-white/30 font-normal">/ hour</span></p>
@@ -215,7 +215,7 @@ export default function Booking() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between bg-black/20 rounded-2xl p-5 border border-white/5">
+                <div className="flex items-center justify-between bg-black/20 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-white/5">
                   <div className="text-left">
                     <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold mb-1">Evening (4PM - 12AM)</p>
                     <p className="text-white font-medium">₱500 <span className="text-white/30 font-normal">/ hour</span></p>
@@ -240,7 +240,7 @@ export default function Booking() {
           >
             <Link
               href="/booking"
-              className="group relative inline-flex items-center gap-6 bg-white text-primary font-[Poppins] font-bold text-lg uppercase tracking-[0.15em] px-12 py-6 rounded-full overflow-hidden transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_20px_60px_rgba(255,255,255,0.2)] active:scale-[0.97]"
+              className="group relative inline-flex items-center gap-4 sm:gap-6 bg-white text-primary font-[Poppins] font-bold text-sm sm:text-lg uppercase tracking-[0.1em] sm:tracking-[0.15em] px-8 sm:px-12 py-4 sm:py-6 rounded-full overflow-hidden transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_20px_60px_rgba(255,255,255,0.2)] active:scale-[0.97]"
             >
               <span className="relative z-10 flex items-center gap-4">
                 Reserve Your Court
@@ -252,16 +252,6 @@ export default function Booking() {
             </Link>
           </motion.div>
 
-          {/* Social Proof / Availability Hint */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 1 }}
-            className="mt-8 font-[Poppins] text-[11px] text-primary-fixed-dim/40 uppercase tracking-[0.2em] flex items-center gap-2"
-          >
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            Limited slots available for this weekend
-          </motion.p>
         </div>
 
         {/* ── Decorative Pickleballs ── */}

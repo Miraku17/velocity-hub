@@ -90,7 +90,7 @@ export default function BookingPage() {
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.06] [&>div>div]:!min-h-0">
         <div className="absolute top-[8%] left-0 right-0 h-[200px] hidden md:block">
           <CurvedLoop
-            marqueeText="BOOK NOW — BOOK NOW — BOOK NOW — BOOK NOW — "
+            marqueeText="✦BOOK NOW✦BOOK NOW✦BOOK NOW✦BOOK NOW✦"
             speed={1}
             curveAmount={200}
             direction="left"
@@ -110,7 +110,7 @@ export default function BookingPage() {
         </div>
         <div className="absolute top-[72%] left-0 right-0 h-[200px] hidden md:block">
           <CurvedLoop
-            marqueeText="BOOK NOW — BOOK NOW — BOOK NOW — BOOK NOW — "
+            marqueeText="✦BOOK NOW✦BOOK NOW✦BOOK NOW✦BOOK NOW✦"
             speed={1.2}
             curveAmount={250}
             direction="left"

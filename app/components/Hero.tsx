@@ -12,7 +12,7 @@ const ease = [0.16, 1, 0.3, 1] as const;
 const STATS = [
   { value: "06", label: "Pro Courts" },
   { value: "500+", label: "Players" },
-  { value: "24/7", label: "Open Daily" },
+  { value: "", label: "Open Everyday" },
 ];
 
 export default function Hero() {
@@ -160,9 +160,11 @@ export default function Hero() {
                 transition={{ duration: 0.6, delay: 1 + i * 0.1, ease }}
                 className="flex-1 py-6 sm:py-8 flex items-center justify-center gap-3 sm:gap-4 group"
               >
-                <span className="font-['Clash_Display'] text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-none">
-                  {stat.value}
-                </span>
+                {stat.value && (
+                  <span className="font-['Clash_Display'] text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-none">
+                    {stat.value}
+                  </span>
+                )}
                 <span className="font-[Poppins] text-[9px] sm:text-[10px] uppercase tracking-[0.25em] text-white/25 font-semibold">
                   {stat.label}
                 </span>

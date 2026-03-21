@@ -8,7 +8,7 @@ const LOGO_URL = "/logo.png";
 
 const NAV_LINKS = [
   { href: "#services", label: "Services" },
-  { href: "#booking", label: "Book Now" },
+  { href: "/booking", label: "Book Now" },
   { href: "#facility", label: "Facility" },
 ];
 
@@ -63,7 +63,7 @@ export default function Header() {
 
         <div className="flex items-center gap-4">
           <Link
-            href="#booking"
+            href="/booking"
             className="hidden sm:inline-flex bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-2.5 rounded-md font-['Clash_Display'] text-sm font-bold tracking-wide transition-all duration-300 hover:shadow-[0_8px_30px_rgba(24,41,22,0.25)] hover:translate-y-[-1px]"
           >
             Reserve Now
@@ -123,7 +123,7 @@ export default function Header() {
               </Link>
             ))}
             <Link
-              href="#booking"
+              href="/booking"
               onClick={() => setMobileOpen(false)}
               className="block mt-4 bg-primary text-on-primary text-center py-3 rounded-md font-['Clash_Display'] font-bold text-sm uppercase tracking-widest"
             >
