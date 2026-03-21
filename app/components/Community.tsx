@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useScroll, useTransform, useInView, AnimatePresence } from "motion/react";
 import {
   Users,
@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   ArrowLeft,
   ArrowRight,
+  Quote,
+  TrendingUp,
 } from "lucide-react";
 import CountUp from "@/components/CountUp";
 
@@ -55,10 +57,10 @@ const TESTIMONIALS: Testimonial[] = [
 ];
 
 const STATS = [
-  { value: 500, suffix: "+", label: "Active Players", icon: Users },
-  { value: 6, suffix: "", label: "Pro Courts", icon: Trophy },
-  { value: 50, suffix: "+", label: "Events Monthly", icon: CheckCircle2 },
-  { value: 4.9, suffix: "/5", label: "Player Rating", icon: Star },
+  { value: 500, suffix: "+", label: "Active Players", icon: Users, color: "text-blue-400" },
+  { value: 6, suffix: "", label: "Pro Courts", icon: Trophy, color: "text-amber-400" },
+  { value: 50, suffix: "+", label: "Monthly Events", icon: TrendingUp, color: "text-emerald-400" },
+  { value: 4.9, suffix: "/5", label: "Player Rating", icon: Star, color: "text-primary-fixed" },
 ];
 
 function StatBlock({
@@ -73,30 +75,30 @@ function StatBlock({
   return (
     <motion.div
       className="relative group"
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.8, delay: 0.2 + index * 0.1, ease }}
+      transition={{ duration: 0.8, delay: 0.1 + index * 0.1, ease }}
     >
-      <div className="flex flex-col items-center gap-5">
-        <div className="relative p-5 rounded-3xl bg-white/[0.03] border border-white/[0.06] group-hover:bg-primary-fixed-dim/10 group-hover:border-primary-fixed-dim/30 transition-all duration-700 group-hover:-translate-y-2">
-          <stat.icon className="w-7 h-7 text-primary-fixed-dim group-hover:scale-110 transition-transform duration-700" />
-          <div className="absolute -inset-2 bg-primary-fixed-dim/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+      <div className="flex flex-col items-center p-6 rounded-[2rem] bg-white/[0.02] border border-white/[0.05] transition-all duration-500 hover:bg-white/[0.04] hover:border-white/10">
+        <div className="mb-4 p-3 rounded-2xl bg-white/[0.03] text-white/40 group-hover:text-primary-fixed-dim transition-colors">
+          <stat.icon size={20} strokeWidth={1.5} />
         </div>
-        <div className="text-center space-y-1">
-          <div className="flex items-baseline justify-center gap-1">
-            <span className="font-['Clash_Display'] text-5xl sm:text-6xl md:text-7xl font-bold text-white tracking-tighter">
+        
+        <div className="text-center">
+          <div className="flex items-baseline justify-center gap-0.5 mb-1">
+            <span className="font-['Clash_Display'] text-4xl sm:text-5xl font-bold text-white tracking-tight">
               <CountUp
                 to={stat.value}
                 from={0}
-                duration={3}
-                delay={0.5 + index * 0.15}
+                duration={2.5}
+                delay={0.4 + index * 0.1}
               />
             </span>
-            <span className="font-['Clash_Display'] text-3xl sm:text-4xl font-bold text-primary-fixed-dim">
+            <span className="font-['Clash_Display'] text-2xl font-bold text-primary-fixed-dim">
               {stat.suffix}
             </span>
           </div>
-          <p className="font-[Poppins] text-[11px] sm:text-[12px] uppercase tracking-[0.4em] text-white/20 group-hover:text-white/60 font-black transition-all duration-700">
+          <p className="font-[Poppins] text-[10px] uppercase tracking-[0.2em] text-white/30 font-medium">
             {stat.label}
           </p>
         </div>
@@ -105,137 +107,114 @@ function StatBlock({
   );
 }
 
-function TestimonialCarousel({ inView }: { inView: boolean }) {
+function TestimonialCarousel() {
   const [current, setCurrent] = useState(0);
   const [direction, setDirection] = useState(1);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const testimonial = TESTIMONIALS[current];
 
-  const go = (dir: 1 | -1) => {
+  const go = useCallback((dir: 1 | -1) => {
     setDirection(dir);
-    setCurrent(
-      (prev) => (prev + dir + TESTIMONIALS.length) % TESTIMONIALS.length
-    );
-  };
+    setCurrent((prev) => (prev + dir + TESTIMONIALS.length) % TESTIMONIALS.length);
+  }, []);
 
-  const contentVariants = {
-    enter: (d: number) => ({ x: d > 0 ? 60 : -60, opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit: (d: number) => ({ x: d > 0 ? -60 : 60, opacity: 0 }),
-  };
-
-  const imageVariants = {
-    enter: (d: number) => ({ x: d > 0 ? 30 : -30, opacity: 0, scale: 1.05 }),
-    center: { x: 0, opacity: 1, scale: 1 },
-    exit: (d: number) => ({ x: d > 0 ? -30 : 30, opacity: 0, scale: 0.95 }),
-  };
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    const interval = setInterval(() => go(1), 6000);
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, go]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 40 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 1, delay: 0.5, ease }}
+    <div 
+      className="relative"
+      onMouseEnter={() => setIsAutoPlaying(false)}
+      onMouseLeave={() => setIsAutoPlaying(true)}
     >
-      {/* Header row */}
-      <div className="flex items-end justify-between mb-12 md:mb-16">
-        <div>
-          <div className="inline-block px-4 py-1.5 rounded-full border border-white/10 mb-5">
-            <span className="font-[Poppins] text-[10px] uppercase tracking-[0.3em] text-white/50 font-semibold">
-              Testimonials
-            </span>
-          </div>
-          <h3 className="font-['Clash_Display'] text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-[1]">
-            What Our Players Say
-          </h3>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => go(-1)}
-            className="w-12 h-12 rounded-full border border-white/15 flex items-center justify-center hover:border-white/40 hover:bg-white/5 transition-all duration-300 cursor-pointer"
-            aria-label="Previous testimonial"
-          >
-            <ArrowLeft className="w-5 h-5 text-white/50" />
-          </button>
-          <button
-            onClick={() => go(1)}
-            className="w-12 h-12 rounded-full bg-primary-fixed-dim flex items-center justify-center hover:bg-primary-fixed transition-colors duration-300 cursor-pointer"
-            aria-label="Next testimonial"
-          >
-            <ArrowRight className="w-5 h-5 text-primary" />
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-14 items-center min-h-[380px] md:min-h-[420px]">
-        {/* Image */}
-        <div className="relative aspect-[4/3] rounded-3xl overflow-hidden">
-          {/* Glow behind image */}
-          <div className="absolute -inset-4 bg-primary-fixed-dim/10 blur-[60px] rounded-full pointer-events-none" />
-          <div className="relative w-full h-full rounded-3xl overflow-hidden border border-white/[0.08]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        {/* Left: Image & Navigation */}
+        <div className="lg:col-span-5 relative">
+          <div className="relative aspect-[4/5] rounded-[2.5rem] overflow-hidden group">
             <AnimatePresence mode="wait" custom={direction}>
-              <motion.img
+              <motion.div
                 key={current}
-                src={testimonial.image}
-                alt={testimonial.name}
-                className="absolute inset-0 w-full h-full object-cover"
-                custom={direction}
-                variants={imageVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.5, ease }}
-              />
+                initial={{ opacity: 0, scale: 1.1, x: direction * 20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.9, x: -direction * 20 }}
+                transition={{ duration: 0.7, ease }}
+                className="absolute inset-0"
+              >
+                <Image
+                  src={testimonial.image}
+                  alt={testimonial.name}
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
+              </motion.div>
             </AnimatePresence>
-            {/* Dark overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/40 via-transparent to-transparent" />
+
+            {/* Quote Icon Overlay */}
+            <div className="absolute top-8 left-8 w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
+              <Quote size={20} fill="currentColor" />
+            </div>
+
+            {/* Navigation Buttons (Desktop Internal) */}
+            <div className="absolute bottom-8 right-8 flex gap-2">
+              <button
+                onClick={() => go(-1)}
+                className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all active:scale-95"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <button
+                onClick={() => go(1)}
+                className="w-12 h-12 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center hover:scale-105 transition-all active:scale-95"
+              >
+                <ArrowRight size={20} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Quote */}
-        <div className="relative">
+        {/* Right: Text Content */}
+        <div className="lg:col-span-7">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={current}
-              custom={direction}
-              variants={contentVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5, ease }}
+              className="space-y-8"
             >
-              {/* Quote mark */}
-              <svg
-                className="w-14 h-14 text-primary-fixed-dim/15 mb-6"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M11 7.05C7.28 7.56 4.5 10.72 4.5 14.5c0 2.48 2.02 4.5 4.5 4.5s4.5-2.02 4.5-4.5h-3c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5c0-2.72 2.02-4.94 4.5-5.27V7.05zM19 7.05c-3.72.51-6.5 3.67-6.5 7.45 0 2.48 2.02 4.5 4.5 4.5s4.5-2.02 4.5-4.5h-3c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5c0-2.72 2.02-4.94 4.5-5.27V7.05z" />
-              </svg>
+              <div className="space-y-4">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: 40 }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
+                  className="h-1 bg-primary-fixed-dim" 
+                />
+                <h3 className="font-['Clash_Display'] text-3xl md:text-5xl font-bold text-white leading-tight">
+                  &ldquo;{testimonial.title}&rdquo;
+                </h3>
+              </div>
 
-              <h4 className="font-['Clash_Display'] text-2xl md:text-3xl font-bold text-white mb-5">
-                {testimonial.title}
-              </h4>
-
-              <p className="font-[Poppins] text-white/40 font-light text-base md:text-lg leading-relaxed mb-10">
+              <p className="font-[Poppins] text-white/50 text-lg md:text-xl leading-relaxed font-light">
                 {testimonial.quote}
               </p>
 
-              {/* Author */}
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="absolute -inset-0.5 bg-primary-fixed-dim/30 rounded-full blur-sm" />
-                  <img
+              <div className="flex items-center gap-5 pt-4">
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-white/10">
+                  <Image
                     src={testimonial.avatar}
                     alt={testimonial.name}
-                    className="relative w-12 h-12 rounded-full object-cover border-2 border-white/15"
+                    fill
+                    className="object-cover"
                   />
                 </div>
                 <div>
-                  <h5 className="font-['Clash_Display'] font-bold text-base text-white">
-                    {testimonial.name}
-                  </h5>
-                  <p className="font-[Poppins] text-sm text-white/30">
+                  <p className="font-['Clash_Display'] text-xl font-bold text-white">{testimonial.name}</p>
+                  <p className="font-[Poppins] text-sm text-primary-fixed-dim font-medium uppercase tracking-wider">
                     {testimonial.role}
                   </p>
                 </div>
@@ -243,8 +222,8 @@ function TestimonialCarousel({ inView }: { inView: boolean }) {
             </motion.div>
           </AnimatePresence>
 
-          {/* Dots */}
-          <div className="flex gap-2 mt-10">
+          {/* Progress Indicators */}
+          <div className="flex gap-3 mt-12">
             {TESTIMONIALS.map((_, i) => (
               <button
                 key={i}
@@ -252,18 +231,24 @@ function TestimonialCarousel({ inView }: { inView: boolean }) {
                   setDirection(i > current ? 1 : -1);
                   setCurrent(i);
                 }}
-                className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer ${
-                  i === current
-                    ? "w-8 bg-primary-fixed-dim"
-                    : "w-4 bg-white/15 hover:bg-white/30"
-                }`}
-                aria-label={`Go to testimonial ${i + 1}`}
-              />
+                className="relative h-1 bg-white/10 overflow-hidden rounded-full transition-all duration-500"
+                style={{ width: i === current ? '60px' : '30px' }}
+              >
+                {i === current && (
+                  <motion.div
+                    layoutId="active-dot"
+                    className="absolute inset-0 bg-primary-fixed"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '0%' }}
+                    transition={{ duration: 6, ease: "linear" }}
+                  />
+                )}
+              </button>
             ))}
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -275,110 +260,80 @@ export default function Community() {
     offset: ["start end", "end start"],
   });
 
-  const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
-  const watermarkScale = useTransform(scrollYProgress, [0, 1], [0.8, 1.2]);
+  const watermarkY = useTransform(scrollYProgress, [0, 1], [-100, 100]);
 
   return (
     <section
       id="community"
       ref={sectionRef}
-      className="relative overflow-hidden bg-primary py-32 md:py-48 lg:py-56"
+      className="relative overflow-hidden bg-primary py-24 md:py-40"
     >
-      {/* ── Background layers ── */}
-      <motion.div className="absolute inset-0 z-0" style={{ y: bgY }}>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(183,205,176,0.1)_0%,transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,rgba(45,63,42,0.6)_0%,transparent_50%)]" />
-      </motion.div>
+      {/* ── Background Elements ── */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-40 bg-linear-to-b from-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(183,205,176,0.03)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 grain-overlay opacity-20" />
+      </div>
 
-      {/* Grid */}
-      <div
-        className="absolute inset-0 z-0 opacity-[0.05]"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)`,
-          backgroundSize: "120px 120px",
-        }}
-      />
-
-      {/* Grain */}
-      <div className="absolute inset-0 z-0 grain-overlay opacity-[0.5]" />
-
-      {/* Watermark */}
-      <motion.div
-        className="absolute -right-40 top-1/2 -translate-y-1/2 w-[800px] md:w-[1200px] opacity-[0.02] pointer-events-none z-0"
-        style={{ scale: watermarkScale, rotate: 15 }}
+      {/* Large Watermark Text */}
+      <motion.div 
+        style={{ y: watermarkY }}
+        className="absolute left-0 top-1/4 -translate-x-1/4 pointer-events-none select-none"
       >
-        <Image
-          src="/logo.png"
-          alt=""
-          width={1200}
-          height={1200}
-          className="w-full h-auto invert brightness-0"
-          aria-hidden
-        />
+        <span className="font-['Clash_Display'] text-[20vw] font-bold text-white/[0.02] whitespace-nowrap leading-none">
+          VELOCITY HUB
+        </span>
       </motion.div>
 
       <div className="relative z-10 px-6 sm:px-10 lg:px-16 max-w-7xl mx-auto">
-        {/* ── Header ── */}
-        <div className="flex flex-col items-center text-center mb-32 md:mb-48">
+        {/* ── Header Section ── */}
+        <div className="max-w-3xl mb-24">
           <motion.div
-            className="flex items-center gap-4 mb-10"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={inView ? { opacity: 1, scale: 1 } : {}}
-            transition={{ duration: 1, ease }}
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="flex items-center gap-3 mb-6"
           >
-            <div className="w-12 h-px bg-primary-fixed-dim/30" />
-            <span className="font-[Poppins] text-[12px] uppercase tracking-[0.6em] text-primary-fixed-dim font-black">
-              Player Community
+            <div className="w-10 h-px bg-primary-fixed-dim" />
+            <span className="font-[Poppins] text-[11px] uppercase tracking-[0.4em] text-primary-fixed-dim font-bold">
+              Player Stories
             </span>
-            <div className="w-12 h-px bg-primary-fixed-dim/30" />
           </motion.div>
 
           <motion.h2
-            className="font-['Clash_Display'] text-[clamp(2.5rem,8vw,6.5rem)] font-bold leading-[0.85] tracking-tighter text-white mb-12"
-            initial={{ opacity: 0, y: 60 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 1.2, delay: 0.2, ease }}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="font-['Clash_Display'] text-[clamp(2.5rem,6vw,5rem)] font-bold leading-[1.05] tracking-tight text-white mb-8"
           >
-            Real Stories.
-            <br />
-            <span className="text-primary-fixed-dim italic">
-              Infinite Momentum.
-            </span>
+            JOIN THE <span className="text-primary-fixed">MOVEMENT</span>
           </motion.h2>
 
           <motion.p
-            className="font-[Poppins] text-xl md:text-2xl text-white/40 font-light max-w-2xl leading-relaxed italic"
-            initial={{ opacity: 0, y: 30 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 1, delay: 0.4, ease }}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="font-[Poppins] text-lg md:text-xl text-white/40 font-light leading-relaxed"
           >
-            &ldquo;Velocity is more than a court—it&apos;s where we find our
-            rhythm and push the boundaries of the game.&rdquo;
+            More than just a facility—it&apos;s a vibrant community where players of all 
+            skill levels come together to elevate their game and build lasting connections.
           </motion.p>
         </div>
 
-        {/* ── Stats ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 mb-32 md:mb-48">
+        {/* ── Stats Grid ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-32">
           {STATS.map((stat, i) => (
             <StatBlock key={stat.label} stat={stat} index={i} inView={inView} />
           ))}
         </div>
 
-        {/* ── Divider ── */}
-        <motion.div
-          className="w-full h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-24 md:mb-32"
-          initial={{ scaleX: 0 }}
-          animate={inView ? { scaleX: 1 } : {}}
-          transition={{ duration: 1.2, delay: 0.4, ease }}
-        />
+        {/* ── Carousel Section ── */}
+        <TestimonialCarousel />
 
-        {/* ── Testimonials Carousel ── */}
-        <TestimonialCarousel inView={inView} />
       </div>
-
-      {/* Bottom line */}
-      <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
     </section>
   );
 }

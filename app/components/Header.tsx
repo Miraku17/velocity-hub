@@ -10,7 +10,6 @@ const NAV_LINKS = [
   { href: "#services", label: "Services" },
   { href: "#booking", label: "Book Now" },
   { href: "#facility", label: "Facility" },
-  { href: "#community", label: "Community" },
 ];
 
 export default function Header() {
@@ -26,22 +25,25 @@ export default function Header() {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled
-          ? "bg-surface/95 backdrop-blur-xl shadow-[0_4px_40px_rgba(24,41,22,0.06)]"
-          : "bg-transparent"
+        scrolled ? "top-4 px-4 sm:px-6" : "top-0 px-0"
       }`}
     >
-      <nav className="flex justify-between items-center w-full px-6 md:px-8 py-4 max-w-7xl mx-auto font-['Clash_Display']">
-        <Link
-          href="/"
-          className="group"
-        >
+      <nav
+        className={`flex justify-between items-center w-full max-w-7xl mx-auto font-['Clash_Display'] transition-all duration-500 ${
+          scrolled
+            ? "bg-surface/90 backdrop-blur-2xl shadow-[0_8px_40px_rgba(24,41,22,0.08),0_1px_3px_rgba(24,41,22,0.05)] rounded-2xl px-6 md:px-8 py-3 border border-outline-variant/30"
+            : "bg-transparent px-6 md:px-8 py-4 rounded-none"
+        }`}
+      >
+        <Link href="/" className="group">
           <Image
             src={LOGO_URL}
             alt="Velocity Logo"
             width={80}
             height={80}
-            className="h-20 w-auto group-hover:rotate-[-4deg] transition-transform duration-300"
+            className={`w-auto group-hover:rotate-[-4deg] transition-all duration-300 ${
+              scrolled ? "h-14" : "h-20"
+            }`}
           />
         </Link>
 
@@ -95,27 +97,39 @@ export default function Header() {
       {/* Mobile menu */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-500 ${
-          mobileOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
+          scrolled ? "px-4 sm:px-6" : "px-0"
         }`}
       >
-        <div className="bg-surface/98 backdrop-blur-xl px-6 pb-6 space-y-1">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileOpen(false)}
-              className="block py-3 text-on-surface font-['Clash_Display'] uppercase text-sm tracking-wide hover:text-primary hover:pl-2 transition-all duration-200"
-            >
-              {link.label}
-            </Link>
-          ))}
-          <Link
-            href="#booking"
-            onClick={() => setMobileOpen(false)}
-            className="block mt-4 bg-primary text-on-primary text-center py-3 rounded-md font-['Clash_Display'] font-bold text-sm uppercase tracking-widest"
+        <div
+          className={`max-w-7xl mx-auto overflow-hidden transition-all duration-500 ${
+            mobileOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
+          }`}
+        >
+          <div
+            className={`backdrop-blur-2xl px-6 pb-6 pt-2 space-y-1 transition-all duration-500 ${
+              scrolled
+                ? "bg-surface/90 rounded-b-2xl border-x border-b border-outline-variant/30 mt-0 shadow-[0_8px_40px_rgba(24,41,22,0.08)]"
+                : "bg-surface/98 mt-0"
+            }`}
           >
-            Reserve Now
-          </Link>
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className="block py-3 text-on-surface font-['Clash_Display'] uppercase text-sm tracking-wide hover:text-primary hover:pl-2 transition-all duration-200"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Link
+              href="#booking"
+              onClick={() => setMobileOpen(false)}
+              className="block mt-4 bg-primary text-on-primary text-center py-3 rounded-md font-['Clash_Display'] font-bold text-sm uppercase tracking-widest"
+            >
+              Reserve Now
+            </Link>
+          </div>
         </div>
       </div>
     </header>

@@ -31,7 +31,7 @@ const NAV_COLUMNS = [
 ];
 
 const SOCIAL_LINKS = [
-  { icon: Facebook, label: "Facebook", href: "#" },
+  { icon: Facebook, label: "Facebook", href: "https://www.facebook.com/velocitypickleballhub" },
   { icon: Instagram, label: "Instagram", href: "#" },
   { icon: Youtube, label: "YouTube", href: "#" },
 ];

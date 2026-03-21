@@ -17,7 +17,7 @@ export default function Home() {
       <main className="pt-24">
         <Hero />
         <ShotTerms />
-        <Services />
+        {/* <Services /> */}
         <Booking />
         <Facility />
         <Community />
