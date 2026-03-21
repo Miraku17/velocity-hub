@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import CurvedLoop from "@/components/CurvedLoop";
+import { BookingFooter } from "./BookingFooter";
 import { Calendar } from "@/components/ui/calendar";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -86,8 +87,8 @@ export default function BookingPage() {
 
   return (
     <div className="min-h-svh relative" style={{ backgroundColor: surface }}>
-      {/* ── Background CurvedLoop ── */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.06] [&>div>div]:!min-h-0">
+      {/* ── Background CurvedLoop (desktop) ── */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.06]">
         <div className="absolute top-[8%] left-0 right-0 h-[200px] hidden md:block">
           <CurvedLoop
             marqueeText="✦BOOK NOW✦BOOK NOW✦BOOK NOW✦BOOK NOW✦"
@@ -118,6 +119,34 @@ export default function BookingPage() {
             className={`font-['Clash_Display'] font-black uppercase tracking-[0.3em] fill-[#182916]`}
           />
         </div>
+      </div>
+
+      {/* ── Background Marquee (mobile) ── */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.04] md:hidden">
+        {[
+          { top: "10%", dir: "left" as const, text: "✦ BOOK NOW ✦ VELOCITY ✦ BOOK NOW ✦ VELOCITY " },
+          { top: "35%", dir: "right" as const, text: "PICKLEBALL HUB — RESERVE YOUR COURT — " },
+          { top: "60%", dir: "left" as const, text: "✦ BOOK NOW ✦ VELOCITY ✦ BOOK NOW ✦ VELOCITY " },
+          { top: "85%", dir: "right" as const, text: "PICKLEBALL HUB — RESERVE YOUR COURT — " },
+        ].map((row, i) => (
+          <div
+            key={i}
+            className="absolute left-0 right-0 whitespace-nowrap overflow-hidden"
+            style={{ top: row.top }}
+          >
+            <div
+              className="inline-block animate-[marquee_20s_linear_infinite]"
+              style={{ animationDirection: row.dir === "right" ? "reverse" : "normal" }}
+            >
+              <span
+                className="font-['Clash_Display'] font-black uppercase tracking-[0.3em] text-3xl"
+                style={{ color: bg }}
+              >
+                {row.text.repeat(6)}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── Header ── */}
@@ -478,16 +507,7 @@ export default function BookingPage() {
       </div>
 
       {/* ── Footer ── */}
-      <footer className="relative z-10 mt-6 sm:mt-10" style={{ borderTop: `1px solid ${bg}08` }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-4 sm:py-6 flex items-center justify-between">
-          <p className="font-[Poppins] text-[9px] sm:text-[10px]" style={{ color: `${bg}30` }}>
-            &copy; {new Date().getFullYear()} Velocity Pickleball Hub
-          </p>
-          <Link href="https://www.facebook.com/velocitypickleballhub" target="_blank" rel="noopener noreferrer" className="font-[Poppins] text-[9px] sm:text-[10px] transition-colors" style={{ color: `${bg}30` }}>
-            Facebook
-          </Link>
-        </div>
-      </footer>
+      <BookingFooter bg={bg} surface={surface} />
     </div>
   );
 }
