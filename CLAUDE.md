@@ -31,6 +31,9 @@ lib/                  # Utilities, Supabase client, Zustand stores
 types/                # Shared TypeScript types
 ```
 
+## Design Approach
+- **Mobile first.** Design and build for small screens first, then scale up with responsive breakpoints (`sm:`, `md:`, `lg:`). Base styles target mobile; use Tailwind breakpoint prefixes to enhance for larger viewports.
+
 ## Coding Conventions
 - **Components:** PascalCase filenames (`CourtCard.tsx`). Default exports for page/layout, named exports for components.
 - **Utilities / stores / hooks:** camelCase filenames (`useBooking.ts`, `bookingStore.ts`).

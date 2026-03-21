@@ -25,9 +25,69 @@ const lexend = Lexend({
 
 
 export const metadata: Metadata = {
-  title: "Velocity Pickleball Hub | Cebu's Premier Indoor Courts",
+  title: {
+    default: "Velocity Pickleball Hub | Pickleball Courts in Cebu — Book Online",
+    template: "%s | Velocity Pickleball Hub",
+  },
   description:
-    "Elite indoor pickleball courts engineered for peak performance in Cebu. Book courts, join leagues, and become part of the fastest growing pickleball community in the Philippines.",
+    "Book pickleball courts in Cebu at Velocity Pickleball Hub — 6 premium indoor & outdoor courts open daily. Walk-ins welcome, no membership needed. Reserve online in seconds.",
+  keywords: [
+    "pickleball courts Cebu",
+    "pickleball Cebu",
+    "indoor pickleball Cebu",
+    "book pickleball court Cebu",
+    "Velocity Pickleball Hub",
+    "pickleball court rental Cebu",
+    "pickleball Philippines",
+    "Cebu pickleball",
+    "pickleball near me Cebu",
+    "best pickleball courts Cebu",
+    "outdoor pickleball Cebu",
+    "pickleball hub Cebu City",
+  ],
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
+  metadataBase: new URL("https://velocitypickleball.com"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_PH",
+    siteName: "Velocity Pickleball Hub",
+    title: "Velocity Pickleball Hub | Pickleball Courts in Cebu",
+    description:
+      "6 premium pickleball courts in Cebu — covered & outdoor. No membership required. Book your court online in seconds.",
+    url: "https://velocitypickleball.com",
+    images: [
+      {
+        url: "/logo.png",
+        width: 800,
+        height: 800,
+        alt: "Velocity Pickleball Hub Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Velocity Pickleball Hub | Pickleball Courts in Cebu",
+    description:
+      "Book pickleball courts in Cebu — 6 premium courts, no membership needed. Reserve online now.",
+    images: ["/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({
