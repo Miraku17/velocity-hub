@@ -152,6 +152,8 @@ function BookingPage() {
       );
     },
     enabled: !!selectedCourt,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Map each time slot hour to its reservation status
@@ -428,6 +430,21 @@ function BookingPage() {
         </div>
       </div>
 
+      {/* ── Booking Policy ── */}
+      <div className="relative z-10 w-full" style={{ backgroundColor: "#182916" }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-3 sm:py-4 flex items-start sm:items-center gap-3 sm:gap-4">
+          <div className="shrink-0 flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full mt-0.5 sm:mt-0" style={{ backgroundColor: "#ff4d4d18", border: "1px solid #ff4d4d40" }}>
+            <span className="material-symbols-outlined text-sm sm:text-base" style={{ color: "#ff6b6b", fontVariationSettings: "'FILL' 1" }}>warning</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="font-['Clash_Display'] text-[10px] font-extrabold uppercase tracking-[0.2em] mr-2" style={{ color: "#ff6b6b" }}>No Cancellation Policy</span>
+            <span className="font-[Poppins] text-[11px] sm:text-xs leading-relaxed" style={{ color: "#d3e9cb99" }}>
+              Once confirmed, no cancellations or refunds. Can&apos;t make it? Find someone to take your slot and settle payment directly.
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* ── Form ── */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-6 sm:py-10">
         {isLoading ? (
@@ -442,10 +459,10 @@ function BookingPage() {
                 <p className="font-[Poppins] text-xs sm:text-sm mb-6 sm:mb-8" style={{ color: `${bg}66` }}>
                   No account needed. We&apos;ll use this to send your booking confirmation.
                 </p>
-                <div className="rounded-xl px-4 py-3 mb-6 sm:mb-8 flex items-start gap-2.5" style={{ backgroundColor: `${bg}06`, border: `1px solid ${bg}10` }}>
-                  <span className="material-symbols-outlined text-base mt-0.5 shrink-0" style={{ color: `${bg}50`, fontVariationSettings: "'FILL' 0, 'wght' 300" }}>info</span>
-                  <p className="font-[Poppins] text-[11px] leading-relaxed" style={{ color: `${bg}70` }}>
-                    Please ensure your email and phone number are <strong style={{ color: `${bg}90` }}>correct and reachable</strong>. We may contact you for booking updates, schedule changes, or payment issues.
+                <div className="rounded-xl px-4 py-3 mb-6 sm:mb-8 flex items-start gap-2.5" style={{ backgroundColor: "#fff8e6", border: "1px solid #f59e0b40" }}>
+                  <span className="material-symbols-outlined text-base mt-0.5 shrink-0" style={{ color: "#f59e0b", fontVariationSettings: "'FILL' 1, 'wght' 500" }}>info</span>
+                  <p className="font-[Poppins] text-[11px] sm:text-xs font-semibold leading-relaxed" style={{ color: "#92400e" }}>
+                    Please ensure your email and phone number are <strong style={{ color: "#b45309" }}>correct and reachable</strong>. We may contact you for booking updates, schedule changes, or payment issues.
                   </p>
                 </div>
 
@@ -1089,9 +1106,6 @@ function BookingPage() {
                       </div>
                     </div>
 
-                    <p className="font-[Poppins] text-[10px] sm:text-[11px] italic leading-relaxed" style={{ color: `${bg}66` }}>
-                      Free cancellation up to 24 hours before your reserved time. A confirmation will be sent to your email.
-                    </p>
                   </div>
                 </div>
               )}
