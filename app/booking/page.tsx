@@ -204,7 +204,7 @@ function BookingPage() {
 
   // Fetch existing reservations for selected court + date
   const dateStr = useMemo(() => selectedDate.toISOString().split("T")[0], [selectedDate]);
-  const { data: existingReservations = [] } = useQuery<
+  const { data: existingReservations = [], isFetching: isFetchingSlots } = useQuery<
     { start_time: string; end_time: string; status: string }[]
   >({
     queryKey: ["slot-availability", selectedCourt, dateStr],
@@ -720,6 +720,13 @@ function BookingPage() {
                       <p className="font-[Poppins] text-xs py-8 text-center" style={{ color: `${bg}30` }}>
                         No time slots available
                       </p>
+                    ) : isFetchingSlots ? (
+                      <div className="flex flex-col items-center justify-center py-10 gap-3">
+                        <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: `${bg}20`, borderTopColor: bg }} />
+                        <p className="font-[Poppins] text-xs font-medium" style={{ color: `${bg}50` }}>
+                          Checking availability...
+                        </p>
+                      </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-2">
                         {timeSlots.map((t) => {
