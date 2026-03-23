@@ -57,6 +57,7 @@ export interface ReservationInput {
   end_time: string
   reservation_type?: ReservationType
   notes?: string
+  turnstile_token?: string
 }
 
 export interface ReservationUpdate {
