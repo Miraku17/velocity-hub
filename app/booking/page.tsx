@@ -14,6 +14,26 @@ import { usePaymentQrCodes } from "@/lib/hooks/usePaymentQrCodes";
 import { useCreateReservation } from "@/lib/hooks/useReservations";
 import { useQuery } from "@tanstack/react-query";
 
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: string | HTMLElement,
+        opts: {
+          sitekey: string;
+          callback: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+          theme?: "light" | "dark" | "auto";
+          size?: "normal" | "compact";
+        }
+      ) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
 const STORAGE_KEY = "velocity-booking-form";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -86,6 +106,12 @@ function BookingPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const receiptInputRef = useRef<HTMLInputElement>(null);
 
+  // Turnstile CAPTCHA
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
   const today = useMemo(() => new Date(), []);
   const maxDate = useMemo(() => {
     const d = new Date(today);
@@ -119,6 +145,49 @@ function BookingPage() {
     };
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [step, name, email, phone, selectedDate, selectedCourt, selectedSlots]);
+
+  // Render Turnstile widget when confirmation modal opens
+  useEffect(() => {
+    if (!showConfirmModal || !TURNSTILE_SITE_KEY) return;
+
+    // Reset token when modal opens
+    setTurnstileToken(null);
+
+    const renderWidget = () => {
+      if (!window.turnstile || !turnstileContainerRef.current) return;
+      // Remove previous widget if any
+      if (turnstileWidgetId.current) {
+        try { window.turnstile.remove(turnstileWidgetId.current); } catch {}
+        turnstileWidgetId.current = null;
+      }
+      turnstileWidgetId.current = window.turnstile.render(
+        turnstileContainerRef.current,
+        {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (token: string) => setTurnstileToken(token),
+          "expired-callback": () => setTurnstileToken(null),
+          "error-callback": () => setTurnstileToken(null),
+          theme: "light",
+          size: "normal",
+        }
+      );
+    };
+
+    // Turnstile script may not be loaded yet — poll briefly
+    if (window.turnstile) {
+      // Small delay to ensure the container ref is mounted
+      const t = setTimeout(renderWidget, 100);
+      return () => clearTimeout(t);
+    } else {
+      const interval = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(interval);
+          renderWidget();
+        }
+      }, 200);
+      return () => clearInterval(interval);
+    }
+  }, [showConfirmModal, TURNSTILE_SITE_KEY]);
 
   const court = courts.find((c) => c.id === selectedCourt);
 
@@ -242,6 +311,7 @@ function BookingPage() {
         date: dateStr,
         start_time: parsedTimeRange.start_time,
         end_time: parsedTimeRange.end_time,
+        ...(turnstileToken ? { turnstile_token: turnstileToken } : {}),
       },
       {
         onSuccess: async (data) => {
@@ -1204,6 +1274,13 @@ function BookingPage() {
                   </div>
                 )}
 
+                {/* Turnstile CAPTCHA */}
+                {TURNSTILE_SITE_KEY && (
+                  <div className="flex justify-center mb-4">
+                    <div ref={turnstileContainerRef} />
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-3">
                   <button
@@ -1216,7 +1293,7 @@ function BookingPage() {
                   </button>
                   <button
                     onClick={() => { handleConfirmBooking(); }}
-                    disabled={createReservation.isPending}
+                    disabled={createReservation.isPending || (!!TURNSTILE_SITE_KEY && !turnstileToken)}
                     className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60"
                     style={{ backgroundColor: bg, color: "white" }}
                   >

@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     end_time,
     reservation_type,
     notes,
+    turnstile_token,
   } = body as {
     court_id: string
     customer_name: string
@@ -73,6 +74,43 @@ export async function POST(request: NextRequest) {
     end_time: string
     reservation_type?: string
     notes?: string
+    turnstile_token?: string
+  }
+
+  // Verify Cloudflare Turnstile token
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
+  if (turnstileSecret) {
+    if (!turnstile_token) {
+      return Response.json(
+        { error: "Human verification is required. Please complete the CAPTCHA." },
+        { status: 400 }
+      )
+    }
+
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      ?? request.headers.get("x-real-ip")
+      ?? ""
+
+    const verifyRes = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          secret: turnstileSecret,
+          response: turnstile_token,
+          remoteip: ip,
+        }),
+      }
+    )
+
+    const verification = (await verifyRes.json()) as { success: boolean }
+    if (!verification.success) {
+      return Response.json(
+        { error: "Human verification failed. Please try again." },
+        { status: 403 }
+      )
+    }
   }
 
   // Validate required fields
