@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Manrope, Lexend, Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { Providers } from "@/lib/providers";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -107,7 +108,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-surface text-on-surface font-body">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
