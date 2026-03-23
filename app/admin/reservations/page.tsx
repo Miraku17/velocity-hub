@@ -56,6 +56,7 @@ function formatTimeSlot(start: string, end: string) {
 
 function getStatusLabel(status: ReservationStatus) {
   const map: Record<ReservationStatus, string> = {
+    pending: "Pending",
     confirmed: "Confirmed",
     cancelled: "Cancelled",
     completed: "Completed",
@@ -877,7 +878,7 @@ export default function ReservationsPage() {
       confirmLabel: msg.label,
       confirmVariant: msg.variant,
       onConfirm: () => {
-        const extra = status === "confirmed" ? { payment_status: "paid" as const } : status === "cancelled" ? { payment_status: "declined" as const } : {}
+        const extra = status === "confirmed" ? { payment_status: "paid" as const } : {}
         updateMutation.mutate({ id, status, ...extra }, { onSuccess: () => setConfirmAction(null) })
       },
     })
@@ -1143,10 +1144,6 @@ export default function ReservationsPage() {
                         {res.payment_status === "refunded" ? (
                           <span className="rounded bg-error/5 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-error">
                             Refunded
-                          </span>
-                        ) : res.payment_status === "declined" ? (
-                          <span className="rounded bg-error/10 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-error">
-                            Declined
                           </span>
                         ) : res.payment_status === "paid" ? (
                           <span className="rounded bg-[#16A34A]/10 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-[#16A34A]">
