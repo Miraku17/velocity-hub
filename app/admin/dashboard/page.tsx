@@ -2,21 +2,14 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import {
-  Calendar,
-  Activity,
-  DollarSign,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  ChevronRight,
-  LayoutList,
-  CalendarRange,
-  XCircle,
-  Ban,
-} from "lucide-react"
 import { LoadingPage } from "@/components/ui/loading"
 import Link from "next/link"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 /* ── Types ── */
 
@@ -113,55 +106,6 @@ function getRelativeTime(dateStr: string) {
   return `${diffDay}d ago`
 }
 
-const statusLabel: Record<CourtStatus, string> = {
-  available: "Available",
-  occupied: "Occupied",
-  maintenance: "Maintenance",
-}
-
-const statusBorder: Record<CourtStatus, string> = {
-  available: "border-l-primary",
-  occupied: "border-l-[#6B5B00]",
-  maintenance: "border-l-error",
-}
-
-const statusIcon: Record<CourtStatus, React.ReactNode> = {
-  available: <CheckCircle className="h-3.5 w-3.5 text-primary" />,
-  occupied: <Clock className="h-3.5 w-3.5 text-[#6B5B00]" />,
-  maintenance: <AlertTriangle className="h-3.5 w-3.5 text-error" />,
-}
-
-const paymentStatusColor: Record<string, string> = {
-  paid: "text-primary",
-  pending: "text-[#6B5B00]",
-  refunded: "text-error",
-}
-
-const activityIcon: Record<string, { icon: React.ReactNode; bg: string; color: string }> = {
-  paid: {
-    icon: <CheckCircle className="h-4 w-4" />,
-    bg: "bg-primary/10",
-    color: "text-primary",
-  },
-  pending: {
-    icon: <Clock className="h-4 w-4" />,
-    bg: "bg-[#6B5B00]/10",
-    color: "text-[#6B5B00]",
-  },
-  refunded: {
-    icon: <XCircle className="h-4 w-4" />,
-    bg: "bg-error/10",
-    color: "text-error",
-  },
-}
-
-const reservationStatusIcon: Record<string, { icon: React.ReactNode; color: string }> = {
-  confirmed: { icon: <CheckCircle className="h-3.5 w-3.5" />, color: "text-primary" },
-  completed: { icon: <CheckCircle className="h-3.5 w-3.5" />, color: "text-primary" },
-  cancelled: { icon: <Ban className="h-3.5 w-3.5" />, color: "text-error" },
-  "no-show": { icon: <XCircle className="h-3.5 w-3.5" />, color: "text-[#6B5B00]" },
-}
-
 /* ── Component ── */
 
 export default function AdminOverview() {
@@ -170,7 +114,7 @@ export default function AdminOverview() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
-    refetchInterval: 30000, // refresh every 30s
+    refetchInterval: 30000,
   })
 
   if (isLoading || !data) {
@@ -179,418 +123,313 @@ export default function AdminOverview() {
 
   const { stats, courts, today_reservations, recent_reservations } = data
 
-  // Determine court status based on current reservations
   const now = new Date()
   const currentHour = now.getHours() + now.getMinutes() / 60
 
-  function getCourtDetail(court: Court) {
+  function getCourtLiveStatus(court: Court) {
     if (court.status === "maintenance") {
-      return { detail: "Under Maintenance", detailColor: "text-error" }
+      return { status: "maintenance" as CourtStatus, detail: "Under Maintenance" }
     }
-
     const courtRes = today_reservations.filter((r) => r.court_id === court.id)
     const activeRes = courtRes.find(
       (r) => timeToHour(r.start_time) <= currentHour && timeToHour(r.end_time) > currentHour
     )
-
     if (activeRes) {
-      return {
-        detail: `Ends: ${formatTime(activeRes.end_time)}`,
-        detailColor: "text-[#6B5B00]",
-        effectiveStatus: "occupied" as CourtStatus,
-      }
+      return { status: "occupied" as CourtStatus, detail: `Until ${formatTime(activeRes.end_time)}` }
     }
-
     const nextRes = courtRes.find((r) => timeToHour(r.start_time) > currentHour)
     if (nextRes) {
-      return {
-        detail: `Next: ${formatTime(nextRes.start_time)}`,
-        detailColor: "text-primary",
-      }
+      return { status: "available" as CourtStatus, detail: `Next: ${formatTime(nextRes.start_time)}` }
     }
-
-    return { detail: "Open Now", detailColor: "text-primary" }
+    return { status: "available" as CourtStatus, detail: "Open" }
   }
 
-  // Build schedule timeline
-  const scheduleStartHour = 6
-  const scheduleEndHour = 22
-  const timeSlots = Array.from(
-    { length: scheduleEndHour - scheduleStartHour },
-    (_, i) => scheduleStartHour + i
-  )
-
-  // Only show occupied hours in timeline (6AM - 10PM)
+  // Timeline slots
   const visibleSlots = (() => {
     if (today_reservations.length === 0) return [7, 8, 9, 10, 11, 12]
-    const minHour = Math.max(
-      scheduleStartHour,
-      Math.floor(Math.min(...today_reservations.map((r) => timeToHour(r.start_time))))
-    )
-    const maxHour = Math.min(
-      scheduleEndHour,
-      Math.ceil(Math.max(...today_reservations.map((r) => timeToHour(r.end_time)))) + 1
-    )
+    const minHour = Math.max(6, Math.floor(Math.min(...today_reservations.map((r) => timeToHour(r.start_time)))))
+    const maxHour = Math.min(22, Math.ceil(Math.max(...today_reservations.map((r) => timeToHour(r.end_time)))) + 1)
     const slots = []
     for (let h = minHour; h < maxHour; h++) slots.push(h)
     return slots.length > 0 ? slots : [7, 8, 9, 10, 11, 12]
   })()
 
   const todayFormatted = now.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
+    weekday: "long",
+    month: "long",
     day: "numeric",
   })
 
-  const statCards = [
-    {
-      label: "Total Bookings",
-      value: stats.total_bookings.toLocaleString(),
-      icon: <Calendar className="h-5 w-5" />,
-      iconBg: "bg-primary/10",
-      iconColor: "text-primary",
-    },
-    {
-      label: "Today's Bookings",
-      value: stats.today_bookings.toString(),
-      icon: <Activity className="h-5 w-5" />,
-      iconBg: "bg-[#6B5B00]/10",
-      iconColor: "text-[#6B5B00]",
-    },
-    {
-      label: "Revenue (Current Mo.)",
-      value: formatCurrency(stats.month_revenue),
-      icon: <DollarSign className="h-5 w-5" />,
-      iconBg: "bg-[#4A2462]/10",
-      iconColor: "text-[#4A2462]",
-    },
-  ]
-
   return (
-    <div className="p-4 lg:p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 lg:p-8 space-y-8">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-on-surface font-headline">Overview</h1>
-        <p className="text-sm text-on-surface-variant font-body">
-          Manage your bookings and view court activity.
-        </p>
-      </div>
-
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {statCards.map((stat) => (
-          <div
-            key={stat.label}
-            className="flex items-center gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm hover:shadow-md transition-shadow"
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h1 className="font-headline text-3xl font-extrabold tracking-tight text-primary lg:text-4xl">
+            Dashboard
+          </h1>
+          <p className="mt-1 font-body text-sm font-medium text-secondary">
+            {todayFormatted}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/reservations"
+            className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-2 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
           >
-            <div
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${stat.iconBg} ${stat.iconColor}`}
-            >
-              {stat.icon}
-            </div>
-            <div>
-              <p className="font-label text-xs font-medium uppercase tracking-[0.1em] text-on-surface-variant mb-1">
-                {stat.label}
-              </p>
-              <p className="font-headline text-3xl font-bold tracking-tight text-on-surface">
-                {stat.value}
-              </p>
-            </div>
-          </div>
-        ))}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+            Reservations
+          </Link>
+          <Link
+            href="/admin/courts"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-primary shadow-sm shadow-primary/20 transition-all hover:shadow-md hover:shadow-primary/25 active:scale-[0.98]"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            Courts
+          </Link>
+        </div>
       </div>
 
-      {/* ── Court Real-Time Status ── */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-label text-sm font-semibold uppercase tracking-[0.1em] text-on-surface">
-            Court Real-Time Status
-          </h2>
+      {/* ── Stats Row ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Total Bookings */}
+        <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
+          <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant">
+            Total Bookings
+          </p>
+          <p className="mt-2 font-headline text-3xl font-extrabold tracking-tight text-on-surface">
+            {stats.total_bookings.toLocaleString()}
+          </p>
+          <p className="mt-1 font-body text-[11px] text-on-surface-variant">Lifetime</p>
+        </div>
+
+        {/* Today */}
+        <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
+          <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant">
+            Today
+          </p>
+          <p className="mt-2 font-headline text-3xl font-extrabold tracking-tight text-primary">
+            {stats.today_bookings}
+          </p>
+          <p className="mt-1 font-body text-[11px] text-on-surface-variant">Scheduled today</p>
+        </div>
+
+        {/* Revenue */}
+        <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
+          <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant">
+            Monthly Revenue
+          </p>
+          <p className="mt-2 font-headline text-3xl font-extrabold tracking-tight text-on-surface">
+            {formatCurrency(stats.month_revenue)}
+          </p>
+          <p className="mt-1 font-body text-[11px] text-on-surface-variant">
+            {now.toLocaleDateString("en-US", { month: "long" })}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Courts Grid ── */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-headline text-lg font-bold text-on-surface">Court Status</h2>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 font-label text-[10px] uppercase tracking-wider text-on-surface-variant">
-              <span className="h-2 w-2 rounded-full bg-primary" />
-              Available
-            </span>
-            <span className="flex items-center gap-1.5 font-label text-[10px] uppercase tracking-wider text-on-surface-variant">
-              <span className="h-2 w-2 rounded-full bg-[#6B5B00]" />
-              Occupied
-            </span>
-            <span className="flex items-center gap-1.5 font-label text-[10px] uppercase tracking-wider text-on-surface-variant">
-              <span className="h-2 w-2 rounded-full bg-error" />
-              Maintenance
-            </span>
+            {[
+              { label: "Available", color: "bg-primary" },
+              { label: "Occupied", color: "bg-[#C49B00]" },
+              { label: "Maintenance", color: "bg-error" },
+            ].map((l) => (
+              <span key={l.label} className="flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${l.color}`} />
+                <span className="font-body text-[10px] text-on-surface-variant">{l.label}</span>
+              </span>
+            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {courts.map((court) => {
-            const courtDetail = getCourtDetail(court)
-            const effectiveStatus = courtDetail.effectiveStatus ?? court.status
+            const live = getCourtLiveStatus(court)
+            const dotColor = live.status === "available" ? "bg-primary" : live.status === "occupied" ? "bg-[#C49B00]" : "bg-error"
+            const textColor = live.status === "available" ? "text-primary" : live.status === "occupied" ? "text-[#C49B00]" : "text-error"
 
             return (
               <div
                 key={court.id}
-                className={`flex flex-col rounded-xl border border-outline-variant/20 border-l-[4px] bg-surface-container-lowest p-5 shadow-sm hover:shadow-md transition-shadow ${statusBorder[effectiveStatus]}`}
+                className="rounded-xl bg-surface-container-lowest p-4 ring-1 ring-outline-variant/20 transition-all hover:ring-outline-variant/40"
               >
-                <div className="flex justify-between items-start mb-2">
-                  <p className="font-label text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-                    {court.name}
-                  </p>
-                  {statusIcon[effectiveStatus]}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-headline text-sm font-bold text-on-surface">{court.name}</span>
+                  <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
                 </div>
-                <p className="font-headline text-lg font-semibold text-on-surface leading-tight">
-                  {statusLabel[effectiveStatus]}
+                <p className="font-label text-[9px] font-medium uppercase tracking-widest text-on-surface-variant">
+                  {court.court_type}
                 </p>
-                <p className={`mt-1 font-body text-xs font-medium ${courtDetail.detailColor}`}>
-                  {courtDetail.detail}
+                <p className={`mt-1 font-body text-[11px] font-semibold ${textColor}`}>
+                  {live.detail}
                 </p>
               </div>
             )
           })}
-
-          {courts.length === 0 && (
-            <div className="col-span-full flex flex-col items-center gap-2 py-8">
-              <p className="font-nav text-xs font-medium text-on-surface-variant">
-                No courts configured yet
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
       {/* ── Schedule + Activity ── */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
-        {/* Live Master Schedule */}
-        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest flex flex-col shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant/15 p-5">
-            <div>
-              <h2 className="font-headline text-lg font-semibold text-on-surface flex items-center gap-2">
-                <CalendarRange className="h-5 w-5 text-on-surface-variant" />
-                Live Master Schedule
-              </h2>
-              <p className="mt-1 font-body text-xs text-on-surface-variant">
-                {todayFormatted} &bull; Real-time tracking
-              </p>
+        {/* Live Schedule */}
+        <Card className="border-none shadow-none ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-outline-variant/10 px-5 py-4 space-y-0">
+            <CardTitle className="font-headline text-base font-bold text-on-surface">
+              Today&apos;s Schedule
+            </CardTitle>
+            <div className="flex rounded-lg bg-surface-container-high p-0.5">
+              {(["timeline", "list"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setScheduleView(v)}
+                  className={`px-3 py-1 rounded-md font-nav text-[10px] font-semibold uppercase tracking-wider transition-all ${
+                    scheduleView === v
+                      ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                      : "text-on-surface-variant hover:text-on-surface"
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
             </div>
-            <div className="flex overflow-hidden rounded-lg border border-outline-variant/30 p-1 bg-surface-container-lowest">
-              <button
-                onClick={() => setScheduleView("timeline")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-nav text-xs font-medium transition-colors ${
-                  scheduleView === "timeline"
-                    ? "bg-surface-container-highest text-on-surface shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-                }`}
-              >
-                <CalendarRange className="h-3.5 w-3.5" />
-                Timeline
-              </button>
-              <button
-                onClick={() => setScheduleView("list")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-nav text-xs font-medium transition-colors ${
-                  scheduleView === "list"
-                    ? "bg-surface-container-highest text-on-surface shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-                }`}
-              >
-                <LayoutList className="h-3.5 w-3.5" />
-                List
-              </button>
-            </div>
-          </div>
+          </CardHeader>
 
-          <div className="flex-1">
+          <CardContent className="p-0">
             {scheduleView === "timeline" ? (
               <div className="overflow-x-auto">
-                <div className="min-w-[640px]">
-                  {/* Time header row */}
+                <div className="min-w-[700px]">
+                  {/* Time header */}
                   <div
-                    className="border-b border-outline-variant/15 bg-surface-container-lowest/50"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: `160px repeat(${visibleSlots.length}, 1fr)`,
-                    }}
+                    className="border-b border-outline-variant/10 bg-surface-container-low/30"
+                    style={{ display: "grid", gridTemplateColumns: `160px repeat(${visibleSlots.length}, 1fr)` }}
                   >
-                    <div className="px-5 py-3 font-label text-[10px] font-medium uppercase tracking-[0.1em] text-on-surface-variant">
-                      Courts / Time
+                    <div className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      Court
                     </div>
                     {visibleSlots.map((hour) => (
-                      <div
-                        key={hour}
-                        className="border-l border-outline-variant/10 px-3 py-3 text-center font-label text-[10px] font-medium uppercase tracking-[0.1em] text-on-surface-variant"
-                      >
+                      <div key={hour} className="border-l border-outline-variant/10 px-2 py-3 text-center font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
                         {hour.toString().padStart(2, "0")}:00
                       </div>
                     ))}
                   </div>
 
                   {/* Court rows */}
-                  {courts.map((court) => {
-                    const courtRes = today_reservations.filter(
-                      (r) => r.court_id === court.id
-                    )
-                    return (
-                      <div
-                        key={court.id}
-                        className="border-b border-outline-variant/10 last:border-b-0 hover:bg-surface-container-lowest/50 transition-colors"
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: `160px repeat(${visibleSlots.length}, 1fr)`,
-                        }}
-                      >
-                        <div className="flex flex-col justify-center px-5 py-4 bg-surface-container-lowest relative z-10">
-                          <p className="font-nav text-sm font-semibold text-on-surface">
-                            {court.name}
-                          </p>
-                          <p className="font-label text-[10px] uppercase tracking-wider text-on-surface-variant mt-0.5">
-                            {court.court_type}
-                          </p>
-                        </div>
-
+                  <div className="divide-y divide-outline-variant/8">
+                    {courts.map((court) => {
+                      const courtRes = today_reservations.filter((r) => r.court_id === court.id)
+                      return (
                         <div
-                          className="relative"
-                          style={{ gridColumn: `span ${visibleSlots.length}` }}
+                          key={court.id}
+                          className="hover:bg-surface-container-low/20 transition-colors"
+                          style={{ display: "grid", gridTemplateColumns: `160px repeat(${visibleSlots.length}, 1fr)` }}
                         >
-                          {/* Grid lines */}
-                          <div
-                            className="absolute inset-0 pointer-events-none"
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: `repeat(${visibleSlots.length}, 1fr)`,
-                            }}
-                          >
-                            {visibleSlots.map((_, i) => (
-                              <div key={i} className="border-l border-outline-variant/10 h-full" />
-                            ))}
+                          <div className="flex flex-col justify-center px-5 py-5 border-r border-outline-variant/10">
+                            <p className="font-headline text-xs font-bold text-on-surface">{court.name}</p>
+                            <p className="font-label text-[9px] font-medium uppercase tracking-wider text-on-surface-variant mt-0.5">{court.court_type}</p>
                           </div>
 
-                          {/* Reservation blocks */}
-                          {courtRes.map((res) => {
-                            const startH = timeToHour(res.start_time)
-                            const endH = timeToHour(res.end_time)
-                            const startOffset = startH - visibleSlots[0]
-                            const totalHours = visibleSlots.length
-                            const leftPercent = (startOffset / totalHours) * 100
-                            const widthPercent =
-                              ((endH - startH) / totalHours) * 100
-                            const isMaintenance =
-                              res.reservation_type === "maintenance"
+                          <div className="relative h-16" style={{ gridColumn: `span ${visibleSlots.length}` }}>
+                            {/* Grid lines */}
+                            <div className="absolute inset-0 pointer-events-none" style={{ display: "grid", gridTemplateColumns: `repeat(${visibleSlots.length}, 1fr)` }}>
+                              {visibleSlots.map((_, i) => (
+                                <div key={i} className="border-l border-outline-variant/8 h-full" />
+                              ))}
+                            </div>
 
-                            return (
-                              <div
-                                key={res.id}
-                                className={`absolute top-2 bottom-2 rounded-lg px-3 py-2.5 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${
-                                  isMaintenance
-                                    ? "bg-error/10 border border-error/20"
-                                    : "bg-primary-fixed/40 border border-primary-fixed-dim/30 hover:bg-primary-fixed/60"
-                                }`}
-                                style={{
-                                  left: `calc(${leftPercent}% + 4px)`,
-                                  width: `calc(${widthPercent}% - 8px)`,
-                                }}
-                              >
-                                <p
-                                  className={`font-nav text-[10px] font-bold tracking-wide uppercase ${
-                                    isMaintenance ? "text-error" : "text-primary"
-                                  }`}
-                                >
-                                  #{res.reservation_code}
-                                </p>
-                                <p
-                                  className={`font-body text-xs font-medium mt-0.5 truncate ${
-                                    isMaintenance
-                                      ? "text-error/80"
-                                      : "text-on-surface"
-                                  }`}
-                                >
-                                  {res.customer_name}
-                                </p>
-                                <p
-                                  className={`font-body text-[10px] mt-1 truncate ${
-                                    isMaintenance
-                                      ? "text-error/60"
-                                      : "text-on-surface-variant"
-                                  }`}
-                                >
-                                  {formatTime(res.start_time)} -{" "}
-                                  {formatTime(res.end_time)}
-                                </p>
-                              </div>
-                            )
-                          })}
+                            {/* Reservation blocks */}
+                            {courtRes.map((res) => {
+                              const startH = timeToHour(res.start_time)
+                              const endH = timeToHour(res.end_time)
+                              const leftPercent = ((startH - visibleSlots[0]) / visibleSlots.length) * 100
+                              const widthPercent = ((endH - startH) / visibleSlots.length) * 100
+                              const isActive = startH <= currentHour && endH > currentHour
 
-                          <div className="h-[72px]" />
+                              return (
+                                <div
+                                  key={res.id}
+                                  className={`absolute top-2 bottom-2 rounded-md px-2.5 py-1.5 transition-all cursor-default ${
+                                    isActive
+                                      ? "bg-primary/15 ring-1 ring-primary/30"
+                                      : "bg-surface-container-high ring-1 ring-outline-variant/20"
+                                  }`}
+                                  style={{
+                                    left: `calc(${leftPercent}% + 4px)`,
+                                    width: `calc(${widthPercent}% - 8px)`,
+                                  }}
+                                >
+                                  <p className={`font-nav text-[9px] font-bold truncate ${isActive ? "text-primary" : "text-on-surface"}`}>
+                                    {res.customer_name}
+                                  </p>
+                                  <p className="font-body text-[8px] text-on-surface-variant mt-0.5">
+                                    {formatTime(res.start_time)} – {formatTime(res.end_time)}
+                                  </p>
+                                </div>
+                              )
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
 
                   {today_reservations.length === 0 && (
-                    <div className="flex flex-col items-center gap-2 py-12">
-                      <CalendarRange className="h-8 w-8 text-outline" />
-                      <p className="font-nav text-xs font-medium text-on-surface-variant">
-                        No reservations for today
-                      </p>
+                    <div className="flex flex-col items-center justify-center py-16">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-outline-variant/30 mb-3">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      <p className="font-nav text-xs font-medium text-on-surface-variant">No reservations today</p>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
+              /* List view */
               <div className="overflow-x-auto">
-                <table className="w-full text-left font-body text-sm whitespace-nowrap">
-                  <thead className="bg-surface-container-lowest/50 border-b border-outline-variant/15 font-label text-[10px] uppercase tracking-[0.1em] text-on-surface-variant">
-                    <tr>
-                      <th className="px-5 py-4 font-medium">Court</th>
-                      <th className="px-5 py-4 font-medium">Code</th>
-                      <th className="px-5 py-4 font-medium">Customer</th>
-                      <th className="px-5 py-4 font-medium">Time</th>
-                      <th className="px-5 py-4 font-medium">Duration</th>
-                      <th className="px-5 py-4 font-medium">Status</th>
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-outline-variant/10 bg-surface-container-low/30">
+                      <th className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Court</th>
+                      <th className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Customer</th>
+                      <th className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Time</th>
+                      <th className="px-5 py-3 text-center font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-outline-variant/10">
+                  <tbody className="divide-y divide-outline-variant/8">
                     {today_reservations
                       .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                      .map((res) => {
-                        const si = reservationStatusIcon[res.status]
-                        return (
-                          <tr
-                            key={res.id}
-                            className="hover:bg-surface-container-lowest/80 transition-colors"
-                          >
-                            <td className="px-5 py-4 font-nav font-medium text-on-surface">
-                              {res.court_name}
-                            </td>
-                            <td className="px-5 py-4 text-on-surface-variant font-mono text-xs">
-                              #{res.reservation_code}
-                            </td>
-                            <td className="px-5 py-4 font-medium text-on-surface">
-                              {res.customer_name}
-                            </td>
-                            <td className="px-5 py-4 text-on-surface-variant">
-                              {formatTime(res.start_time)} -{" "}
-                              {formatTime(res.end_time)}
-                            </td>
-                            <td className="px-5 py-4 text-on-surface-variant">
-                              {res.duration_hours}h
-                            </td>
-                            <td className="px-5 py-4">
-                              <span
-                                className={`inline-flex items-center gap-1 font-label text-[10px] font-semibold uppercase tracking-wider ${si?.color ?? "text-on-surface-variant"}`}
-                              >
-                                {si?.icon}
-                                {res.status}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
+                      .map((res) => (
+                        <tr key={res.id} className="hover:bg-surface-container-low/20 transition-colors">
+                          <td className="px-5 py-4 font-headline text-xs font-bold text-on-surface">{res.court_name}</td>
+                          <td className="px-5 py-4 font-body text-xs text-on-surface">{res.customer_name}</td>
+                          <td className="px-5 py-4 font-body text-xs text-on-surface-variant">
+                            {formatTime(res.start_time)} – {formatTime(res.end_time)}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <span className={`inline-block rounded px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-widest ${
+                              res.status === "confirmed" || res.status === "completed"
+                                ? "bg-primary/10 text-primary"
+                                : res.status === "pending"
+                                ? "bg-[#C49B00]/10 text-[#C49B00]"
+                                : "bg-error/10 text-error"
+                            }`}>
+                              {res.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
                     {today_reservations.length === 0 && (
                       <tr>
-                        <td
-                          colSpan={6}
-                          className="px-5 py-8 text-center text-on-surface-variant"
-                        >
-                          No reservations for today.
+                        <td colSpan={4} className="px-5 py-16 text-center font-nav text-xs font-medium text-on-surface-variant">
+                          No reservations today
                         </td>
                       </tr>
                     )}
@@ -598,82 +437,64 @@ export default function AdminOverview() {
                 </table>
               </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Recent Activity */}
-        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest flex flex-col shadow-sm">
-          <div className="flex items-center justify-between border-b border-outline-variant/15 px-6 py-5">
-            <h2 className="font-headline text-lg font-semibold text-on-surface flex items-center gap-2">
-              <Activity className="h-5 w-5 text-on-surface-variant" />
+        <Card className="border-none shadow-none ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-outline-variant/10 px-5 py-4 space-y-0">
+            <CardTitle className="font-headline text-base font-bold text-on-surface">
               Recent Activity
-            </h2>
+            </CardTitle>
             <Link
               href="/admin/reservations"
-              className="flex items-center gap-1 font-label text-[10px] font-bold uppercase tracking-[0.1em] text-primary transition-colors hover:text-primary/80"
+              className="font-nav text-[10px] font-semibold uppercase tracking-wider text-primary transition-colors hover:text-primary/80"
             >
-              View All
-              <ChevronRight className="h-3 w-3" />
+              View all
             </Link>
-          </div>
+          </CardHeader>
 
-          <div className="divide-y divide-outline-variant/10 flex-1 overflow-y-auto">
-            {recent_reservations.map((res) => {
-              const ai = activityIcon[res.payment_status] ?? activityIcon.pending
-
-              return (
-                <div
-                  key={res.id}
-                  className="flex items-center gap-4 px-6 py-4 hover:bg-surface-container-lowest/50 transition-colors group"
-                >
-                  <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${ai.bg} ${ai.color} group-hover:scale-110 transition-transform`}
-                  >
-                    {ai.icon}
-                  </div>
+          <CardContent className="p-0">
+            <div className="divide-y divide-outline-variant/8">
+              {recent_reservations.map((res) => (
+                <div key={res.id} className="flex items-center gap-3 px-5 py-4 hover:bg-surface-container-low/20 transition-colors">
+                  {/* Status dot */}
+                  <div className={`h-2 w-2 shrink-0 rounded-full ${
+                    res.payment_status === "paid" ? "bg-primary" :
+                    res.payment_status === "refunded" ? "bg-error" : "bg-[#C49B00]"
+                  }`} />
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-nav text-sm font-semibold text-on-surface">
-                      {res.reservation_type === "walk-in"
-                        ? "Walk-in"
-                        : "Court Reservation"}
-                    </p>
-                    <p className="truncate font-body text-xs text-on-surface-variant mt-0.5">
-                      {res.court_name} &bull; {res.duration_hours}h &bull;{" "}
+                    <p className="truncate font-nav text-xs font-semibold text-on-surface">
                       {res.customer_name}
+                    </p>
+                    <p className="truncate font-body text-[10px] text-on-surface-variant">
+                      {res.court_name} · {getRelativeTime(res.created_at)}
                     </p>
                   </div>
 
                   <div className="shrink-0 text-right">
-                    <p className="font-nav text-sm font-bold text-on-surface">
+                    <p className="font-headline text-xs font-bold text-on-surface">
                       {formatCurrency(res.total_amount)}
                     </p>
-                    <p
-                      className={`font-label text-[9px] font-bold uppercase tracking-wider mt-1 ${paymentStatusColor[res.payment_status] ?? "text-on-surface-variant"}`}
-                    >
+                    <p className={`font-label text-[9px] font-bold uppercase tracking-widest ${
+                      res.payment_status === "paid" ? "text-primary" :
+                      res.payment_status === "refunded" ? "text-error" : "text-[#C49B00]"
+                    }`}>
                       {res.payment_status}
-                      <span className="text-on-surface-variant mx-1">
-                        &bull;
-                      </span>
-                      <span className="text-on-surface-variant">
-                        {getRelativeTime(res.created_at)}
-                      </span>
                     </p>
                   </div>
                 </div>
-              )
-            })}
+              ))}
 
-            {recent_reservations.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-12">
-                <Activity className="h-8 w-8 text-outline" />
-                <p className="font-nav text-xs font-medium text-on-surface-variant">
-                  No recent activity
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+              {recent_reservations.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <p className="font-nav text-xs font-medium text-on-surface-variant">No recent activity</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

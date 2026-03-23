@@ -109,6 +109,8 @@ export default function AdminLayout({
     try {
       const res = await fetch("/api/auth/sign-out", { method: "POST" })
       if (res.ok) {
+        setSignOutModalOpen(false)
+        setSigningOut(false)
         router.push("/admin/sign-in")
       }
     } catch {
