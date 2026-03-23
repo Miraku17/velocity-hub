@@ -493,17 +493,18 @@ function ReservationDetailModal({
   const isCancelled = res.status === "cancelled"
 
   const statusBadge: Record<string, { bg: string; text: string; label: string }> = {
-    pending: { bg: "bg-[#6B5B00]/10", text: "text-[#6B5B00]", label: "Pending" },
-    confirmed: { bg: "bg-primary/10", text: "text-primary", label: "Confirmed" },
+    pending: { bg: "bg-[#F59E0B]/10", text: "text-[#D97706]", label: "Pending" },
+    confirmed: { bg: "bg-[#2563EB]/10", text: "text-[#2563EB]", label: "Confirmed" },
     completed: { bg: "bg-primary/10", text: "text-primary", label: "Completed" },
     cancelled: { bg: "bg-error/10", text: "text-error", label: "Cancelled" },
-    "no-show": { bg: "bg-[#6B5B00]/10", text: "text-[#6B5B00]", label: "No Show" },
+    "no-show": { bg: "bg-[#7C3AED]/10", text: "text-[#7C3AED]", label: "No Show" },
   }
 
   const paymentBadge: Record<string, { bg: string; text: string; label: string }> = {
-    paid: { bg: "bg-primary/10", text: "text-primary", label: "Paid" },
-    pending: { bg: "bg-[#6B5B00]/10", text: "text-[#6B5B00]", label: "Pending" },
+    paid: { bg: "bg-[#16A34A]/10", text: "text-[#16A34A]", label: "Paid" },
+    pending: { bg: "bg-[#F59E0B]/10", text: "text-[#D97706]", label: "Pending" },
     refunded: { bg: "bg-error/10", text: "text-error", label: "Refunded" },
+    declined: { bg: "bg-error/10", text: "text-error", label: "Declined" },
   }
 
   const sb = statusBadge[res.status] ?? statusBadge.confirmed
@@ -650,65 +651,20 @@ function ReservationDetailModal({
                 {res.status === "pending" && (
                   <>
                     <Button
-                      onClick={() => { onStatusChange(res.id, "confirmed"); onClose() }}
+                      onClick={() => { onClose(); onStatusChange(res.id, "confirmed") }}
                       disabled={isPending}
                       className="w-full rounded-lg bg-primary px-3 py-2 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary-container hover:text-on-primary-container disabled:opacity-60"
                     >
                       Confirm Booking
                     </Button>
                     <Button
-                      onClick={() => { onStatusChange(res.id, "cancelled"); onClose() }}
+                      onClick={() => { onClose(); onStatusChange(res.id, "cancelled") }}
                       disabled={isPending}
                       className="w-full rounded-lg border border-error/30 bg-transparent px-3 py-2 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-error transition-colors hover:bg-error/5 disabled:opacity-60"
                     >
                       Decline
                     </Button>
                   </>
-                )}
-                {res.status === "confirmed" && (
-                  <>
-                    <Button
-                      onClick={() => { onStatusChange(res.id, "completed"); onClose() }}
-                      disabled={isPending}
-                      className="w-full rounded-lg bg-primary px-3 py-2 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary-container hover:text-on-primary-container disabled:opacity-60"
-                    >
-                      Mark Completed
-                    </Button>
-                    <Button
-                      onClick={() => { onStatusChange(res.id, "cancelled"); onClose() }}
-                      disabled={isPending}
-                      className="w-full rounded-lg border border-error/30 bg-transparent px-3 py-2 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-error transition-colors hover:bg-error/5 disabled:opacity-60"
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                )}
-                {res.payment_status === "pending" && res.status !== "cancelled" && (
-                  <Button
-                    onClick={() => { onPaymentChange(res.id, "paid"); onClose() }}
-                    disabled={isPending}
-                    className="w-full rounded-lg border border-primary/30 bg-transparent px-3 py-2 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-primary transition-colors hover:bg-primary/5 disabled:opacity-60"
-                  >
-                    Mark as Paid
-                  </Button>
-                )}
-                {(res.status === "cancelled" || res.status === "no-show") && (
-                  <Button
-                    onClick={() => { onStatusChange(res.id, "confirmed"); onClose() }}
-                    disabled={isPending}
-                    className="w-full rounded-lg bg-primary px-3 py-2 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary-container hover:text-on-primary-container disabled:opacity-60"
-                  >
-                    Mark Confirmed
-                  </Button>
-                )}
-                {res.status === "cancelled" && res.payment_status === "paid" && (
-                  <Button
-                    onClick={() => { onPaymentChange(res.id, "refunded"); onClose() }}
-                    disabled={isPending}
-                    className="w-full rounded-lg border border-error/30 bg-transparent px-3 py-2 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-error transition-colors hover:bg-error/5 disabled:opacity-60"
-                  >
-                    Process Refund
-                  </Button>
                 )}
               </div>
             </div>
@@ -803,6 +759,73 @@ function ReservationDetailModal({
   )
 }
 
+/* ── Confirmation Modal ── */
+
+function ConfirmationModal({
+  open,
+  title,
+  message,
+  confirmLabel,
+  confirmVariant = "primary",
+  onConfirm,
+  onCancel,
+  isPending,
+}: {
+  open: boolean
+  title: string
+  message: string
+  confirmLabel: string
+  confirmVariant?: "primary" | "destructive"
+  onConfirm: () => void
+  onCancel: () => void
+  isPending: boolean
+}) {
+  useEffect(() => {
+    if (!open) return
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel()
+    }
+    window.addEventListener("keydown", handleKey)
+    return () => window.removeEventListener("keydown", handleKey)
+  }, [open, onCancel])
+
+  if (!open) return null
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
+        <div className="relative w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto">
+          <div className="px-6 pt-6 pb-2">
+            <h3 className="font-headline text-base font-bold text-on-surface">{title}</h3>
+            <p className="mt-2 font-body text-sm text-on-surface-variant">{message}</p>
+          </div>
+          <div className="flex gap-3 px-6 py-4">
+            <button
+              onClick={onCancel}
+              disabled={isPending}
+              className="flex-1 rounded-lg border border-outline-variant/30 bg-transparent px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isPending}
+              className={`flex-1 rounded-lg px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] transition-colors disabled:opacity-60 ${
+                confirmVariant === "destructive"
+                  ? "bg-error text-white hover:bg-error/80"
+                  : "bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+              }`}
+            >
+              {isPending ? "Updating…" : confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 /* ── Component ── */
 
 export default function ReservationsPage() {
@@ -814,6 +837,13 @@ export default function ReservationsPage() {
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
   const [detailReservation, setDetailReservation] = useState<Reservation | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    confirmVariant: "primary" | "destructive"
+    onConfirm: () => void
+  } | null>(null)
 
   const filters = {
     date: dateFilter || undefined,
@@ -829,14 +859,42 @@ export default function ReservationsPage() {
   const reservations = result?.data ?? []
   const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
 
+  const confirmMessages: Record<string, { title: string; message: string; label: string; variant: "primary" | "destructive" }> = {
+    confirmed: { title: "Confirm Booking", message: "Are you sure you want to confirm this booking? The payment status will be set to paid.", label: "Confirm", variant: "primary" },
+    cancelled: { title: "Decline Booking", message: "Are you sure you want to decline this booking? The payment status will be set to declined.", label: "Decline", variant: "destructive" },
+    completed: { title: "Complete Booking", message: "Are you sure you want to mark this booking as completed?", label: "Complete", variant: "primary" },
+    "no-show": { title: "Mark No Show", message: "Are you sure you want to mark this booking as no-show?", label: "Mark No Show", variant: "destructive" },
+    paid: { title: "Mark as Paid", message: "Are you sure you want to mark this payment as paid?", label: "Mark Paid", variant: "primary" },
+    refunded: { title: "Refund Payment", message: "Are you sure you want to refund this payment?", label: "Refund", variant: "destructive" },
+  }
+
   function handleStatusChange(id: string, status: ReservationStatus) {
-    updateMutation.mutate({ id, status })
+    const msg = confirmMessages[status] ?? { title: "Update Status", message: `Set status to "${status}"?`, label: "Update", variant: "primary" as const }
     setActionMenuId(null)
+    setConfirmAction({
+      title: msg.title,
+      message: msg.message,
+      confirmLabel: msg.label,
+      confirmVariant: msg.variant,
+      onConfirm: () => {
+        const extra = status === "confirmed" ? { payment_status: "paid" as const } : status === "cancelled" ? { payment_status: "declined" as const } : {}
+        updateMutation.mutate({ id, status, ...extra }, { onSuccess: () => setConfirmAction(null) })
+      },
+    })
   }
 
   function handlePaymentStatusChange(id: string, payment_status: "paid" | "refunded") {
-    updateMutation.mutate({ id, payment_status })
+    const msg = confirmMessages[payment_status] ?? { title: "Update Payment", message: `Set payment to "${payment_status}"?`, label: "Update", variant: "primary" as const }
     setActionMenuId(null)
+    setConfirmAction({
+      title: msg.title,
+      message: msg.message,
+      confirmLabel: msg.label,
+      confirmVariant: msg.variant,
+      onConfirm: () => {
+        updateMutation.mutate({ id, payment_status }, { onSuccess: () => setConfirmAction(null) })
+      },
+    })
   }
 
   const totalPages = pagination.totalPages
@@ -1007,6 +1065,16 @@ export default function ReservationsPage() {
                       >
                         {getTypeLabel(res.reservation_type)}
                       </span>
+                      <span className={`mt-1.5 block w-fit rounded px-1.5 py-0.5 font-label text-[9px] font-extrabold uppercase tracking-widest ${
+                        res.status === "pending" ? "bg-[#F59E0B]/10 text-[#D97706]" :
+                        res.status === "confirmed" ? "bg-[#2563EB]/10 text-[#2563EB]" :
+                        res.status === "cancelled" ? "bg-error/10 text-error" :
+                        res.status === "completed" ? "bg-primary/10 text-primary" :
+                        res.status === "no-show" ? "bg-[#7C3AED]/10 text-[#7C3AED]" :
+                        "bg-surface-container text-on-surface-variant"
+                      }`}>
+                        {res.status}
+                      </span>
                     </td>
 
                     {/* Schedule */}
@@ -1076,12 +1144,16 @@ export default function ReservationsPage() {
                           <span className="rounded bg-error/5 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-error">
                             Refunded
                           </span>
+                        ) : res.payment_status === "declined" ? (
+                          <span className="rounded bg-error/10 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-error">
+                            Declined
+                          </span>
                         ) : res.payment_status === "paid" ? (
-                          <span className="rounded bg-primary/10 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-primary">
+                          <span className="rounded bg-[#16A34A]/10 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-[#16A34A]">
                             Paid
                           </span>
                         ) : (
-                          <span className="rounded bg-[#6B5B00]/10 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-[#6B5B00]">
+                          <span className="rounded bg-[#F59E0B]/10 px-2 py-0.5 font-label text-[10px] font-extrabold uppercase tracking-widest text-[#D97706]">
                             Pending
                           </span>
                         )}
@@ -1149,91 +1221,6 @@ export default function ReservationsPage() {
                                     <line x1="9" y1="9" x2="15" y2="15" />
                                   </svg>
                                   Decline
-                                </button>
-                              </>
-                            )}
-                            {res.status === "confirmed" && (
-                              <>
-                                <div className="mx-3 my-1 border-t border-outline-variant/15" />
-                                <button
-                                  onClick={() => handleStatusChange(res.id, "completed")}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left font-nav text-xs font-medium text-on-surface transition-colors hover:bg-surface-container"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                    <polyline points="22 4 12 14.01 9 11.01" />
-                                  </svg>
-                                  Mark Completed
-                                </button>
-                                <button
-                                  onClick={() => handleStatusChange(res.id, "no-show")}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left font-nav text-xs font-medium text-on-surface transition-colors hover:bg-surface-container"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                                  </svg>
-                                  Mark No Show
-                                </button>
-                                <button
-                                  onClick={() => handleStatusChange(res.id, "cancelled")}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left font-nav text-xs font-medium text-error transition-colors hover:bg-surface-container"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="15" y1="9" x2="9" y2="15" />
-                                    <line x1="9" y1="9" x2="15" y2="15" />
-                                  </svg>
-                                  Cancel Reservation
-                                </button>
-                              </>
-                            )}
-
-                            {/* Cancelled / No-show can be re-confirmed */}
-                            {(res.status === "cancelled" || res.status === "no-show") && (
-                              <>
-                                <div className="mx-3 my-1 border-t border-outline-variant/15" />
-                                <button
-                                  onClick={() => handleStatusChange(res.id, "confirmed")}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left font-nav text-xs font-medium text-primary transition-colors hover:bg-surface-container"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                    <polyline points="22 4 12 14.01 9 11.01" />
-                                  </svg>
-                                  Mark Confirmed
-                                </button>
-                              </>
-                            )}
-
-                            {/* Payment actions */}
-                            {res.status === "cancelled" && res.payment_status === "paid" && (
-                              <>
-                                <div className="mx-3 my-1 border-t border-outline-variant/15" />
-                                <button
-                                  onClick={() => handlePaymentStatusChange(res.id, "refunded")}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left font-nav text-xs font-medium text-error transition-colors hover:bg-surface-container"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="23 4 23 10 17 10" />
-                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                                  </svg>
-                                  Process Refund
-                                </button>
-                              </>
-                            )}
-                            {res.payment_status === "pending" && res.status !== "cancelled" && (
-                              <>
-                                <div className="mx-3 my-1 border-t border-outline-variant/15" />
-                                <button
-                                  onClick={() => handlePaymentStatusChange(res.id, "paid")}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left font-nav text-xs font-medium text-primary transition-colors hover:bg-surface-container"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="12" y1="1" x2="12" y2="23" />
-                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                                  </svg>
-                                  Mark as Paid
                                 </button>
                               </>
                             )}
@@ -1320,6 +1307,16 @@ export default function ReservationsPage() {
           </div>
         </div>
       )}
+      <ConfirmationModal
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ""}
+        message={confirmAction?.message ?? ""}
+        confirmLabel={confirmAction?.confirmLabel ?? ""}
+        confirmVariant={confirmAction?.confirmVariant ?? "primary"}
+        onConfirm={() => confirmAction?.onConfirm()}
+        onCancel={() => setConfirmAction(null)}
+        isPending={updateMutation.isPending}
+      />
     </div>
   )
 }
