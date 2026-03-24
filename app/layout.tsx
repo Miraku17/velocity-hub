@@ -3,6 +3,7 @@ import { Space_Grotesk, Manrope, Lexend, Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Providers } from "@/lib/providers";
+import { Analytics } from "@vercel/analytics/react";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -124,6 +125,7 @@ export default function RootLayout({
       </head>
       <body className="bg-surface text-on-surface font-body">
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
