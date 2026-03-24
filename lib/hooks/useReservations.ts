@@ -32,9 +32,7 @@ export interface Reservation {
 export interface ReservationFilters {
   date?: string
   status?: ReservationStatus
-  payment_status?: PaymentStatus
   court_type?: CourtType
-  court_id?: string
   page?: number
   limit?: number
 }
@@ -75,9 +73,7 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
   const url = new URL("/api/reservations", window.location.origin)
   if (filters?.date) url.searchParams.set("date", filters.date)
   if (filters?.status) url.searchParams.set("status", filters.status)
-  if (filters?.payment_status) url.searchParams.set("payment_status", filters.payment_status)
   if (filters?.court_type) url.searchParams.set("court_type", filters.court_type)
-  if (filters?.court_id) url.searchParams.set("court_id", filters.court_id)
   if (filters?.page) url.searchParams.set("page", filters.page.toString())
   if (filters?.limit) url.searchParams.set("limit", filters.limit.toString())
 

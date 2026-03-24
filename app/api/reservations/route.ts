@@ -29,9 +29,6 @@ export async function GET(request: NextRequest) {
   if (courtType) query = query.eq("court_type", courtType)
   if (courtId) query = query.eq("court_id", courtId)
 
-  const paymentStatus = params.get("payment_status")
-  if (paymentStatus) query = query.eq("payment_status", paymentStatus)
-
   query = query.range(offset, offset + limit - 1)
 
   const { data, error, count } = await query

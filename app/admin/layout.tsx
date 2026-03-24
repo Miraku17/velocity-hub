@@ -33,13 +33,6 @@ const navItems = [
     ),
   },
   {
-    label: "Sales",
-    href: "/admin/sales",
-    icon: (
-      <span className="flex h-5 w-5 items-center justify-center font-headline text-base font-extrabold leading-none">₱</span>
-    ),
-  },
-  {
     label: "Courts",
     href: "/admin/courts",
     icon: (
