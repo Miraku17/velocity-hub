@@ -45,6 +45,9 @@ export const metadata: Metadata = {
     "best pickleball courts Cebu",
     "outdoor pickleball Cebu",
     "pickleball hub Cebu City",
+    "pickleball Cebu City",
+    "pickleball court booking online",
+    "walk-in pickleball Cebu",
   ],
   icons: {
     icon: "/logo.png",
@@ -88,6 +91,13 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
+  },
+  category: "sports",
+  other: {
+    "geo.region": "PH-CEB",
+    "geo.placename": "Cebu City",
+    "geo.position": "10.3157;123.8854",
+    "ICBM": "10.3157, 123.8854",
   },
 };
 

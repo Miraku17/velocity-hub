@@ -12,13 +12,17 @@ import CallToAction from "./components/CallToAction";
 import FAQ from "./components/FAQ";
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "SportsActivityLocation",
+  "@type": ["SportsActivityLocation", "LocalBusiness"],
+  "@id": "https://velocitypickleball.com/#business",
   name: "Velocity Pickleball Hub",
   description:
     "Premium pickleball courts in Cebu with 6 indoor and outdoor courts. No membership required — book online or walk in.",
   url: "https://velocitypickleball.com",
   logo: "https://velocitypickleball.com/logo.png",
-  image: "https://velocitypickleball.com/hero.png",
+  image: [
+    "https://velocitypickleball.com/hero.png",
+    "https://velocitypickleball.com/logo.png",
+  ],
   sport: "Pickleball",
   address: {
     "@type": "PostalAddress",
@@ -45,11 +49,30 @@ const jsonLd = {
     opens: "06:00",
     closes: "22:00",
   },
+  priceRange: "$$",
+  currenciesAccepted: "PHP",
+  paymentAccepted: "GCash, Cash",
   amenityFeature: [
     { "@type": "LocationFeatureSpecification", name: "Indoor Courts", value: true },
     { "@type": "LocationFeatureSpecification", name: "Outdoor Courts", value: true },
     { "@type": "LocationFeatureSpecification", name: "Online Booking", value: true },
+    { "@type": "LocationFeatureSpecification", name: "Walk-ins Welcome", value: true },
   ],
+  potentialAction: {
+    "@type": "ReserveAction",
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate: "https://velocitypickleball.com/booking",
+      actionPlatform: [
+        "http://schema.org/DesktopWebPlatform",
+        "http://schema.org/MobileWebPlatform",
+      ],
+    },
+    result: {
+      "@type": "Reservation",
+      name: "Court Reservation",
+    },
+  },
 };
 
 export default function Home() {
