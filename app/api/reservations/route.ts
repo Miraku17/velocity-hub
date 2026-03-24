@@ -194,7 +194,8 @@ export async function PATCH(request: NextRequest) {
 
   const updates: Record<string, string> = {}
   if (status) updates.status = status
-  if (payment_status) updates.payment_status = payment_status
+  if (status === "cancelled") updates.payment_status = "declined"
+  else if (payment_status) updates.payment_status = payment_status
   if (notes !== undefined) updates.notes = notes
 
   if (Object.keys(updates).length === 0) {

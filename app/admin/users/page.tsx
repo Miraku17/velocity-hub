@@ -218,11 +218,14 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all")
   const [inviteOpen, setInviteOpen] = useState(false)
 
-  const { data: users = [], isLoading } = useQuery<UserProfile[]>({
+  const { data: users = [], isLoading, isError, error } = useQuery<UserProfile[]>({
     queryKey: ["users"],
     queryFn: async () => {
       const res = await fetch("/api/users")
-      if (!res.ok) throw new Error("Failed to fetch users")
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to fetch users")
+      }
       return res.json()
     },
   })
@@ -245,8 +248,14 @@ export default function AdminUsers() {
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
       {isLoading && <LoadingPage message="Loading users..." />}
 
+      {isError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+          {(error as Error)?.message ?? "Failed to load users."}
+        </div>
+      )}
+
       {/* ── Stats ── */}
-      {!isLoading && (
+      {!isLoading && !isError && (
         <>
           <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
             <div>
