@@ -60,32 +60,34 @@ export async function GET() {
 
   const admin = createAdminClient()
 
-  // Fetch profiles
-  const { data: profiles, error } = await admin
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: true })
-
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+  // Use auth users as the source of truth so no user is ever missing
+  const { data: authData, error: authError } = await admin.auth.admin.listUsers()
+  if (authError) {
+    return Response.json({ error: authError.message }, { status: 500 })
   }
-
-  // Fetch auth users for last_sign_in
-  const { data: authData } = await admin.auth.admin.listUsers()
   const authUsers = authData?.users ?? []
 
-  const authMap = new Map(
-    authUsers.map((u) => [u.id, u.last_sign_in_at])
-  )
+  // Merge with profiles for role / full_name
+  const { data: profiles } = await admin.from("profiles").select("*")
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
-  const users = profiles.map((p) => ({
-    id: p.id,
-    full_name: p.full_name,
-    email: p.email,
-    role: p.role,
-    created_at: p.created_at,
-    last_sign_in: authMap.get(p.id) ?? null,
-  }))
+  const users = authUsers
+    .map((u) => {
+      const profile = profileMap.get(u.id)
+      return {
+        id: u.id,
+        full_name:
+          profile?.full_name ??
+          u.user_metadata?.full_name ??
+          u.email?.split("@")[0] ??
+          "Unknown",
+        email: u.email ?? profile?.email ?? "",
+        role: profile?.role ?? u.user_metadata?.role ?? "employee",
+        created_at: u.created_at,
+        last_sign_in: u.last_sign_in_at ?? null,
+      }
+    })
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
   return Response.json(users)
 }

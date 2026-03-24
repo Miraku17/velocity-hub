@@ -46,6 +46,13 @@ const navItems = [
     ),
   },
   {
+    label: "Sales",
+    href: "/admin/sales",
+    icon: (
+      <span className="text-[17px] font-bold leading-none" style={{ fontFamily: "inherit" }}>₱</span>
+    ),
+  },
+  {
     label: "Users",
     href: "/admin/users",
     icon: (
@@ -174,7 +181,7 @@ export default function AdminLayout({
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3">
           <div className="space-y-1">
-            {navItems.filter((item) => (item.href !== "/admin/users" && item.href !== "/admin/venue-settings") || isAdmin).map((item) => (
+            {navItems.filter((item) => (item.href !== "/admin/users" && item.href !== "/admin/venue-settings" && item.href !== "/admin/sales") || isAdmin).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
