@@ -2,17 +2,18 @@ import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://velocitypickleball.com";
+  const now = new Date();
 
   return [
     {
       url: baseUrl,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: "weekly",
       priority: 1,
     },
     {
       url: `${baseUrl}/booking`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: "daily",
       priority: 0.9,
     },
