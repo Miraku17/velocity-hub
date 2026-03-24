@@ -26,14 +26,16 @@ const jsonLd = {
   sport: "Pickleball",
   address: {
     "@type": "PostalAddress",
+    streetAddress: "Beside QC Pavilion, Gorordo Ave",
     addressLocality: "Cebu City",
+    postalCode: "6000",
     addressRegion: "Cebu",
     addressCountry: "PH",
   },
   geo: {
     "@type": "GeoCoordinates",
-    latitude: 10.3157,
-    longitude: 123.8854,
+    latitude: 10.3167497,
+    longitude: 123.9000693,
   },
   openingHoursSpecification: {
     "@type": "OpeningHoursSpecification",

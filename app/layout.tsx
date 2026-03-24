@@ -97,8 +97,8 @@ export const metadata: Metadata = {
   other: {
     "geo.region": "PH-CEB",
     "geo.placename": "Cebu City",
-    "geo.position": "10.3157;123.8854",
-    "ICBM": "10.3157, 123.8854",
+    "geo.position": "10.3167497;123.9000693",
+    "ICBM": "10.3167497, 123.9000693",
   },
 };
 

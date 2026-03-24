@@ -2,31 +2,18 @@ export default function Location() {
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-8 py-24">
       <div className="flex flex-col lg:flex-row gap-12 lg:gap-16 items-center">
-        {/* Map placeholder */}
-        <div className="flex-1 w-full h-[350px] md:h-[400px] bg-surface-container-highest rounded-[2rem] overflow-hidden relative group">
-          <div className="absolute inset-0 grid-pattern opacity-15 group-hover:opacity-30 transition-opacity duration-700" />
-
-          {/* Ambient glow on hover */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <span className="material-symbols-outlined text-6xl text-primary animate-bounce">
-                location_on
-              </span>
-              <p className="font-headline font-black text-2xl mt-4 uppercase tracking-tight">
-                IT Park, Cebu City
-              </p>
-            </div>
-          </div>
-          <div className="absolute bottom-6 right-6">
-            <button className="bg-surface-container-lowest text-primary px-6 py-3 rounded-lg font-label font-bold text-xs shadow-[0_4px_20px_rgba(27,28,24,0.08)] flex items-center gap-2 hover:bg-primary hover:text-white transition-all duration-300">
-              Open in Maps
-              <span className="material-symbols-outlined text-sm">
-                open_in_new
-              </span>
-            </button>
-          </div>
+        {/* Google Map */}
+        <div className="flex-1 w-full h-[350px] md:h-[400px] rounded-[2rem] overflow-hidden relative group">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d981.3286480348152!2d123.9001117081166!3d10.31668871646746!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x33a999004fe8bcd5%3A0x7259e73e0d931092!2sVELOCITY%20PICKLEBALL%20HUB!5e0!3m2!1sen!2sph!4v1774325927158!5m2!1sen!2sph"
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            title="Velocity Pickleball Hub Location"
+          />
         </div>
 
         {/* Info */}
@@ -39,8 +26,7 @@ export default function Location() {
               Locate Velocity
             </h2>
             <p className="font-body text-on-surface-variant leading-relaxed mb-8 text-sm md:text-base">
-              Located in the heart of Cebu, our facility is easily accessible
-              with ample parking for all players.
+              Located beside QC Pavilion along Gorordo Ave, Cebu City. Easily accessible with ample parking for all players.
             </p>
 
             <div className="space-y-6">
@@ -55,8 +41,7 @@ export default function Location() {
                     Address
                   </h5>
                   <p className="text-on-surface-variant text-sm font-body leading-relaxed">
-                    Velocity Hub, Unit 4B, Central Bloc IT Park, Cebu City,
-                    Philippines
+                    Beside QC Pavilion, Gorordo Ave, Cebu City, 6000 Cebu
                   </p>
                 </div>
               </div>
