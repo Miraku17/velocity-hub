@@ -9,6 +9,7 @@ import Footer from "./components/Footer";
 import ShotTerms from "./components/ShotTerms";
 import FlowingMenuSection from "./components/FlowingMenuSection";
 import CallToAction from "./components/CallToAction";
+import Cafe from "./components/Cafe";
 import FAQ from "./components/FAQ";
 const jsonLd = {
   "@context": "https://schema.org",
@@ -93,6 +94,7 @@ export default function Home() {
         <Facility />
         <Community />
         {/* <FlowingMenuSection /> */}
+        <Cafe />
         <FAQ />
         <Location />
         <CallToAction />

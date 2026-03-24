@@ -45,7 +45,7 @@ export default function VenueSettingsPage() {
   const updateQr = useUpdatePaymentQrCode()
   const deleteQr = useDeletePaymentQrCode()
 
-  const [activeTab, setActiveTab] = useState<Tab>("general")
+  const [activeTab, setActiveTab] = useState<Tab>("hours")
   const [saved, setSaved] = useState(false)
 
   // ── General fields ──
@@ -216,7 +216,7 @@ export default function VenueSettingsPage() {
   }
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: "general", label: "General", icon: "store" },
+    // { key: "general", label: "General", icon: "store" },
     { key: "hours", label: "Hours", icon: "schedule" },
     { key: "tags", label: "Tags & Photos", icon: "sell" },
     { key: "payments", label: "Payments", icon: "qr_code_2" },
@@ -286,7 +286,7 @@ export default function VenueSettingsPage() {
       {/* ── Tab Content ── */}
       <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 md:p-8">
         {/* ═══ GENERAL ═══ */}
-        {activeTab === "general" && (
+        {false && activeTab === "general" && (
           <div className="max-w-2xl space-y-6">
             <div>
               <h2 className="font-headline text-lg font-bold text-on-surface">General Information</h2>

@@ -5,7 +5,7 @@ export default function Location() {
         {/* Google Map */}
         <div className="flex-1 w-full h-[350px] md:h-[400px] rounded-[2rem] overflow-hidden relative group">
           <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d981.3286480348152!2d123.9001117081166!3d10.31668871646746!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x33a999004fe8bcd5%3A0x7259e73e0d931092!2sVELOCITY%20PICKLEBALL%20HUB!5e0!3m2!1sen!2sph!4v1774325927158!5m2!1sen!2sph"
+            src="https://maps.google.com/maps?q=10.316736,123.900031&z=17&output=embed"
             width="100%"
             height="100%"
             style={{ border: 0 }}

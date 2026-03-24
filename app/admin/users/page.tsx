@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useRef, useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { LoadingPage } from "@/components/ui/loading"
 
 /* ── Types ── */
@@ -47,11 +48,175 @@ function formatDate(date: string) {
   })
 }
 
+/* ── Invite Modal ── */
+
+function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      setFullName("")
+      setEmail("")
+      setError(null)
+      setSuccess(false)
+      setTimeout(() => nameRef.current?.focus(), 50)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open, submitting, onClose])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: fullName, email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to send invite")
+      setSuccess(true)
+      queryClient.invalidateQueries({ queryKey: ["users"] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !submitting && onClose()} />
+
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-outline-variant/15 px-6 py-5">
+          <div>
+            <h3 className="font-headline text-base font-semibold text-on-surface">Add Employee</h3>
+            <p className="mt-0.5 font-body text-xs text-on-surface-variant">
+              They&apos;ll receive an email to set their password.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface disabled:opacity-40"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {success ? (
+          <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.27 6.27l.97-.97a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-headline text-base font-semibold text-on-surface">Invite Sent!</p>
+              <p className="mt-1 font-body text-xs text-on-surface-variant">
+                <span className="font-medium text-on-surface">{email}</span> will receive an email to set up their account.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="mt-2 rounded-lg bg-primary px-6 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
+            <div className="space-y-2">
+              <Label className="font-nav text-xs font-medium uppercase tracking-wider text-on-surface-variant">
+                Full Name
+              </Label>
+              <Input
+                ref={nameRef}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Juan dela Cruz"
+                disabled={submitting}
+                required
+                className="h-11 rounded-lg border-outline-variant/50 bg-surface-container-low px-3.5 font-body text-sm text-on-surface"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-nav text-xs font-medium uppercase tracking-wider text-on-surface-variant">
+                Email Address
+              </Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="juan@example.com"
+                disabled={submitting}
+                required
+                className="h-11 rounded-lg border-outline-variant/50 bg-surface-container-low px-3.5 font-body text-sm text-on-surface"
+              />
+            </div>
+
+            <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3">
+              <p className="font-body text-[11px] text-on-surface-variant leading-relaxed">
+                <span className="font-medium text-on-surface">Role:</span> Employee — The employee will receive an invite email and set their own password upon first login.
+              </p>
+            </div>
+
+            {error && (
+              <p className="font-body text-xs text-error">{error}</p>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="flex-1 rounded-lg border border-outline-variant/30 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || !fullName.trim() || !email.trim()}
+                className="flex-1 rounded-lg bg-primary py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                {submitting ? "Sending..." : "Send Invite"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── Component ── */
 
 export default function AdminUsers() {
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all")
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const { data: users = [], isLoading } = useQuery<UserProfile[]>({
     queryKey: ["users"],
@@ -77,6 +242,7 @@ export default function AdminUsers() {
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
+      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
       {isLoading && <LoadingPage message="Loading users..." />}
 
       {/* ── Stats ── */}
@@ -118,6 +284,15 @@ export default function AdminUsers() {
                 </p>
               </div>
 
+              <button
+                onClick={() => setInviteOpen(true)}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add Employee
+              </button>
             </div>
 
             {/* Filters */}

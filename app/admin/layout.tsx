@@ -6,6 +6,8 @@ import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useMe } from "@/lib/hooks/useTimeClock"
+import { useQueryClient } from "@tanstack/react-query"
 
 const navItems = [
   {
@@ -79,7 +81,7 @@ const operationsItems = [
     ),
   },
   {
-    label: "Activity Logs",
+    label: "Audit Logs",
     href: "/admin/activity-logs",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -103,12 +105,17 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [signOutModalOpen, setSignOutModalOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const queryClient = useQueryClient()
+  const { data: me } = useMe()
+  const isAdmin = me?.role === "admin"
 
   async function handleSignOut() {
     setSigningOut(true)
     try {
       const res = await fetch("/api/auth/sign-out", { method: "POST" })
       if (res.ok) {
+        // Clear all cached queries so the next sign-in gets fresh data
+        queryClient.clear()
         setSignOutModalOpen(false)
         setSigningOut(false)
         router.push("/admin/sign-in")
@@ -167,7 +174,7 @@ export default function AdminLayout({
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3">
           <div className="space-y-1">
-            {navItems.map((item) => (
+            {navItems.filter((item) => (item.href !== "/admin/users" && item.href !== "/admin/venue-settings") || isAdmin).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -193,7 +200,7 @@ export default function AdminLayout({
               Operations
             </p>
             <div className="space-y-1">
-              {operationsItems.map((item) => (
+              {operationsItems.filter((item) => item.href !== "/admin/activity-logs" || isAdmin).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -219,14 +226,16 @@ export default function AdminLayout({
         <div className="border-t border-outline-variant/20 px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-fixed-dim/30 font-nav text-xs font-bold text-primary">
-              FA
+              {me?.full_name
+                ? me.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                : "?"}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-nav text-xs font-semibold text-on-surface">
-                Facility Admin
+                {me?.full_name ?? "Loading..."}
               </p>
-              <p className="truncate font-body text-[11px] text-on-surface-variant">
-                admin@velocity.com
+              <p className="truncate font-body text-[11px] text-on-surface-variant capitalize">
+                {me?.role ?? ""}
               </p>
             </div>
             <button

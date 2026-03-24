@@ -8,14 +8,6 @@ import { ScrollVelocity } from "@/components/ScrollVelocity";
 const COURT_IMAGE = "/hero.png";
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const AMENITIES = [
-  { icon: "local_parking", label: "Free Parking" },
-  { icon: "wc", label: "Restrooms" },
-  { icon: "local_drink", label: "Water Station" },
-  { icon: "weekend", label: "Lounge Area" },
-  { icon: "storefront", label: "Pro Shop" },
-  { icon: "wifi", label: "Free WiFi" },
-];
 
 export default function Facility() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -220,47 +212,6 @@ export default function Facility() {
             </div>
           </motion.div>
         </div>
-      </div>
-
-      {/* ── Amenities Strip ── */}
-      <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pb-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, ease }}
-          className="rounded-3xl bg-primary p-8 sm:p-10"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-8 h-px bg-primary-fixed-dim/40" />
-            <span className="font-[Poppins] text-[10px] uppercase tracking-[0.35em] text-primary-fixed-dim font-bold">
-              Amenities Included
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-            {AMENITIES.map((a, i) => (
-              <motion.div
-                key={a.label}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.1 + i * 0.05, ease }}
-                className="flex flex-col items-center gap-3 py-5 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.07] transition-colors"
-              >
-                <span
-                  className="material-symbols-outlined text-primary-fixed-dim text-2xl"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  {a.icon}
-                </span>
-                <span className="font-[Poppins] text-[10px] uppercase tracking-[0.2em] text-white/50 font-semibold text-center">
-                  {a.label}
-                </span>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
       </div>
 
       {/* ── ScrollVelocity Marquee ── */}

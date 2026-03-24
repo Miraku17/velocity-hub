@@ -6,16 +6,22 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signIn } from "@/app/admin/actions"
+import { useQueryClient } from "@tanstack/react-query"
 
 export default function AdminSignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const queryClient = useQueryClient()
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
     const formData = new FormData(e.currentTarget)
+
+    // Clear any cached user data from a previous session
+    // so the new sign-in fetches fresh data
+    queryClient.clear()
 
     startTransition(async () => {
       const result = await signIn(formData)
