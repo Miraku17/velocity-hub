@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: "Book a Pickleball Court — Velocity Pickleball Hub",
     description:
       "Reserve your court online at Velocity Pickleball Hub, Cebu. 6 premium courts, no membership needed.",
-    url: "https://velocitypickleball.com/booking",
+    url: "https://velocitypickleballcebu.com/booking",
   },
 };
 

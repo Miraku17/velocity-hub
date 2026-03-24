@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     icon: "/logo.png",
     apple: "/logo.png",
   },
-  metadataBase: new URL("https://velocitypickleball.com"),
+  metadataBase: new URL("https://velocitypickleballcebu.com"),
   alternates: {
     canonical: "/",
   },
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     title: "Velocity Pickleball Hub | Pickleball Courts in Cebu",
     description:
       "6 premium pickleball courts in Cebu — covered & outdoor. No membership required. Book your court online in seconds.",
-    url: "https://velocitypickleball.com",
+    url: "https://velocitypickleballcebu.com",
     images: [
       {
         url: "/logo.png",
