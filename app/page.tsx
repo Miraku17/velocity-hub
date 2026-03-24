@@ -13,15 +13,15 @@ import FAQ from "./components/FAQ";
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": ["SportsActivityLocation", "LocalBusiness"],
-  "@id": "https://velocitypickleball.com/#business",
+  "@id": "https://velocitypickleballcebu.com/#business",
   name: "Velocity Pickleball Hub",
   description:
     "Premium pickleball courts in Cebu with 6 indoor and outdoor courts. No membership required — book online or walk in.",
-  url: "https://velocitypickleball.com",
-  logo: "https://velocitypickleball.com/logo.png",
+  url: "https://velocitypickleballcebu.com",
+  logo: "https://velocitypickleballcebu.com/logo.png",
   image: [
-    "https://velocitypickleball.com/hero.png",
-    "https://velocitypickleball.com/logo.png",
+    "https://velocitypickleballcebu.com/hero.png",
+    "https://velocitypickleballcebu.com/logo.png",
   ],
   sport: "Pickleball",
   address: {
@@ -62,7 +62,7 @@ const jsonLd = {
     "@type": "ReserveAction",
     target: {
       "@type": "EntryPoint",
-      urlTemplate: "https://velocitypickleball.com/booking",
+      urlTemplate: "https://velocitypickleballcebu.com/booking",
       actionPlatform: [
         "http://schema.org/DesktopWebPlatform",
         "http://schema.org/MobileWebPlatform",
