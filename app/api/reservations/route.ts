@@ -4,6 +4,7 @@ import {
   getAuthenticatedUser,
   unauthorizedResponse,
 } from "@/lib/supabase/auth"
+import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
 
 // GET /api/reservations — list reservations (admin: all via view, public: by email)
 export async function GET(request: NextRequest) {
@@ -137,6 +138,27 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 400 })
   }
 
+  // Send admin notification email (non-blocking — don't fail the request if email fails)
+  const { data: court } = await supabase
+    .from("courts")
+    .select("name, court_type")
+    .eq("id", court_id)
+    .single()
+
+  sendBookingNotification({
+    reservationId: data as string,
+    customerName: customer_name,
+    customerEmail: customer_email,
+    customerPhone: customer_phone,
+    courtName: court?.name ?? "Unknown Court",
+    courtType: court?.court_type ?? "",
+    date,
+    startTime: start_time,
+    endTime: end_time,
+    reservationType: reservation_type || "regular",
+    notes,
+  }).catch(console.error)
+
   return Response.json({ id: data }, { status: 201 })
 }
 
@@ -188,6 +210,31 @@ export async function PATCH(request: NextRequest) {
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 })
+  }
+
+  // Send receipt to customer when admin confirms the booking
+  if (status === "confirmed") {
+    const { data: reservation } = await supabase
+      .from("reservations_view")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (reservation) {
+      sendReceiptEmail({
+        customerName: reservation.customer_name,
+        customerEmail: reservation.customer_email,
+        courtName: reservation.court_name,
+        courtType: reservation.court_type,
+        date: reservation.reservation_date,
+        startTime: reservation.start_time,
+        endTime: reservation.end_time,
+        reservationType: reservation.reservation_type,
+        reservationCode: reservation.reservation_code,
+        totalAmount: reservation.total_amount,
+        notes: reservation.notes,
+      }).catch(console.error)
+    }
   }
 
   return Response.json(data)

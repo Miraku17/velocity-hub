@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { useClockIn, useClockOut, useTimeEntries } from "@/lib/hooks/useTimeClock"
 
@@ -156,6 +157,7 @@ export default function EmployeeClockWidget() {
   const [modalOpen, setModalOpen] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [time, setTime] = useState(new Date())
+  const [settling, setSettling] = useState(false)
 
   const { data: entries } = useTimeEntries()
   const clockInMutation = useClockIn()
@@ -188,6 +190,8 @@ export default function EmployeeClockWidget() {
   const pendingAction = isClockedIn ? "clock-out" : "clock-in"
   const isPending = clockInMutation.isPending || clockOutMutation.isPending
 
+  const queryClient = useQueryClient()
+
   const handleConfirm = useCallback(async () => {
     setMutationError(null)
     try {
@@ -197,10 +201,15 @@ export default function EmployeeClockWidget() {
         await clockOutMutation.mutateAsync(undefined)
       }
       setModalOpen(false)
+      // Block the button until the refetch completes so user can't double-tap
+      setSettling(true)
+      await queryClient.invalidateQueries({ queryKey: ["time-entries"] })
+      setSettling(false)
     } catch (err) {
+      setSettling(false)
       setMutationError(err instanceof Error ? err.message : "Something went wrong")
     }
-  }, [pendingAction, clockInMutation, clockOutMutation])
+  }, [pendingAction, clockInMutation, clockOutMutation, queryClient])
 
   const handleCancel = useCallback(() => {
     setMutationError(null)
@@ -288,7 +297,7 @@ export default function EmployeeClockWidget() {
           {/* Clock button */}
           <button
             onClick={() => setModalOpen(true)}
-            disabled={isPending}
+            disabled={isPending || settling}
             className={`group flex h-20 w-20 items-center justify-center rounded-full transition-all active:scale-95 disabled:opacity-60 ${
               !isClockedIn
                 ? "bg-primary text-on-primary shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
