@@ -834,6 +834,7 @@ export default function ReservationsPage() {
   const [dateFilter, setDateFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [courtTypeFilter, setCourtTypeFilter] = useState("")
+  const [courtFilter, setCourtFilter] = useState("")
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
@@ -850,10 +851,12 @@ export default function ReservationsPage() {
     date: dateFilter || undefined,
     status: (statusFilter || undefined) as ReservationStatus | undefined,
     court_type: (courtTypeFilter || undefined) as CourtType | undefined,
+    court_id: courtFilter || undefined,
     page: currentPage,
     limit: PAGE_SIZE,
   }
 
+  const { data: courts = [] } = useCourts()
   const { data: result, isLoading } = useReservations(filters)
   const updateMutation = useUpdateReservation()
 
@@ -956,8 +959,38 @@ export default function ReservationsPage() {
                 setDateFilter(e.target.value)
                 setCurrentPage(1)
               }}
-              className="rounded-md bg-surface-container-high px-3 py-2 font-body text-xs font-semibold text-on-surface outline-none"
+              className="h-9 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-xs font-semibold text-on-surface outline-none transition-colors focus:border-primary"
             />
+          </div>
+
+          {/* Court */}
+          <div className="flex flex-col gap-1">
+            <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+              Court
+            </span>
+            <Select
+              value={courtFilter}
+              onValueChange={(val) => {
+                setCourtFilter(val === "all" ? "" : val ?? "")
+                setCurrentPage(1)
+              }}
+            >
+              <SelectTrigger className="h-9 w-[160px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest font-body text-xs font-semibold text-on-surface">
+                <SelectValue placeholder="All Courts">
+                  {courtFilter ? courts.find((c) => c.id === courtFilter)?.name ?? "All Courts" : undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">All Courts</SelectItem>
+                  {courts.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Court Type */}
@@ -965,18 +998,24 @@ export default function ReservationsPage() {
             <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
               Court Type
             </span>
-            <select
+            <Select
               value={courtTypeFilter}
-              onChange={(e) => {
-                setCourtTypeFilter(e.target.value)
+              onValueChange={(val) => {
+                setCourtTypeFilter(val === "all" ? "" : val ?? "")
                 setCurrentPage(1)
               }}
-              className="rounded-md bg-surface-container-high px-3 py-2 font-body text-xs font-semibold text-on-surface outline-none"
             >
-              <option value="">All Courts</option>
-              <option value="indoor">Indoor</option>
-              <option value="outdoor">Outdoor</option>
-            </select>
+              <SelectTrigger className="h-9 w-[140px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest font-body text-xs font-semibold text-on-surface">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="indoor">Indoor</SelectItem>
+                  <SelectItem value="outdoor">Outdoor</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status */}
@@ -984,32 +1023,40 @@ export default function ReservationsPage() {
             <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
               Status
             </span>
-            <select
+            <Select
               value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
+              onValueChange={(val) => {
+                setStatusFilter(val === "all" ? "" : val ?? "")
                 setCurrentPage(1)
               }}
-              className="rounded-md bg-surface-container-high px-3 py-2 font-body text-xs font-semibold text-on-surface outline-none"
             >
-              <option value="">Any Status</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="no-show">No Show</option>
-            </select>
+              <SelectTrigger className="h-9 w-[150px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest font-body text-xs font-semibold text-on-surface">
+                <SelectValue placeholder="Any Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">Any Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="no-show">No Show</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Clear filters */}
-          {(dateFilter || statusFilter || courtTypeFilter) && (
+          {(dateFilter || statusFilter || courtTypeFilter || courtFilter) && (
             <button
               onClick={() => {
                 setDateFilter("")
                 setStatusFilter("")
                 setCourtTypeFilter("")
+                setCourtFilter("")
                 setCurrentPage(1)
               }}
-              className="mt-auto flex h-[34px] items-center gap-1.5 rounded-md bg-surface-container-high px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container"
+              className="mt-auto flex h-9 items-center gap-1.5 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -1243,7 +1290,7 @@ export default function ReservationsPage() {
                         No reservations found
                       </p>
                       <p className="font-body text-xs text-outline">
-                        {dateFilter || statusFilter || courtTypeFilter
+                        {dateFilter || statusFilter || courtTypeFilter || courtFilter
                           ? "Try adjusting your filters"
                           : "Reservations will appear here once customers book"}
                       </p>

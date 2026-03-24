@@ -203,26 +203,38 @@ function BookingPage() {
   }, [court, selectedDayOfWeek]);
 
   // Fetch existing reservations for selected court + date
-  const dateStr = useMemo(() => selectedDate.toISOString().split("T")[0], [selectedDate]);
-  const { data: existingReservations = [], isFetching: isFetchingSlots } = useQuery<
+  // Use local date parts to avoid UTC timezone shift from toISOString()
+  const dateStr = useMemo(() => {
+    const y = selectedDate.getFullYear();
+    const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const d = String(selectedDate.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, [selectedDate]);
+  const {
+    data: existingReservations = [],
+    isLoading: isLoadingSlots,
+    isFetching: isFetchingSlots,
+  } = useQuery<
     { start_time: string; end_time: string; status: string }[]
   >({
     queryKey: ["slot-availability", selectedCourt, dateStr],
     queryFn: async () => {
       if (!selectedCourt) return [];
       const res = await fetch(
-        `/api/reservations?court_id=${selectedCourt}&date=${dateStr}&fields=start_time,end_time,status`
+        `/api/reservations?court_id=${selectedCourt}&date=${dateStr}&limit=100`
       );
       if (!res.ok) return [];
       const json = await res.json();
-      // API returns { data: [...] } with pagination
       return (json.data || []).filter(
         (r: { status: string }) => r.status !== "cancelled"
       );
     },
-    enabled: !!selectedCourt,
+    enabled: !!selectedCourt && step === 2,
     staleTime: 0,
     gcTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 30_000,
   });
 
   // Map each time slot hour to its reservation status
@@ -301,7 +313,6 @@ function BookingPage() {
 
   async function handleConfirmBooking() {
     if (!court || !parsedTimeRange) return;
-    const dateStr = selectedDate.toISOString().split("T")[0];
     createReservation.mutate(
       {
         court_id: court.id,
@@ -681,9 +692,12 @@ function BookingPage() {
                   {/* Time slots card */}
                   <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm" style={{ border: `1px solid ${bg}08` }}>
                     <div className="flex items-center justify-between mb-4">
-                      <label className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider" style={{ color: `${bg}80` }}>
-                        <span className="material-symbols-outlined text-sm align-middle mr-1" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
+                      <label className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: `${bg}80` }}>
+                        <span className="material-symbols-outlined text-sm align-middle" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
                         Time Slots
+                        {isFetchingSlots && !isLoadingSlots && (
+                          <span className="inline-block h-3 w-3 animate-spin rounded-full border border-t-transparent" style={{ borderColor: `${bg}30`, borderTopColor: bg }} />
+                        )}
                       </label>
                       {selectedSlots.length > 0 && (
                         <button onClick={() => setSelectedSlots([])} className="font-[Poppins] text-[10px] uppercase tracking-wider text-red-400 hover:text-red-500 font-semibold transition-colors">
@@ -720,7 +734,7 @@ function BookingPage() {
                       <p className="font-[Poppins] text-xs py-8 text-center" style={{ color: `${bg}30` }}>
                         No time slots available
                       </p>
-                    ) : isFetchingSlots ? (
+                    ) : isLoadingSlots ? (
                       <div className="flex flex-col items-center justify-center py-10 gap-3">
                         <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: `${bg}20`, borderTopColor: bg }} />
                         <p className="font-[Poppins] text-xs font-medium" style={{ color: `${bg}50` }}>
