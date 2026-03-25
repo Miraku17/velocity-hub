@@ -7,7 +7,6 @@ import Link from "next/link";
 const LOGO_URL = "/logo.png";
 
 const NAV_LINKS = [
-  { href: "#services", label: "Services" },
   { href: "/booking", label: "Book Now" },
   { href: "#facility", label: "Facility" },
 ];

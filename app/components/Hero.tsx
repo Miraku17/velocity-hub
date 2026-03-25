@@ -135,7 +135,7 @@ export default function Hero() {
           className="flex flex-col sm:flex-row items-start gap-4"
         >
           <Link
-            href="#booking"
+            href="/booking"
             className="group relative w-full sm:w-auto text-center px-8 sm:px-10 py-4 sm:py-5 bg-white text-primary font-[Poppins] font-bold text-xs sm:text-sm uppercase tracking-[0.15em] rounded-full overflow-hidden transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_20px_60px_rgba(255,255,255,0.12)] active:scale-[0.97]"
           >
             <span className="relative z-10 flex items-center justify-center gap-3">

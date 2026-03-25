@@ -124,7 +124,7 @@ export default function CallToAction() {
             transition={{ duration: 1, delay: 0.5, ease }}
           >
             <Link
-              href="#booking"
+              href="/booking"
               className="group relative isolate flex items-center gap-4 px-12 py-6 rounded-2xl font-[Poppins] font-black uppercase tracking-[0.2em] text-sm overflow-hidden bg-white text-primary transition-all duration-500 hover:shadow-[0_20px_50px_rgba(255,255,255,0.2)] hover:bg-primary-fixed-dim hover:-translate-y-1 active:translate-y-0"
             >
               Reserve a Court
