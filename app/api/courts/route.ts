@@ -13,12 +13,14 @@ export async function GET(request: NextRequest) {
 
   const type = request.nextUrl.searchParams.get("type")
   const status = request.nextUrl.searchParams.get("status")
+  const includeArchived = request.nextUrl.searchParams.get("includeArchived") === "true"
 
   let query = supabase
     .from("courts")
     .select("*, court_schedules(*)")
     .order("created_at", { ascending: true })
 
+  if (!includeArchived) query = query.eq("archived", false)
   if (type) query = query.eq("court_type", type)
   if (status) query = query.eq("status", status)
 

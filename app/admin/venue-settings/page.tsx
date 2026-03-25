@@ -637,23 +637,6 @@ export default function VenueSettingsPage() {
                         </span>
                       )}
 
-                      {/* Hover overlay with actions */}
-                      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
-                        <button
-                          onClick={() => openEditQr(qr)}
-                          disabled={qrSaving}
-                          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-on-surface shadow-lg backdrop-blur-sm transition-transform hover:scale-110"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
-                        <button
-                          onClick={() => removeQr(qr.id)}
-                          disabled={qrSaving}
-                          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-error shadow-lg backdrop-blur-sm transition-transform hover:scale-110"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
-                      </div>
                     </div>
 
                     {/* Card footer */}
@@ -671,6 +654,22 @@ export default function VenueSettingsPage() {
                         <span className="font-label text-[10px] font-semibold uppercase tracking-wider text-primary">
                           {QR_TYPES.find((t) => t.value === qr.type)?.label || qr.type}
                         </span>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          onClick={() => openEditQr(qr)}
+                          disabled={qrSaving}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-primary/8 hover:text-primary disabled:opacity-40"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button
+                          onClick={() => removeQr(qr.id)}
+                          disabled={qrSaving}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error/8 hover:text-error disabled:opacity-40"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
                       </div>
                     </div>
                   </div>
