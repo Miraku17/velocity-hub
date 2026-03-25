@@ -63,6 +63,26 @@ function formatTime12(time: string): string {
   return `${hour12}:00 ${ampm}`;
 }
 
+/** Convert "7:00 AM" to 24h hour number (e.g. 7, or "12:00 AM" → 0) */
+function parse12Hour(slot: string): number {
+  const [timePart, ampm] = slot.split(" ");
+  let hour = parseInt(timePart.split(":")[0], 10);
+  if (ampm === "AM" && hour === 12) hour = 0;
+  else if (ampm === "PM" && hour !== 12) hour += 12;
+  return hour;
+}
+
+/** Get the per-hour rate for a slot, falling back to court base price */
+function getSlotRate(
+  slot: string,
+  hourlyRates: Record<string, number> | null | undefined,
+  basePrice: number
+): number {
+  if (!hourlyRates) return basePrice;
+  const hour = parse12Hour(slot);
+  return hourlyRates[String(hour)] ?? basePrice;
+}
+
 function formatCurrency(amount: number) {
   return `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
@@ -270,8 +290,11 @@ function BookingPage() {
 
   const breakdown = useMemo(() => {
     if (!court) return [];
-    return selectedSlots.map((t) => ({ time: t, rate: court.price_per_hour }));
-  }, [court, selectedSlots]);
+    return selectedSlots.map((t) => ({
+      time: t,
+      rate: getSlotRate(t, courtSchedule?.hourly_rates, court.price_per_hour),
+    }));
+  }, [court, courtSchedule, selectedSlots]);
 
   const total = breakdown.reduce((sum, b) => sum + b.rate, 0);
 
@@ -780,7 +803,7 @@ function BookingPage() {
                                 </span>
                               ) : (
                                 <span className="block text-[10px] font-[Poppins] font-semibold mt-0.5" style={{ color: isSelected ? "rgba(255,255,255,0.75)" : `${bg}66` }}>
-                                  {formatCurrency(court!.price_per_hour)}
+                                  {formatCurrency(getSlotRate(t, courtSchedule?.hourly_rates, court!.price_per_hour))}
                                 </span>
                               )}
                             </button>

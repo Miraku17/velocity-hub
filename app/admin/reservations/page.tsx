@@ -896,7 +896,10 @@ export default function ReservationsPage() {
       confirmLabel: msg.label,
       confirmVariant: msg.variant,
       onConfirm: () => {
-        const extra = status === "confirmed" ? { payment_status: "paid" as const } : {}
+        const extra =
+          status === "confirmed" ? { payment_status: "paid" as const } :
+          status === "cancelled" ? { payment_status: "declined" as const } :
+          {}
         updateMutation.mutate({ id, status, ...extra }, { onSuccess: () => setConfirmAction(null) })
       },
     })

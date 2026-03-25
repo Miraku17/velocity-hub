@@ -29,6 +29,8 @@ interface ScheduleFormEntry {
   enabled: boolean
   open_time: string
   close_time: string
+  customPricing: boolean
+  hourly_rates: Record<string, string> // keys are hour strings, values are price strings for input
 }
 
 interface FormState {
@@ -44,6 +46,26 @@ const defaultSchedule: ScheduleFormEntry = {
   enabled: true,
   open_time: "06:00",
   close_time: "22:00",
+  customPricing: false,
+  hourly_rates: {},
+}
+
+/** Generate hour keys between open and close time */
+function getHoursInRange(openTime: string, closeTime: string): number[] {
+  const openHour = parseInt(openTime.split(":")[0], 10)
+  let closeHour = parseInt(closeTime.split(":")[0], 10)
+  if (closeHour <= openHour) closeHour += 24
+  const hours: number[] = []
+  for (let h = openHour; h < closeHour; h++) {
+    hours.push(h % 24)
+  }
+  return hours
+}
+
+function formatHour12(hour: number): string {
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+  const ampm = hour < 12 ? "AM" : "PM"
+  return `${h12}:00 ${ampm}`
 }
 
 const emptyForm: FormState = {
@@ -52,7 +74,7 @@ const emptyForm: FormState = {
   status: "available",
   price_per_hour: "",
   description: "",
-  schedules: Array.from({ length: 7 }, () => ({ ...defaultSchedule })),
+  schedules: Array.from({ length: 7 }, () => ({ ...defaultSchedule, hourly_rates: {} })),
 }
 
 /* ── Helpers ── */
@@ -124,13 +146,20 @@ export default function CourtsPage() {
     const schedules: ScheduleFormEntry[] = Array.from({ length: 7 }, (_, i) => {
       const existing = court.court_schedules?.find((s) => s.day_of_week === i)
       if (existing) {
+        const rates = existing.hourly_rates ?? {}
+        const hourlyRatesStr: Record<string, string> = {}
+        for (const [k, v] of Object.entries(rates)) {
+          hourlyRatesStr[k] = String(v)
+        }
         return {
           enabled: !existing.is_closed,
-          open_time: existing.open_time.slice(0, 5), // "HH:MM:SS" → "HH:MM"
+          open_time: existing.open_time.slice(0, 5),
           close_time: existing.close_time.slice(0, 5),
+          customPricing: Object.keys(rates).length > 0,
+          hourly_rates: hourlyRatesStr,
         }
       }
-      return { enabled: false, open_time: "06:00", close_time: "22:00" }
+      return { enabled: false, open_time: "06:00", close_time: "22:00", customPricing: false, hourly_rates: {} }
     })
 
     setFormData({
@@ -169,12 +198,24 @@ export default function CourtsPage() {
     }
 
     // Build schedule entries from form — send all 7 days
-    const schedulesToSend: ScheduleInput[] = formData.schedules.map((s, i) => ({
-      day_of_week: i,
-      open_time: s.open_time,
-      close_time: s.close_time,
-      is_closed: !s.enabled,
-    }))
+    const schedulesToSend: ScheduleInput[] = formData.schedules.map((s, i) => {
+      let hourlyRates: Record<string, number> | null = null
+      if (s.customPricing && Object.keys(s.hourly_rates).length > 0) {
+        hourlyRates = {}
+        for (const [k, v] of Object.entries(s.hourly_rates)) {
+          const parsed = parseFloat(v)
+          if (!isNaN(parsed) && parsed >= 0) hourlyRates[k] = parsed
+        }
+        if (Object.keys(hourlyRates).length === 0) hourlyRates = null
+      }
+      return {
+        day_of_week: i,
+        open_time: s.open_time,
+        close_time: s.close_time,
+        is_closed: !s.enabled,
+        hourly_rates: hourlyRates,
+      }
+    })
 
     const body = {
       name: formData.name,
@@ -226,17 +267,17 @@ export default function CourtsPage() {
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex gap-1 rounded-xl bg-surface-container-low p-1">
-            <div className="min-w-[100px] rounded-lg bg-surface-container-lowest px-4 py-3 text-center lg:min-w-[120px] lg:px-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-1 gap-1 rounded-xl bg-surface-container-low p-1 sm:flex-none">
+            <div className="flex-1 rounded-lg bg-surface-container-lowest px-3 py-3 text-center sm:flex-none sm:min-w-[100px] sm:px-4 lg:min-w-[120px] lg:px-6">
               <p className="mb-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                Total Courts
+                Total
               </p>
               <p className="font-headline text-2xl font-extrabold text-on-surface">
                 {totalCourts.toString().padStart(2, "0")}
               </p>
             </div>
-            <div className="min-w-[100px] px-4 py-3 text-center lg:min-w-[120px] lg:px-6">
+            <div className="flex-1 px-3 py-3 text-center sm:flex-none sm:min-w-[100px] sm:px-4 lg:min-w-[120px] lg:px-6">
               <p className="mb-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                 Active
               </p>
@@ -244,9 +285,9 @@ export default function CourtsPage() {
                 {activeCourts.toString().padStart(2, "0")}
               </p>
             </div>
-            <div className="min-w-[100px] px-4 py-3 text-center lg:min-w-[120px] lg:px-6">
+            <div className="flex-1 px-3 py-3 text-center sm:flex-none sm:min-w-[100px] sm:px-4 lg:min-w-[120px] lg:px-6">
               <p className="mb-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                Maintenance
+                Maint.
               </p>
               <p className="font-headline text-2xl font-extrabold text-[#6B3B65]">
                 {maintenanceCourts.toString().padStart(2, "0")}
@@ -257,7 +298,7 @@ export default function CourtsPage() {
           {canCreateCourt && (
             <Button
               onClick={openAdd}
-              className="h-10 gap-2 rounded-lg bg-primary px-5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-all hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98]"
+              className="h-10 w-full gap-2 rounded-lg bg-primary px-5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-all hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98] sm:w-auto"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               Add Court
@@ -484,7 +525,7 @@ export default function CourtsPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex shrink-0 items-center justify-between border-b border-outline-variant/15 px-6 py-5">
+              <div className="flex shrink-0 items-center justify-between border-b border-outline-variant/15 px-4 py-4 sm:px-6 sm:py-5">
                 <div>
                   <h2 className="font-headline text-lg font-bold text-on-surface">
                     {modalMode === "add" ? "Add New Court" : "Edit Court"}
@@ -508,13 +549,13 @@ export default function CourtsPage() {
 
               {/* Error */}
               {error && (
-                <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-6">
                   {error}
                 </div>
               )}
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="overflow-y-auto px-6 py-5">
+              <form onSubmit={handleSubmit} className="overflow-y-auto px-4 py-5 sm:px-6">
                 <div className="space-y-5">
                   {/* Court Name */}
                   <div className="space-y-2">
@@ -698,58 +739,119 @@ export default function CourtsPage() {
 
                     <div className="space-y-1.5 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
                       {formData.schedules.map((sched, dayIndex) => (
-                        <div
-                          key={dayIndex}
-                          className={`flex items-center gap-2 rounded-md px-2.5 py-2 transition-colors ${sched.enabled ? "bg-surface-container-lowest" : ""}`}
-                        >
-                          {/* Day toggle */}
-                          <button
-                            type="button"
-                            disabled={submitting}
-                            onClick={() => {
-                              const updated = [...formData.schedules]
-                              updated[dayIndex] = { ...updated[dayIndex], enabled: !updated[dayIndex].enabled }
-                              setFormData({ ...formData, schedules: updated })
-                            }}
-                            className={`flex h-7 w-12 items-center justify-center rounded font-nav text-[10px] font-bold uppercase tracking-wider transition-all ${
-                              sched.enabled
-                                ? "bg-primary text-on-primary"
-                                : "bg-outline-variant/20 text-outline line-through"
-                            }`}
-                          >
-                            {DAY_SHORT[dayIndex]}
-                          </button>
+                        <div key={dayIndex} className={`rounded-md px-2.5 py-2 transition-colors ${sched.enabled ? "bg-surface-container-lowest" : ""}`}>
+                          <div className="flex items-center gap-2">
+                            {/* Day toggle */}
+                            <button
+                              type="button"
+                              disabled={submitting}
+                              onClick={() => {
+                                const updated = [...formData.schedules]
+                                updated[dayIndex] = { ...updated[dayIndex], enabled: !updated[dayIndex].enabled }
+                                setFormData({ ...formData, schedules: updated })
+                              }}
+                              className={`flex h-7 w-12 shrink-0 items-center justify-center rounded font-nav text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                sched.enabled
+                                  ? "bg-primary text-on-primary"
+                                  : "bg-outline-variant/20 text-outline line-through"
+                              }`}
+                            >
+                              {DAY_SHORT[dayIndex]}
+                            </button>
 
-                          {sched.enabled ? (
-                            <div className="flex flex-1 items-center gap-1.5">
-                              <input
-                                type="time"
-                                value={sched.open_time}
-                                disabled={submitting}
-                                onChange={(e) => {
-                                  const updated = [...formData.schedules]
-                                  updated[dayIndex] = { ...updated[dayIndex], open_time: e.target.value }
-                                  setFormData({ ...formData, schedules: updated })
-                                }}
-                                className="h-7 w-full rounded border border-outline-variant/40 bg-transparent px-2 font-body text-[11px] text-on-surface outline-none focus:border-primary"
-                              />
-                              <span className="font-body text-[10px] text-outline">to</span>
-                              <input
-                                type="time"
-                                value={sched.close_time}
-                                disabled={submitting}
-                                onChange={(e) => {
-                                  const updated = [...formData.schedules]
-                                  updated[dayIndex] = { ...updated[dayIndex], close_time: e.target.value }
-                                  setFormData({ ...formData, schedules: updated })
-                                }}
-                                className="h-7 w-full rounded border border-outline-variant/40 bg-transparent px-2 font-body text-[11px] text-on-surface outline-none focus:border-primary"
-                              />
+                            {sched.enabled ? (
+                              <div className="flex flex-1 flex-wrap items-center gap-1.5">
+                                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                                  <input
+                                    type="time"
+                                    value={sched.open_time}
+                                    disabled={submitting}
+                                    onChange={(e) => {
+                                      const updated = [...formData.schedules]
+                                      updated[dayIndex] = { ...updated[dayIndex], open_time: e.target.value }
+                                      setFormData({ ...formData, schedules: updated })
+                                    }}
+                                    className="h-7 min-w-0 flex-1 rounded border border-outline-variant/40 bg-transparent px-1.5 font-body text-[11px] text-on-surface outline-none focus:border-primary"
+                                  />
+                                  <span className="shrink-0 font-body text-[10px] text-outline">–</span>
+                                  <input
+                                    type="time"
+                                    value={sched.close_time}
+                                    disabled={submitting}
+                                    onChange={(e) => {
+                                      const updated = [...formData.schedules]
+                                      updated[dayIndex] = { ...updated[dayIndex], close_time: e.target.value }
+                                      setFormData({ ...formData, schedules: updated })
+                                    }}
+                                    className="h-7 min-w-0 flex-1 rounded border border-outline-variant/40 bg-transparent px-1.5 font-body text-[11px] text-on-surface outline-none focus:border-primary"
+                                  />
+                                </div>
+                                {/* Custom pricing toggle */}
+                                <button
+                                  type="button"
+                                  disabled={submitting}
+                                  onClick={() => {
+                                    const updated = [...formData.schedules]
+                                    updated[dayIndex] = { ...updated[dayIndex], customPricing: !updated[dayIndex].customPricing }
+                                    setFormData({ ...formData, schedules: updated })
+                                  }}
+                                  className={`shrink-0 rounded px-1.5 py-0.5 font-nav text-[9px] font-bold uppercase tracking-wider transition-all ${
+                                    sched.customPricing
+                                      ? "bg-primary/10 text-primary"
+                                      : "bg-outline-variant/10 text-outline hover:text-on-surface-variant"
+                                  }`}
+                                  title="Set per-hour pricing"
+                                >
+                                  ₱/hr
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="flex-1 font-body text-[11px] italic text-outline">
+                                Closed
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Per-hour pricing grid */}
+                          {sched.enabled && sched.customPricing && (
+                            <div className="mt-2 ml-0 grid grid-cols-2 gap-x-3 gap-y-1 rounded-md border border-outline-variant/20 bg-surface-container-low p-2 sm:ml-14">
+                              <p className="col-span-2 font-nav text-[9px] font-semibold uppercase tracking-wider text-on-surface-variant mb-1">
+                                Hourly Rates — {DAY_LABELS[dayIndex]}
+                              </p>
+                              {getHoursInRange(sched.open_time, sched.close_time).map((hour) => (
+                                <div key={hour} className="flex items-center gap-1.5">
+                                  <span className="w-16 shrink-0 font-body text-[10px] text-on-surface-variant">
+                                    {formatHour12(hour)}
+                                  </span>
+                                  <div className="relative flex-1">
+                                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 font-body text-[10px] text-outline">₱</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      placeholder={formData.price_per_hour || "0"}
+                                      value={sched.hourly_rates[String(hour)] ?? ""}
+                                      disabled={submitting}
+                                      onChange={(e) => {
+                                        const updated = [...formData.schedules]
+                                        const newRates = { ...updated[dayIndex].hourly_rates }
+                                        if (e.target.value === "") {
+                                          delete newRates[String(hour)]
+                                        } else {
+                                          newRates[String(hour)] = e.target.value
+                                        }
+                                        updated[dayIndex] = { ...updated[dayIndex], hourly_rates: newRates }
+                                        setFormData({ ...formData, schedules: updated })
+                                      }}
+                                      className="h-6 w-full rounded border border-outline-variant/30 bg-transparent pl-5 pr-1.5 font-body text-[10px] text-on-surface outline-none focus:border-primary"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                              <p className="col-span-2 mt-1 font-body text-[9px] text-outline">
+                                Empty fields use the default rate (₱{formData.price_per_hour || "0"})
+                              </p>
                             </div>
-                          ) : (
-                            <span className="flex-1 font-body text-[11px] italic text-outline">
-                              Closed
-                            </span>
                           )}
                         </div>
                       ))}
@@ -758,7 +860,7 @@ export default function CourtsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="mt-8 flex items-center justify-end gap-3 border-t border-outline-variant/15 pt-5">
+                <div className="mt-6 flex items-center justify-end gap-3 border-t border-outline-variant/15 pt-4 sm:mt-8 sm:pt-5">
                   <Button
                     type="button"
                     variant="outline"
@@ -819,17 +921,14 @@ export default function CourtsPage() {
               {/* Content */}
               <div className="mt-4 text-center">
                 <h3 className="font-headline text-lg font-semibold text-on-surface">
-                  Remove Court
+                  Archive Court
                 </h3>
                 <p className="mt-2 font-body text-sm text-on-surface-variant">
-                  Remove{" "}
+                  Archive{" "}
                   <span className="font-semibold text-on-surface">
                     {selectedCourt.name}
-                  </span>{" "}
-                  from public booking?
-                </p>
-                <p className="mt-2 font-body text-xs text-outline">
-                  If this court has existing reservations it will be <span className="font-semibold">archived</span> (hidden but recoverable). Otherwise it will be permanently deleted.
+                  </span>
+                  ? It will be hidden from public booking but all reservation history will be preserved. You can restore it at any time.
                 </p>
               </div>
 
@@ -854,7 +953,7 @@ export default function CourtsPage() {
                   disabled={submitting}
                   className="flex-1 rounded-lg bg-error px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
                 >
-                  {submitting ? "Removing..." : "Remove Court"}
+                  {submitting ? "Archiving..." : "Archive Court"}
                 </Button>
               </div>
             </div>

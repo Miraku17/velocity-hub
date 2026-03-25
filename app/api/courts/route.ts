@@ -89,12 +89,13 @@ export async function POST(request: NextRequest) {
 
   // Insert schedules if provided
   if (schedules && Array.isArray(schedules) && schedules.length > 0) {
-    const scheduleRows = schedules.map((s: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }) => ({
+    const scheduleRows = schedules.map((s: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean; hourly_rates?: Record<string, number> | null }) => ({
       court_id: court.id,
       day_of_week: s.day_of_week,
       open_time: s.open_time,
       close_time: s.close_time,
       is_closed: s.is_closed,
+      hourly_rates: s.hourly_rates || null,
     }))
 
     const { error: schedError } = await supabase
