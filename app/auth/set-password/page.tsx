@@ -18,16 +18,65 @@ export default function SetPasswordPage() {
   const [name, setName] = useState<string>("")
 
   useEffect(() => {
-    // Session is established by /auth/callback before redirecting here
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error || !data.session) {
-        setStatus("error")
+
+    // Supabase browser client auto-processes the hash fragment on load.
+    // Listen for the resulting AUTH_STATE_CHANGE event first.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") && session) {
+        subscription.unsubscribe()
+        setName(session.user.user_metadata?.full_name ?? "")
+        window.history.replaceState(null, "", window.location.pathname)
+        setStatus("ready")
+      }
+    })
+
+    // Also check for an already-active session (e.g. redirected via /auth/callback)
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        subscription.unsubscribe()
+        setName(data.session.user.user_metadata?.full_name ?? "")
+        setStatus("ready")
         return
       }
-      setName(data.session.user.user_metadata?.full_name ?? "")
-      setStatus("ready")
+
+      // Fallback: manually set session from hash fragment
+      const hash = window.location.hash.substring(1)
+      const params = new URLSearchParams(hash)
+      const accessToken = params.get("access_token")
+      const refreshToken = params.get("refresh_token")
+      const type = params.get("type")
+
+      if (type === "invite" && accessToken && refreshToken) {
+        supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          .then(({ data: sessionData, error }) => {
+            if (error || !sessionData.session) {
+              subscription.unsubscribe()
+              setStatus("error")
+              return
+            }
+            subscription.unsubscribe()
+            setName(sessionData.session.user.user_metadata?.full_name ?? "")
+            window.history.replaceState(null, "", window.location.pathname)
+            setStatus("ready")
+          })
+      } else {
+        // No hash, no existing session — set a timeout to wait for onAuthStateChange
+        setTimeout(() => {
+          supabase.auth.getSession().then(({ data: retryData }) => {
+            subscription.unsubscribe()
+            if (retryData.session) {
+              setName(retryData.session.user.user_metadata?.full_name ?? "")
+              setStatus("ready")
+            } else {
+              setStatus("error")
+            }
+          })
+        }, 1000)
+      }
     })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
