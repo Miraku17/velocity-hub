@@ -16,6 +16,10 @@ const nextConfig: NextConfig = {
         hostname: "127.0.0.1",
         port: "54331",
       },
+      {
+        protocol: "https",
+        hostname: "pkahsxwnkvqmwmnvbzdc.supabase.co",
+      },
     ],
   },
 };

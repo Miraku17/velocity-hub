@@ -33,16 +33,6 @@ const FAQS = [
       "Yes! We have rental paddles and pickleballs available at the front desk. Rental paddles are ₱50 per session. Balls are provided free of charge for all court bookings.",
   },
   {
-    question: "Can I cancel or reschedule my booking?",
-    answer:
-      "Absolutely. You can cancel or reschedule up to 2 hours before your reserved time slot at no charge. Late cancellations may be subject to a 50% fee.",
-  },
-  {
-    question: "Do you offer coaching or clinics for beginners?",
-    answer:
-      "Yes! We run beginner clinics every Saturday morning and offer private coaching sessions throughout the week. Our certified coaches cater to all skill levels—from first-timers to competitive players.",
-  },
-  {
     question: "Is there parking available?",
     answer:
       "Yes, we have free parking for up to 50 vehicles right next to the facility. Motorcycle parking is also available.",
@@ -60,6 +50,7 @@ export default function FAQ() {
 
   return (
     <section
+      id="faq"
       ref={ref}
       className="relative bg-surface py-28 md:py-36 lg:py-44 overflow-hidden"
     >

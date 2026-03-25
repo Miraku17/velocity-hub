@@ -1,29 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { Facebook, Instagram, Youtube } from "lucide-react";
+import { Facebook, Instagram } from "lucide-react";
 
 const NAV_COLUMNS = [
   {
     title: "Home",
     links: [
-      { href: "#services", label: "About" },
-      { href: "#community", label: "Membership" },
-      { href: "#facility", label: "Coaches" },
+      { href: "#", label: "About" },
     ],
   },
   {
     title: "Community",
     links: [
-      { href: "#facility", label: "Accessories" },
-      { href: "#", label: "Terms & Conditions" },
-      { href: "#", label: "Privacy Policy" },
+      { href: "/terms", label: "Terms & Conditions" },
+      { href: "/privacy", label: "Privacy Policy" },
     ],
   },
   {
     title: "Support",
     links: [
-      { href: "#", label: "FAQ" },
+      { href: "/#faq", label: "FAQ" },
       { href: "#", label: "Contact Us" },
       { href: "#", label: "Help Center" },
     ],
@@ -32,8 +29,7 @@ const NAV_COLUMNS = [
 
 const SOCIAL_LINKS = [
   { icon: Facebook, label: "Facebook", href: "https://www.facebook.com/velocitypickleballhub" },
-  { icon: Instagram, label: "Instagram", href: "#" },
-  { icon: Youtube, label: "YouTube", href: "#" },
+  { icon: Instagram, label: "Instagram", href: "https://www.instagram.com/velocitypickleball.ceb/" },
 ];
 
 export default function Footer() {
@@ -139,13 +135,13 @@ export default function Footer() {
 
           <div className="flex items-center gap-8">
             <Link
-              href="#"
+              href="/terms"
               className="font-[Poppins] text-xs text-primary/30 hover:text-primary transition-colors"
             >
               Terms of Service
             </Link>
             <Link
-              href="#"
+              href="/privacy"
               className="font-[Poppins] text-xs text-primary/30 hover:text-primary transition-colors"
             >
               Privacy Policy
