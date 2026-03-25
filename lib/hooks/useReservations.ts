@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 export type ReservationType = "regular" | "walk-in" | "priority"
 export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "completed" | "no-show"
-export type PaymentStatus = "pending" | "paid" | "refunded"
+export type PaymentStatus = "pending" | "paid" | "refunded" | "declined"
 export type CourtType = "indoor" | "outdoor"
 
 export interface Reservation {
