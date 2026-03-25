@@ -1,11 +1,14 @@
 "use client";
 
-import Image from "next/image";
 import { useRef } from "react";
 import { motion, useInView } from "motion/react";
 import { ScrollVelocity } from "@/components/ScrollVelocity";
 
-const COURT_IMAGE = "/hero.png";
+const STORAGE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/venue-assets`;
+const IMG_1 = `${STORAGE}/IMG_0592.webp`;
+const IMG_2 = `${STORAGE}/IMG_0594.jpg`;
+const VIDEO_1 = `${STORAGE}/IMG_0664.mp4`;
+const VIDEO_2 = `${STORAGE}/IMG_0670.mp4`;
 const ease = [0.16, 1, 0.3, 1] as const;
 
 
@@ -71,11 +74,10 @@ export default function Facility() {
             transition={{ duration: 1, ease }}
             className="col-span-2 row-span-2 relative rounded-3xl overflow-hidden group cursor-default"
           >
-            <Image
-              src={COURT_IMAGE}
+            <img
+              src={IMG_1}
               alt="Velocity Courts Overview"
-              fill
-              className="object-cover group-hover:scale-[1.03] transition-transform duration-[2000ms]"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-primary/10 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
@@ -96,11 +98,10 @@ export default function Facility() {
             transition={{ duration: 0.7, delay: 0.1, ease }}
             className="relative rounded-3xl overflow-hidden group cursor-default"
           >
-            <Image
-              src={COURT_IMAGE}
+            <img
+              src={IMG_2}
               alt="Court Surface Detail"
-              fill
-              className="object-cover object-right-bottom group-hover:scale-[1.05] transition-transform duration-[2000ms]"
+              className="absolute inset-0 w-full h-full object-cover object-right-bottom group-hover:scale-[1.05] transition-transform duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-primary/30" />
             <div className="absolute bottom-4 left-4">
@@ -138,7 +139,7 @@ export default function Facility() {
             </div>
           </motion.div>
 
-          {/* Cell 4 — Lighting angle */}
+          {/* Cell 4 — Video clip */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -146,11 +147,13 @@ export default function Facility() {
             transition={{ duration: 0.7, delay: 0.25, ease }}
             className="relative rounded-3xl overflow-hidden group cursor-default"
           >
-            <Image
-              src={COURT_IMAGE}
-              alt="Court Lighting"
-              fill
-              className="object-cover object-top group-hover:scale-[1.05] transition-transform duration-[2000ms]"
+            <video
+              src={VIDEO_2}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-primary/50 to-primary/20" />
             <div className="absolute bottom-4 left-4">
@@ -187,7 +190,7 @@ export default function Facility() {
             </div>
           </motion.div>
 
-          {/* Cell 6 — Wide bottom shot (spans 2 cols) */}
+          {/* Cell 6 — Wide video (spans 2 cols) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -195,11 +198,13 @@ export default function Facility() {
             transition={{ duration: 0.7, delay: 0.35, ease }}
             className="col-span-2 relative rounded-3xl overflow-hidden group cursor-default"
           >
-            <Image
-              src={COURT_IMAGE}
-              alt="Courts Panorama"
-              fill
-              className="object-cover object-center group-hover:scale-[1.03] transition-transform duration-[2000ms]"
+            <video
+              src={VIDEO_1}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-primary/60 via-primary/20 to-transparent" />
             <div className="absolute bottom-5 left-6 flex items-center gap-3">
