@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { useClockIn, useClockOut, useTimeEntries } from "@/lib/hooks/useTimeClock"
+import { useClockIn, useClockOut, useTimeEntries, useMe } from "@/lib/hooks/useTimeClock"
 
 /* ── Elapsed Timer ── */
 
@@ -40,11 +40,12 @@ export default function EmployeeClockWidget() {
   const [transitioning, setTransitioning] = useState(false)
 
   const queryClient = useQueryClient()
+  const { data: me } = useMe()
   const { data: entries, isLoading } = useTimeEntries()
   const clockInMutation = useClockIn()
   const clockOutMutation = useClockOut()
 
-  const activeEntry = entries?.find((e) => e.is_active) ?? null
+  const activeEntry = entries?.find((e) => e.is_active && e.user_id === me?.id) ?? null
   const isClockedIn = !!activeEntry
   const isPending = clockInMutation.isPending || clockOutMutation.isPending
 

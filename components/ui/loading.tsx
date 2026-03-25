@@ -30,7 +30,7 @@ interface LoadingPageProps {
 
 export function LoadingPage({ message = "Loading...", className }: LoadingPageProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center py-20", className)}>
+    <div className={cn("flex min-h-[60vh] flex-col items-center justify-center", className)}>
       <LoadingSpinner size="lg" />
       <p className="mt-4 font-body text-sm text-on-surface-variant">{message}</p>
     </div>

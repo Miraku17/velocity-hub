@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const { id } = await params
   const body = await request.json()
-  const { name, court_type, price_per_hour, description, status, schedules } = body
+  const { name, court_type, price_per_hour, description, status, schedules, archived } = body
 
   if (court_type && !["indoor", "outdoor"].includes(court_type)) {
     return Response.json(
@@ -75,6 +75,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (price_per_hour !== undefined) updates.price_per_hour = price_per_hour
   if (description !== undefined) updates.description = description
   if (status !== undefined) updates.status = status
+  if (archived !== undefined) updates.archived = archived
 
   // Update court fields if any
   if (Object.keys(updates).length > 0) {
@@ -140,7 +141,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   return Response.json(data)
 }
 
-// DELETE /api/courts/[id] — delete a court (requires courts.delete permission)
+// DELETE /api/courts/[id] — archive a court if it has reservations, hard-delete otherwise
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
@@ -151,11 +152,25 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { error } = await supabase.from("courts").delete().eq("id", id)
+  // Check if any reservations reference this court
+  const { count } = await supabase
+    .from("reservations")
+    .select("id", { count: "exact", head: true })
+    .eq("court_id", id)
 
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+  if (count && count > 0) {
+    // Soft delete — preserve reservation history
+    const { error } = await supabase
+      .from("courts")
+      .update({ archived: true })
+      .eq("id", id)
+
+    if (error) return Response.json({ error: error.message }, { status: 500 })
+    return Response.json({ message: "Court archived", archived: true })
   }
 
-  return Response.json({ message: "Court deleted" })
+  // No reservations — safe to hard delete
+  const { error } = await supabase.from("courts").delete().eq("id", id)
+  if (error) return Response.json({ error: error.message }, { status: 500 })
+  return Response.json({ message: "Court deleted", archived: false })
 }

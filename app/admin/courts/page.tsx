@@ -10,6 +10,7 @@ import {
   useCreateCourt,
   useUpdateCourt,
   useDeleteCourt,
+  useRestoreCourt,
   type Court,
   type CourtType,
   type CourtStatus,
@@ -87,7 +88,7 @@ function formatCurrency(amount: number) {
 /* ── Component ── */
 
 export default function CourtsPage() {
-  const { data: courts = [], isLoading } = useCourts()
+  const { data: allCourts = [], isLoading } = useCourts({ includeArchived: true })
   const { data: me } = useMe()
   const canCreateCourt = me?.permissions.courts_create ?? false
   const canUpdateCourt = me?.permissions.courts_update ?? false
@@ -95,17 +96,21 @@ export default function CourtsPage() {
   const createCourt = useCreateCourt()
   const updateCourt = useUpdateCourt()
   const deleteCourt = useDeleteCourt()
+  const restoreCourt = useRestoreCourt()
 
   const [modalMode, setModalMode] = useState<ModalMode>(null)
   const [selectedCourt, setSelectedCourt] = useState<Court | null>(null)
   const [formData, setFormData] = useState<FormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
 
+  const courts = allCourts.filter((c) => !c.archived)
+  const archivedCourts = allCourts.filter((c) => c.archived)
+
   const totalCourts = courts.length
   const activeCourts = courts.filter((c) => c.status === "available").length
   const maintenanceCourts = courts.filter((c) => c.status === "maintenance").length
 
-  const submitting = createCourt.isPending || updateCourt.isPending || deleteCourt.isPending
+  const submitting = createCourt.isPending || updateCourt.isPending || deleteCourt.isPending || restoreCourt.isPending
 
   function openAdd() {
     setFormData(emptyForm)
@@ -202,6 +207,10 @@ export default function CourtsPage() {
       onSuccess: () => closeModal(),
       onError: (err) => setError(err.message),
     })
+  }
+
+  function handleRestore(court: Court) {
+    restoreCourt.mutate(court.id)
   }
 
   return (
@@ -409,6 +418,56 @@ export default function CourtsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Archived Courts ── */}
+      {archivedCourts.length > 0 && (
+        <div className="mt-12">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="material-symbols-outlined text-[20px] text-outline/60" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>archive</span>
+            <h2 className="font-headline text-base font-bold text-on-surface-variant">
+              Archived Courts
+            </h2>
+            <span className="rounded-full bg-surface-container-high px-2 py-0.5 font-label text-[10px] font-bold text-outline">
+              {archivedCourts.length}
+            </span>
+          </div>
+          <p className="mb-5 font-body text-xs text-outline">
+            These courts have been removed from public booking but their reservation history is preserved. Restore to make them active again.
+          </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {archivedCourts.map((court) => (
+              <div
+                key={court.id}
+                className="flex items-center gap-4 rounded-xl border border-outline-variant/10 bg-surface-container-low px-4 py-3 opacity-60"
+              >
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${court.court_type === "indoor" ? "bg-primary/10" : "bg-[#2D6A4F]/10"}`}>
+                  <span className="material-symbols-outlined text-[18px] text-outline/60" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    {court.court_type === "indoor" ? "house" : "wb_sunny"}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-headline text-sm font-bold text-on-surface-variant line-through">
+                    {court.name}
+                  </p>
+                  <p className="font-body text-xs text-outline">
+                    {court.court_type === "indoor" ? "Indoor" : "Outdoor"} · {formatCurrency(court.price_per_hour)}/hr
+                  </p>
+                </div>
+                {canDeleteCourt && (
+                  <button
+                    onClick={() => handleRestore(court)}
+                    disabled={submitting}
+                    className="shrink-0 flex items-center gap-1.5 rounded-lg bg-primary/8 px-3 py-1.5 font-nav text-[10px] font-semibold uppercase tracking-wider text-primary transition-colors hover:bg-primary/15 disabled:opacity-40"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">restore</span>
+                    Restore
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -760,14 +819,17 @@ export default function CourtsPage() {
               {/* Content */}
               <div className="mt-4 text-center">
                 <h3 className="font-headline text-lg font-semibold text-on-surface">
-                  Delete Court
+                  Remove Court
                 </h3>
                 <p className="mt-2 font-body text-sm text-on-surface-variant">
-                  Are you sure you want to delete{" "}
+                  Remove{" "}
                   <span className="font-semibold text-on-surface">
                     {selectedCourt.name}
-                  </span>
-                  ? This action cannot be undone.
+                  </span>{" "}
+                  from public booking?
+                </p>
+                <p className="mt-2 font-body text-xs text-outline">
+                  If this court has existing reservations it will be <span className="font-semibold">archived</span> (hidden but recoverable). Otherwise it will be permanently deleted.
                 </p>
               </div>
 
@@ -792,7 +854,7 @@ export default function CourtsPage() {
                   disabled={submitting}
                   className="flex-1 rounded-lg bg-error px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
                 >
-                  {submitting ? "Deleting..." : "Delete Court"}
+                  {submitting ? "Removing..." : "Remove Court"}
                 </Button>
               </div>
             </div>
