@@ -23,6 +23,12 @@ export interface UserProfile {
   role: "admin" | "employee"
   permissions: {
     time_clock_manage: boolean
+    courts_create: boolean
+    courts_update: boolean
+    courts_delete: boolean
+    users_create: boolean
+    bookings_create: boolean
+    bookings_update: boolean
   }
 }
 

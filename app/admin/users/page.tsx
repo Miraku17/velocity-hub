@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingPage } from "@/components/ui/loading"
+import { useMe } from "@/lib/hooks/useTimeClock"
 
 /* ── Types ── */
 
@@ -217,6 +218,8 @@ export default function AdminUsers() {
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all")
   const [inviteOpen, setInviteOpen] = useState(false)
+  const { data: me } = useMe()
+  const canCreateUser = me?.permissions.users_create ?? false
 
   const { data: users = [], isLoading, isError, error } = useQuery<UserProfile[]>({
     queryKey: ["users"],
@@ -293,15 +296,17 @@ export default function AdminUsers() {
                 </p>
               </div>
 
-              <button
-                onClick={() => setInviteOpen(true)}
-                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Add Employee
-              </button>
+              {canCreateUser && (
+                <button
+                  onClick={() => setInviteOpen(true)}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Add Employee
+                </button>
+              )}
             </div>
 
             {/* Filters */}
