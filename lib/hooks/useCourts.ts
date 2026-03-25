@@ -12,6 +12,7 @@ export interface CourtSchedule {
   open_time: string   // "HH:MM:SS"
   close_time: string  // "HH:MM:SS"
   is_closed: boolean
+  hourly_rates: Record<string, number> | null // e.g. {"7": 300, "8": 500} — keys are hour (0-23)
   created_at: string
   updated_at: string
 }
@@ -21,6 +22,7 @@ export interface ScheduleInput {
   open_time: string
   close_time: string
   is_closed: boolean
+  hourly_rates?: Record<string, number> | null
 }
 
 export interface Court {
