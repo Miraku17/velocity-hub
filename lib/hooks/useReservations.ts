@@ -136,7 +136,23 @@ export function useUpdateReservation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateReservation,
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      // Immediately patch the cached list so the row reflects the new status
+      // without waiting for the background refetch to complete.
+      queryClient.setQueriesData<PaginatedResponse>(
+        { queryKey: ["reservations"] },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            data: old.data.map((r) =>
+              r.id === updated.id
+                ? { ...r, status: updated.status, payment_status: updated.payment_status, notes: updated.notes }
+                : r
+            ),
+          }
+        }
+      )
       queryClient.invalidateQueries({ queryKey: ["reservations"] })
     },
   })

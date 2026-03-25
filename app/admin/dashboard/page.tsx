@@ -1,15 +1,9 @@
 "use client"
 
-import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { LoadingPage } from "@/components/ui/loading"
 import Link from "next/link"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 /* ── Types ── */
 
@@ -132,8 +126,6 @@ function getRelativeTime(dateStr: string) {
 /* ── Component ── */
 
 export default function AdminOverview() {
-  const [scheduleView, setScheduleView] = useState<"timeline" | "list">("timeline")
-
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
@@ -166,16 +158,6 @@ export default function AdminOverview() {
     }
     return { status: "available" as CourtStatus, detail: "Open" }
   }
-
-  // Timeline slots
-  const visibleSlots = (() => {
-    if (today_reservations.length === 0) return [7, 8, 9, 10, 11, 12]
-    const minHour = Math.max(6, Math.floor(Math.min(...today_reservations.map((r) => timeToHour(r.start_time)))))
-    const maxHour = Math.min(22, Math.ceil(Math.max(...today_reservations.map((r) => timeToHour(r.end_time)))) + 1)
-    const slots = []
-    for (let h = minHour; h < maxHour; h++) slots.push(h)
-    return slots.length > 0 ? slots : [7, 8, 9, 10, 11, 12]
-  })()
 
   const todayFormatted = now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -439,169 +421,8 @@ export default function AdminOverview() {
         </div>
       </div>
 
-      {/* ── Schedule + Activity ── */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
-        {/* Live Schedule */}
-        <Card className="border-none shadow-none ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-outline-variant/10 px-5 py-4 space-y-0">
-            <CardTitle className="font-headline text-base font-bold text-on-surface">
-              Today&apos;s Schedule
-            </CardTitle>
-            <div className="flex rounded-lg bg-surface-container-high p-0.5">
-              {(["timeline", "list"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setScheduleView(v)}
-                  className={`px-3 py-1 rounded-md font-nav text-[10px] font-semibold uppercase tracking-wider transition-all ${
-                    scheduleView === v
-                      ? "bg-surface-container-lowest text-on-surface shadow-sm"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-0">
-            {scheduleView === "timeline" ? (
-              <div className="overflow-x-auto">
-                <div className="min-w-[700px]">
-                  {/* Time header */}
-                  <div
-                    className="border-b border-outline-variant/10 bg-surface-container-low/30"
-                    style={{ display: "grid", gridTemplateColumns: `160px repeat(${visibleSlots.length}, 1fr)` }}
-                  >
-                    <div className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                      Court
-                    </div>
-                    {visibleSlots.map((hour) => (
-                      <div key={hour} className="border-l border-outline-variant/10 px-2 py-3 text-center font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                        {hour.toString().padStart(2, "0")}:00
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Court rows */}
-                  <div className="divide-y divide-outline-variant/8">
-                    {courts.map((court) => {
-                      const courtRes = today_reservations.filter((r) => r.court_id === court.id)
-                      return (
-                        <div
-                          key={court.id}
-                          className="hover:bg-surface-container-low/20 transition-colors"
-                          style={{ display: "grid", gridTemplateColumns: `160px repeat(${visibleSlots.length}, 1fr)` }}
-                        >
-                          <div className="flex flex-col justify-center px-5 py-5 border-r border-outline-variant/10">
-                            <p className="font-headline text-xs font-bold text-on-surface">{court.name}</p>
-                            <p className="font-label text-[9px] font-medium uppercase tracking-wider text-on-surface-variant mt-0.5">{court.court_type}</p>
-                          </div>
-
-                          <div className="relative h-16" style={{ gridColumn: `span ${visibleSlots.length}` }}>
-                            {/* Grid lines */}
-                            <div className="absolute inset-0 pointer-events-none" style={{ display: "grid", gridTemplateColumns: `repeat(${visibleSlots.length}, 1fr)` }}>
-                              {visibleSlots.map((_, i) => (
-                                <div key={i} className="border-l border-outline-variant/8 h-full" />
-                              ))}
-                            </div>
-
-                            {/* Reservation blocks */}
-                            {courtRes.map((res) => {
-                              const startH = timeToHour(res.start_time)
-                              const endH = timeToHour(res.end_time)
-                              const leftPercent = ((startH - visibleSlots[0]) / visibleSlots.length) * 100
-                              const widthPercent = ((endH - startH) / visibleSlots.length) * 100
-                              const isActive = startH <= currentHour && endH > currentHour
-
-                              return (
-                                <div
-                                  key={res.id}
-                                  className={`absolute top-2 bottom-2 rounded-md px-2.5 py-1.5 transition-all cursor-default ${
-                                    isActive
-                                      ? "bg-primary/15 ring-1 ring-primary/30"
-                                      : "bg-surface-container-high ring-1 ring-outline-variant/20"
-                                  }`}
-                                  style={{
-                                    left: `calc(${leftPercent}% + 4px)`,
-                                    width: `calc(${widthPercent}% - 8px)`,
-                                  }}
-                                >
-                                  <p className={`font-nav text-[9px] font-bold truncate ${isActive ? "text-primary" : "text-on-surface"}`}>
-                                    {res.customer_name}
-                                  </p>
-                                  <p className="font-body text-[8px] text-on-surface-variant mt-0.5">
-                                    {formatTime(res.start_time)} – {formatTime(res.end_time)}
-                                  </p>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {today_reservations.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16">
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-outline-variant/30 mb-3">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                      </svg>
-                      <p className="font-nav text-xs font-medium text-on-surface-variant">No reservations today</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* List view */
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-outline-variant/10 bg-surface-container-low/30">
-                      <th className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Court</th>
-                      <th className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Customer</th>
-                      <th className="px-5 py-3 font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Time</th>
-                      <th className="px-5 py-3 text-center font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-outline-variant/8">
-                    {today_reservations
-                      .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                      .map((res) => (
-                        <tr key={res.id} className="hover:bg-surface-container-low/20 transition-colors">
-                          <td className="px-5 py-4 font-headline text-xs font-bold text-on-surface">{res.court_name}</td>
-                          <td className="px-5 py-4 font-body text-xs text-on-surface">{res.customer_name}</td>
-                          <td className="px-5 py-4 font-body text-xs text-on-surface-variant">
-                            {formatTime(res.start_time)} – {formatTime(res.end_time)}
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            <span className={`inline-block rounded px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-widest ${
-                              res.status === "confirmed" || res.status === "completed"
-                                ? "bg-primary/10 text-primary"
-                                : res.status === "pending"
-                                ? "bg-[#C49B00]/10 text-[#C49B00]"
-                                : "bg-error/10 text-error"
-                            }`}>
-                              {res.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    {today_reservations.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-5 py-16 text-center font-nav text-xs font-medium text-on-surface-variant">
-                          No reservations today
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity */}
+      {/* ── Recent Activity ── */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card className="border-none shadow-none ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between border-b border-outline-variant/10 px-5 py-4 space-y-0">
             <CardTitle className="font-headline text-base font-bold text-on-surface">
