@@ -10,7 +10,7 @@ async function main() {
   const today = new Date().toISOString().split("T")[0]
 
   await sendBookingNotification({
-    reservationId: "test-123",
+    reservationCode: "VL-00001",
     customerName: "Juan dela Cruz",
     customerEmail: process.env.ADMIN_NOTIFY_EMAIL!,
     customerPhone: "+63 912 345 6789",

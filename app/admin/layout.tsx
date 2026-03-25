@@ -262,17 +262,23 @@ export default function AdminLayout({
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Mobile hamburger */}
-        <button
-          className="fixed top-4 left-4 z-40 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface-variant shadow-sm lg:hidden"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
+        {/* Mobile top bar */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-outline-variant/15 bg-surface-container-lowest px-4 py-3 lg:hidden">
+          <button
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <Image src="/logo.png" alt="Velocity" width={28} height={28} className="rounded-lg shrink-0" />
+            <span className="font-headline text-sm font-bold tracking-tight text-on-surface truncate">Velocity Hub</span>
+          </div>
+        </div>
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">

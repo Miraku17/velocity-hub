@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 
 type Status = "loading" | "ready" | "success" | "error"
 
-export default function SetPasswordPage() {
+export default function ResetPasswordPage() {
   const router = useRouter()
   const [status, setStatus] = useState<Status>("loading")
   const [password, setPassword] = useState("")
@@ -15,31 +15,16 @@ export default function SetPasswordPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [name, setName] = useState<string>("")
 
   useEffect(() => {
-    // Supabase puts the tokens in the URL hash for invite links
-    const hash = window.location.hash.substring(1)
-    const params = new URLSearchParams(hash)
-    const accessToken = params.get("access_token")
-    const refreshToken = params.get("refresh_token")
-    const type = params.get("type")
-
-    if (type !== "invite" || !accessToken || !refreshToken) {
-      setStatus("error")
-      return
-    }
-
+    // Session is already established by /auth/callback server route
     const supabase = createClient()
-    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).then(({ data, error }) => {
-      if (error || !data.user) {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        setStatus("ready")
+      } else {
         setStatus("error")
-        return
       }
-      setName(data.user.user_metadata?.full_name ?? "")
-      // Clear hash from URL
-      window.history.replaceState(null, "", window.location.pathname)
-      setStatus("ready")
     })
   }, [])
 
@@ -73,21 +58,16 @@ export default function SetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface p-4">
       <div className="w-full max-w-sm">
-        {/* Logo / brand */}
         <div className="mb-8 text-center">
-          <p className="font-['Clash_Display'] text-2xl font-bold text-primary tracking-tight">
-            VELOCITY
-          </p>
-          <p className="font-[Poppins] text-[10px] uppercase tracking-[0.3em] text-on-surface-variant mt-1">
-            Pickleball Hub
-          </p>
+          <p className="font-['Clash_Display'] text-2xl font-bold text-primary tracking-tight">VELOCITY</p>
+          <p className="font-[Poppins] text-[10px] uppercase tracking-[0.3em] text-on-surface-variant mt-1">Pickleball Hub</p>
         </div>
 
         <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-xl">
           {status === "loading" && (
             <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="font-body text-sm text-on-surface-variant">Verifying your invite...</p>
+              <p className="font-body text-sm text-on-surface-variant">Verifying your link...</p>
             </div>
           )}
 
@@ -103,9 +83,12 @@ export default function SetPasswordPage() {
               <div>
                 <p className="font-headline text-base font-semibold text-on-surface">Invalid or Expired Link</p>
                 <p className="mt-1 font-body text-xs text-on-surface-variant">
-                  This invite link is no longer valid. Ask your admin to send a new invite.
+                  This reset link is no longer valid. Request a new one.
                 </p>
               </div>
+              <a href="/auth/forgot-password" className="font-nav text-xs font-medium text-primary hover:underline">
+                Request new link
+              </a>
             </div>
           )}
 
@@ -118,10 +101,8 @@ export default function SetPasswordPage() {
                 </svg>
               </div>
               <div>
-                <p className="font-headline text-base font-semibold text-on-surface">Password Set!</p>
-                <p className="mt-1 font-body text-xs text-on-surface-variant">
-                  Redirecting you to the dashboard...
-                </p>
+                <p className="font-headline text-base font-semibold text-on-surface">Password Updated!</p>
+                <p className="mt-1 font-body text-xs text-on-surface-variant">Redirecting you to the dashboard...</p>
               </div>
             </div>
           )}
@@ -129,18 +110,12 @@ export default function SetPasswordPage() {
           {status === "ready" && (
             <form onSubmit={handleSubmit} className="px-6 py-6 space-y-5">
               <div className="mb-2">
-                <h2 className="font-headline text-base font-semibold text-on-surface">
-                  {name ? `Welcome, ${name.split(" ")[0]}!` : "Set Your Password"}
-                </h2>
-                <p className="mt-1 font-body text-xs text-on-surface-variant">
-                  Choose a password to activate your account.
-                </p>
+                <h2 className="font-headline text-base font-semibold text-on-surface">Set a new password</h2>
+                <p className="mt-1 font-body text-xs text-on-surface-variant">Choose a strong password for your account.</p>
               </div>
 
               <div className="space-y-2">
-                <label className="font-nav text-xs font-medium uppercase tracking-wider text-on-surface-variant">
-                  Password
-                </label>
+                <label className="font-nav text-xs font-medium uppercase tracking-wider text-on-surface-variant">New Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -176,9 +151,7 @@ export default function SetPasswordPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="font-nav text-xs font-medium uppercase tracking-wider text-on-surface-variant">
-                  Confirm Password
-                </label>
+                <label className="font-nav text-xs font-medium uppercase tracking-wider text-on-surface-variant">Confirm Password</label>
                 <div className="relative">
                   <input
                     type={showConfirm ? "text" : "password"}
@@ -213,16 +186,14 @@ export default function SetPasswordPage() {
                 </div>
               </div>
 
-              {error && (
-                <p className="font-body text-xs text-error">{error}</p>
-              )}
+              {error && <p className="font-body text-xs text-error">{error}</p>}
 
               <button
                 type="submit"
                 disabled={submitting || !password || !confirm}
                 className="w-full rounded-lg bg-primary py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
-                {submitting ? "Setting Password..." : "Set Password & Continue"}
+                {submitting ? "Updating..." : "Update Password"}
               </button>
             </form>
           )}

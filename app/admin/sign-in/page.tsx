@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import Link from "next/link"
 import { signIn } from "@/app/admin/actions"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -162,12 +163,12 @@ export default function AdminSignIn() {
                   >
                     Password
                   </Label>
-                  <button
-                    type="button"
+                  <Link
+                    href="/auth/forgot-password"
                     className="font-nav text-[11px] font-medium text-primary transition-colors hover:text-primary-container"
                   >
                     Forgot password?
-                  </button>
+                  </Link>
                 </div>
                 <div className="relative">
                   <Input
