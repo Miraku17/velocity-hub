@@ -495,7 +495,7 @@ export default function SalesPage() {
         <LoadingPage />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-outline-variant/15">
                 <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">

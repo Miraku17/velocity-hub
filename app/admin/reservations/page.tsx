@@ -537,7 +537,7 @@ function ReservationDetailModal({
                     {sb.label}
                   </span>
                 </div>
-                <p className="font-mono text-xs text-on-surface-variant">
+                <p className="truncate font-mono text-xs text-on-surface-variant">
                   #{res.reservation_code} &middot; {res.customer_email} &middot; {res.customer_phone}
                 </p>
               </div>
@@ -554,10 +554,10 @@ function ReservationDetailModal({
           </div>
 
           {/* Bento Grid */}
-          <div className="grid grid-cols-3 gap-3 p-4">
+          <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
 
             {/* Left Column - Booking Details (spans 1 col, 2 rows) */}
-            <div className="row-span-2 rounded-lg bg-surface-container-low p-4">
+            <div className="md:row-span-2 rounded-lg bg-surface-container-low p-4">
               <p className="mb-3 font-label text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/60">
                 Booking Details
               </p>
@@ -671,7 +671,7 @@ function ReservationDetailModal({
             </div>
 
             {/* Payment Proof - spans middle and right columns */}
-            <div className="col-span-2 rounded-lg bg-surface-container-low p-4">
+            <div className="md:col-span-2 rounded-lg bg-surface-container-low p-4">
               <p className="mb-3 font-label text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/60">
                 Payment Proof
               </p>
@@ -920,8 +920,8 @@ export default function ReservationsPage() {
       />
 
       {/* ── Header + Filters ── */}
-      <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div className="flex items-center gap-4">
+      <div className="mb-8 flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="font-headline text-3xl font-extrabold tracking-tight text-primary lg:text-4xl">
               Reservations
@@ -932,13 +932,14 @@ export default function ReservationsPage() {
           </div>
           <button
             onClick={() => setWalkInModalOpen(true)}
-            className="mt-1 flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-primary shadow-sm shadow-primary/20 transition-all hover:shadow-md hover:shadow-primary/25 active:scale-[0.98]"
+            className="shrink-0 flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 sm:px-4 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-primary shadow-sm shadow-primary/20 transition-all hover:shadow-md hover:shadow-primary/25 active:scale-[0.98]"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Add Walk-in
+            <span className="hidden sm:inline">Add Walk-in</span>
+            <span className="sm:hidden">Walk-in</span>
           </button>
         </div>
 
@@ -1027,7 +1028,7 @@ export default function ReservationsPage() {
       {/* ── Reservations Table ── */}
       {!isLoading && (
         <div className="overflow-x-auto pb-4">
-          <table className="w-full text-left" style={{ borderSpacing: "0 0.75rem", borderCollapse: "separate" }}>
+          <table className="w-full min-w-[640px] text-left" style={{ borderSpacing: "0 0.75rem", borderCollapse: "separate" }}>
             <thead>
               <tr className="text-[10px] font-bold uppercase tracking-[0.15em] text-outline">
                 <th className="px-6 py-2 font-bold">Transaction</th>

@@ -139,14 +139,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Send admin notification email (non-blocking — don't fail the request if email fails)
-  const { data: court } = await supabase
-    .from("courts")
-    .select("name, court_type")
-    .eq("id", court_id)
-    .single()
+  const [{ data: court }, { data: reservation }] = await Promise.all([
+    supabase.from("courts").select("name, court_type").eq("id", court_id).single(),
+    supabase.from("reservations").select("reservation_code").eq("id", data as string).single(),
+  ])
 
   sendBookingNotification({
-    reservationId: data as string,
+    reservationCode: reservation?.reservation_code ?? (data as string),
     customerName: customer_name,
     customerEmail: customer_email,
     customerPhone: customer_phone,

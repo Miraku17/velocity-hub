@@ -51,12 +51,35 @@ interface RecentReservation {
   created_at: string
 }
 
+interface DayOfWeekData {
+  day: number
+  label: string
+  count: number
+  hours: number
+}
+
+interface TimeSlotData {
+  hour: number
+  label: string
+  count: number
+  hours: number
+}
+
+interface Analytics {
+  month_booked_hours: number
+  month_total_hours: number
+  month_booking_count: number
+  by_day_of_week: DayOfWeekData[]
+  by_time_slot: TimeSlotData[]
+}
+
 interface DashboardData {
   stats: {
     total_bookings: number
     today_bookings: number
     month_revenue: number
   }
+  analytics: Analytics
   courts: Court[]
   today_reservations: TodayReservation[]
   recent_reservations: RecentReservation[]
@@ -121,7 +144,7 @@ export default function AdminOverview() {
     return <LoadingPage message="Loading dashboard..." />
   }
 
-  const { stats, courts, today_reservations, recent_reservations } = data
+  const { stats, analytics, courts, today_reservations, recent_reservations } = data
 
   const now = new Date()
   const currentHour = now.getHours() + now.getMinutes() / 60
@@ -233,11 +256,149 @@ export default function AdminOverview() {
         </div>
       </div>
 
+      {/* ── Monthly Insights ── */}
+      <div>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="font-headline text-lg font-bold text-on-surface">
+            Monthly Insights
+          </h2>
+          <span className="font-body text-xs text-on-surface-variant">
+            {now.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* Utilization Card */}
+          <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
+            <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant">
+              Court Utilization
+            </p>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
+                {analytics.month_booked_hours}
+              </span>
+              <span className="font-body text-sm text-on-surface-variant">
+                / {analytics.month_total_hours} hrs
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-surface-container-high">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{
+                  width: `${analytics.month_total_hours > 0 ? Math.min((analytics.month_booked_hours / analytics.month_total_hours) * 100, 100) : 0}%`,
+                }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <p className="font-body text-[11px] text-on-surface-variant">
+                {analytics.month_booking_count} bookings
+              </p>
+              <p className="font-headline text-xs font-bold text-primary">
+                {analytics.month_total_hours > 0
+                  ? Math.round((analytics.month_booked_hours / analytics.month_total_hours) * 100)
+                  : 0}%
+              </p>
+            </div>
+          </div>
+
+          {/* Busiest Days */}
+          <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
+            <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant mb-3">
+              Bookings by Day
+            </p>
+            <div className="space-y-2">
+              {(() => {
+                const maxCount = Math.max(...analytics.by_day_of_week.map((d) => d.count), 1)
+                return analytics.by_day_of_week.map((d) => (
+                  <div key={d.day} className="flex items-center gap-2">
+                    <span className="w-8 shrink-0 font-label text-[10px] font-semibold text-on-surface-variant">
+                      {d.label}
+                    </span>
+                    <div className="flex-1 h-4 rounded bg-surface-container-high overflow-hidden">
+                      <div
+                        className={`h-full rounded transition-all ${
+                          d.count === maxCount && d.count > 0 ? "bg-primary" : "bg-primary/40"
+                        }`}
+                        style={{ width: `${maxCount > 0 ? (d.count / maxCount) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="w-6 shrink-0 text-right font-headline text-[11px] font-bold text-on-surface">
+                      {d.count}
+                    </span>
+                  </div>
+                ))
+              })()}
+            </div>
+            {(() => {
+              const sorted = [...analytics.by_day_of_week].sort((a, b) => b.count - a.count)
+              const busiest = sorted[0]
+              const slowest = sorted.filter((d) => d.count > 0).pop() ?? sorted[sorted.length - 1]
+              return (
+                <div className="mt-3 flex items-center justify-between border-t border-outline-variant/10 pt-3">
+                  <p className="font-body text-[10px] text-on-surface-variant">
+                    Peak: <span className="font-semibold text-primary">{busiest?.label}</span>
+                  </p>
+                  <p className="font-body text-[10px] text-on-surface-variant">
+                    Slowest: <span className="font-semibold text-error">{slowest?.label}</span>
+                  </p>
+                </div>
+              )
+            })()}
+          </div>
+
+          {/* Busiest Times */}
+          <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
+            <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant mb-3">
+              Bookings by Time
+            </p>
+            <div className="space-y-1.5">
+              {(() => {
+                const maxCount = Math.max(...analytics.by_time_slot.map((s) => s.count), 1)
+                return analytics.by_time_slot.map((s) => (
+                  <div key={s.hour} className="flex items-center gap-2">
+                    <span className="w-10 shrink-0 font-label text-[9px] font-semibold text-on-surface-variant">
+                      {s.label}
+                    </span>
+                    <div className="flex-1 h-3 rounded bg-surface-container-high overflow-hidden">
+                      <div
+                        className={`h-full rounded transition-all ${
+                          s.count === maxCount && s.count > 0 ? "bg-primary" : "bg-primary/40"
+                        }`}
+                        style={{ width: `${maxCount > 0 ? (s.count / maxCount) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="w-5 shrink-0 text-right font-headline text-[10px] font-bold text-on-surface">
+                      {s.count}
+                    </span>
+                  </div>
+                ))
+              })()}
+            </div>
+            {(() => {
+              const sorted = [...analytics.by_time_slot].sort((a, b) => b.count - a.count)
+              const peak = sorted[0]
+              const slowest = sorted.filter((s) => s.count > 0).pop() ?? sorted[sorted.length - 1]
+              return (
+                <div className="mt-3 flex items-center justify-between border-t border-outline-variant/10 pt-3">
+                  <p className="font-body text-[10px] text-on-surface-variant">
+                    Peak: <span className="font-semibold text-primary">{peak?.label}</span>
+                  </p>
+                  <p className="font-body text-[10px] text-on-surface-variant">
+                    Slowest: <span className="font-semibold text-error">{slowest?.label}</span>
+                  </p>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      </div>
+
       {/* ── Courts Grid ── */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h2 className="font-headline text-lg font-bold text-on-surface">Court Status</h2>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             {[
               { label: "Available", color: "bg-primary" },
               { label: "Occupied", color: "bg-[#C49B00]" },

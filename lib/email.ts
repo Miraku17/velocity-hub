@@ -33,7 +33,7 @@ export interface BookingEmailData {
   endTime: string
   reservationType: string
   notes?: string | null
-  reservationId: string
+  reservationCode: string
 }
 
 export interface ReceiptEmailData {
@@ -67,7 +67,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
     endTime,
     reservationType,
     notes,
-    reservationId,
+    reservationCode,
   } = data
 
   const formattedDate = formatDate(date)
@@ -164,7 +164,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
         <tr>
           <td style="background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:16px 36px;">
             <p style="margin:0;font-size:12px;color:#9ca3af;">
-              Reservation ID: <code style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px;color:#6b7280;font-size:11px;">${reservationId}</code>
+              Transaction ID: <code style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px;color:#6b7280;font-size:11px;">${reservationCode}</code>
             </p>
           </td>
         </tr>
