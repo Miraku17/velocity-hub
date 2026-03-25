@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -38,17 +39,28 @@ const STORAGE_KEY = "velocity-booking-form";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-/** Generate hourly time slots between open_time and close_time */
+/** Generate hourly time slots between open_time and close_time (supports overnight, e.g. 07:00–00:00) */
 function generateTimeSlots(openTime: string, closeTime: string): string[] {
   const openHour = parseInt(openTime.split(":")[0], 10);
-  const closeHour = parseInt(closeTime.split(":")[0], 10);
+  let closeHour = parseInt(closeTime.split(":")[0], 10);
+  // If close_time is midnight (0) or earlier than open, it wraps to the next day
+  if (closeHour <= openHour) closeHour += 24;
   const slots: string[] = [];
   for (let h = openHour; h < closeHour; h++) {
-    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    const ampm = h < 12 ? "AM" : "PM";
+    const displayHour = h % 24;
+    const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
+    const ampm = displayHour < 12 ? "AM" : "PM";
     slots.push(`${hour12}:00 ${ampm}`);
   }
   return slots;
+}
+
+/** Convert "HH:MM" or "HH:MM:SS" to "7:00 AM" format */
+function formatTime12(time: string): string {
+  const hour = parseInt(time.split(":")[0], 10);
+  const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const ampm = hour < 12 ? "AM" : "PM";
+  return `${hour12}:00 ${ampm}`;
 }
 
 function formatCurrency(amount: number) {
@@ -102,6 +114,7 @@ function BookingPage() {
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [selectedQrIndex, setSelectedQrIndex] = useState(0);
+  const [qrLightbox, setQrLightbox] = useState(false);
   const [showSlots, setShowSlots] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const receiptInputRef = useRef<HTMLInputElement>(null);
@@ -231,10 +244,12 @@ function BookingPage() {
     for (const r of existingReservations) {
       // start_time/end_time are like "06:00:00" or "6:00 AM" from the view
       const startH = parseInt(r.start_time.split(":")[0], 10);
-      const endH = parseInt(r.end_time.split(":")[0], 10);
+      let endH = parseInt(r.end_time.split(":")[0], 10);
+      if (endH <= startH) endH += 24;
       for (let h = startH; h < endH; h++) {
-        const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-        const ampm = h < 12 ? "AM" : "PM";
+        const displayHour = h % 24;
+        const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
+        const ampm = displayHour < 12 ? "AM" : "PM";
         const key = `${hour12}:00 ${ampm}`;
         // "confirmed" or "completed" = booked, "pending" = pending
         map[key] = r.status === "confirmed" || r.status === "completed" ? "booked" : "pending";
@@ -697,7 +712,7 @@ function BookingPage() {
                       <div className="mb-4 flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ backgroundColor: `${bg}05` }}>
                         <span className="material-symbols-outlined text-sm" style={{ color: `${bg}40` }}>schedule</span>
                         <span className="font-[Poppins] text-[11px] font-medium" style={{ color: `${bg}60` }}>
-                          {courtSchedule.open_time.slice(0, 5)} – {courtSchedule.close_time.slice(0, 5)}
+                          {formatTime12(courtSchedule.open_time)} – {formatTime12(courtSchedule.close_time)}
                         </span>
                       </div>
                     )}
@@ -1011,18 +1026,55 @@ function BookingPage() {
                         )}
 
                         {/* QR image */}
-                        <div className="flex justify-center rounded-xl bg-white p-4 border" style={{ borderColor: `${bg}10` }}>
+                        <button
+                          type="button"
+                          onClick={() => setQrLightbox(true)}
+                          className="w-full flex justify-center rounded-xl bg-white p-4 border cursor-zoom-in transition-shadow hover:shadow-md"
+                          style={{ borderColor: `${bg}10` }}
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={paymentQrCodes[selectedQrIndex]?.image_url}
                             alt={paymentQrCodes[selectedQrIndex]?.name}
-                            className="h-48 w-48 sm:h-56 sm:w-56 object-contain"
+                            className="h-64 w-64 sm:h-72 sm:w-72 object-contain"
                           />
-                        </div>
+                        </button>
                         <p className="mt-3 text-center font-[Poppins] text-[10px] font-semibold uppercase tracking-wider" style={{ color: `${bg}60` }}>
                           {paymentQrCodes[selectedQrIndex]?.name}
+                          <span className="block mt-1 text-[9px] font-normal" style={{ color: `${bg}30` }}>Tap to enlarge</span>
                         </p>
                       </div>
+                    )}
+
+                    {/* QR Lightbox */}
+                    {qrLightbox && paymentQrCodes[selectedQrIndex] && createPortal(
+                      <div
+                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+                        onClick={() => setQrLightbox(false)}
+                      >
+                        <div
+                          className="flex flex-col items-center p-4"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={paymentQrCodes[selectedQrIndex].image_url}
+                            alt={paymentQrCodes[selectedQrIndex].name}
+                            className="max-h-[80vh] max-w-[90vw] rounded-xl object-contain bg-white p-4"
+                          />
+                          <button
+                            onClick={() => setQrLightbox(false)}
+                            className="mt-4 flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 font-[Poppins] text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                            Close
+                          </button>
+                        </div>
+                      </div>,
+                      document.body
                     )}
 
                     {/* Receipt upload */}

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { LoadingPage } from "@/components/ui/loading"
+import { useMe } from "@/lib/hooks/useTimeClock"
 
 /* ── Helpers ── */
 
@@ -457,12 +458,14 @@ function ReservationDetailModal({
   onStatusChange,
   onPaymentChange,
   isPending,
+  canUpdate,
 }: {
   reservation: Reservation | null
   onClose: () => void
   onStatusChange: (id: string, status: ReservationStatus) => void
   onPaymentChange: (id: string, status: "paid" | "refunded") => void
   isPending: boolean
+  canUpdate: boolean
 }) {
   const stableOnClose = useCallback(onClose, [onClose])
 
@@ -649,7 +652,7 @@ function ReservationDetailModal({
                 Actions
               </p>
               <div className="space-y-2">
-                {res.status === "pending" && (
+                {canUpdate && res.status === "pending" && (
                   <>
                     <Button
                       onClick={() => { onClose(); onStatusChange(res.id, "confirmed") }}
@@ -831,6 +834,8 @@ function ConfirmationModal({
 
 export default function ReservationsPage() {
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchInput, setSearchInput] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
   const [dateFilter, setDateFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [courtTypeFilter, setCourtTypeFilter] = useState("")
@@ -846,16 +851,29 @@ export default function ReservationsPage() {
     onConfirm: () => void
   } | null>(null)
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
   const filters = {
     date: dateFilter || undefined,
     status: (statusFilter || undefined) as ReservationStatus | undefined,
     court_type: (courtTypeFilter || undefined) as CourtType | undefined,
+    search: searchQuery || undefined,
     page: currentPage,
     limit: PAGE_SIZE,
   }
 
   const { data: result, isLoading } = useReservations(filters)
   const updateMutation = useUpdateReservation()
+  const { data: me } = useMe()
+  const canCreateBooking = me?.permissions.bookings_create ?? false
+  const canUpdateBooking = me?.permissions.bookings_update ?? false
 
   const reservations = result?.data ?? []
   const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
@@ -917,6 +935,7 @@ export default function ReservationsPage() {
         onStatusChange={handleStatusChange}
         onPaymentChange={handlePaymentStatusChange}
         isPending={updateMutation.isPending}
+        canUpdate={canUpdateBooking}
       />
 
       {/* ── Header + Filters ── */}
@@ -930,17 +949,55 @@ export default function ReservationsPage() {
               Manage and track all court schedules
             </p>
           </div>
-          <button
-            onClick={() => setWalkInModalOpen(true)}
-            className="shrink-0 flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 sm:px-4 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-primary shadow-sm shadow-primary/20 transition-all hover:shadow-md hover:shadow-primary/25 active:scale-[0.98]"
+          {/* {canCreateBooking && (
+            <button
+              onClick={() => setWalkInModalOpen(true)}
+              className="shrink-0 flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 sm:px-4 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-primary shadow-sm shadow-primary/20 transition-all hover:shadow-md hover:shadow-primary/25 active:scale-[0.98]"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span className="hidden sm:inline">Add Walk-in</span>
+              <span className="sm:hidden">Walk-in</span>
+            </button>
+          )} */}
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-outline"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span className="hidden sm:inline">Add Walk-in</span>
-            <span className="sm:hidden">Walk-in</span>
-          </button>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by name, email, phone, or code..."
+            className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-2.5 pl-10 pr-10 font-body text-sm text-on-surface placeholder:text-outline outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+          {searchInput && (
+            <button
+              onClick={() => { setSearchInput(""); setSearchQuery("") }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-outline transition-colors hover:text-on-surface"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Filters */}
@@ -1196,7 +1253,7 @@ export default function ReservationsPage() {
                             </button>
 
                             {/* Status actions */}
-                            {res.status === "pending" && (
+                            {canUpdateBooking && res.status === "pending" && (
                               <>
                                 <div className="mx-3 my-1 border-t border-outline-variant/15" />
                                 <button

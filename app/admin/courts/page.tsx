@@ -15,6 +15,7 @@ import {
   type CourtStatus,
   type ScheduleInput,
 } from "@/lib/hooks/useCourts"
+import { useMe } from "@/lib/hooks/useTimeClock"
 
 /* ── Types ── */
 
@@ -87,6 +88,10 @@ function formatCurrency(amount: number) {
 
 export default function CourtsPage() {
   const { data: courts = [], isLoading } = useCourts()
+  const { data: me } = useMe()
+  const canCreateCourt = me?.permissions.courts_create ?? false
+  const canUpdateCourt = me?.permissions.courts_update ?? false
+  const canDeleteCourt = me?.permissions.courts_delete ?? false
   const createCourt = useCreateCourt()
   const updateCourt = useUpdateCourt()
   const deleteCourt = useDeleteCourt()
@@ -240,13 +245,15 @@ export default function CourtsPage() {
             </div>
           </div>
 
-          <Button
-            onClick={openAdd}
-            className="h-10 gap-2 rounded-lg bg-primary px-5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-all hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98]"
-          >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Add Court
-          </Button>
+          {canCreateCourt && (
+            <Button
+              onClick={openAdd}
+              className="h-10 gap-2 rounded-lg bg-primary px-5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-all hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              Add Court
+            </Button>
+          )}
         </div>
       </div>
 
@@ -377,22 +384,28 @@ export default function CourtsPage() {
                 )}
 
                 {/* Actions */}
-                <div className="mt-4 flex gap-2 border-t border-outline-variant/10 pt-4">
-                  <button
-                    onClick={() => openEdit(court)}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-surface-container-high py-2.5 font-nav text-xs font-semibold uppercase tracking-widest text-on-surface transition-colors hover:bg-surface-container-highest active:scale-[0.98]"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">edit</span>
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => openDelete(court)}
-                    className="flex h-[38px] w-[38px] items-center justify-center rounded-lg bg-error/8 text-error transition-colors hover:bg-error/15 active:scale-[0.98]"
-                    aria-label="Delete court"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
-                </div>
+                {(canUpdateCourt || canDeleteCourt) && (
+                  <div className="mt-4 flex gap-2 border-t border-outline-variant/10 pt-4">
+                    {canUpdateCourt && (
+                      <button
+                        onClick={() => openEdit(court)}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-surface-container-high py-2.5 font-nav text-xs font-semibold uppercase tracking-widest text-on-surface transition-colors hover:bg-surface-container-highest active:scale-[0.98]"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                        Edit
+                      </button>
+                    )}
+                    {canDeleteCourt && (
+                      <button
+                        onClick={() => openDelete(court)}
+                        className="flex h-[38px] w-[38px] items-center justify-center rounded-lg bg-error/8 text-error transition-colors hover:bg-error/15 active:scale-[0.98]"
+                        aria-label="Delete court"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

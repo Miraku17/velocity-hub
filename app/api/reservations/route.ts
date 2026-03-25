@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const status = params.get("status")
   const courtType = params.get("court_type")
   const courtId = params.get("court_id")
+  const search = params.get("search")?.trim()
   const page = parseInt(params.get("page") || "1", 10)
   const limit = parseInt(params.get("limit") || "20", 10)
   const offset = (page - 1) * limit
@@ -29,6 +30,11 @@ export async function GET(request: NextRequest) {
   if (status) query = query.eq("status", status)
   if (courtType) query = query.eq("court_type", courtType)
   if (courtId) query = query.eq("court_id", courtId)
+  if (search) {
+    query = query.or(
+      `customer_name.ilike.%${search}%,customer_email.ilike.%${search}%,customer_phone.ilike.%${search}%,reservation_code.ilike.%${search}%`
+    )
+  }
 
   query = query.range(offset, offset + limit - 1)
 
