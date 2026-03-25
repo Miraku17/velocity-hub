@@ -18,27 +18,14 @@ export default function SetPasswordPage() {
   const [name, setName] = useState<string>("")
 
   useEffect(() => {
-    // Supabase puts the tokens in the URL hash for invite links
-    const hash = window.location.hash.substring(1)
-    const params = new URLSearchParams(hash)
-    const accessToken = params.get("access_token")
-    const refreshToken = params.get("refresh_token")
-    const type = params.get("type")
-
-    if (type !== "invite" || !accessToken || !refreshToken) {
-      setStatus("error")
-      return
-    }
-
+    // Session is established by /auth/callback before redirecting here
     const supabase = createClient()
-    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).then(({ data, error }) => {
-      if (error || !data.user) {
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error || !data.session) {
         setStatus("error")
         return
       }
-      setName(data.user.user_metadata?.full_name ?? "")
-      // Clear hash from URL
-      window.history.replaceState(null, "", window.location.pathname)
+      setName(data.session.user.user_metadata?.full_name ?? "")
       setStatus("ready")
     })
   }, [])
