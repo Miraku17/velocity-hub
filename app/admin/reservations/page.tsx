@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   useReservations,
+  useReservationsRealtime,
   useCreateReservation,
   useUpdateReservation,
   type ReservationStatus,
@@ -870,6 +871,7 @@ export default function ReservationsPage() {
   }
 
   const { data: result, isLoading } = useReservations(filters)
+  useReservationsRealtime()
   const updateMutation = useUpdateReservation()
   const { data: me } = useMe()
   const canCreateBooking = me?.permissions.bookings_create ?? false
