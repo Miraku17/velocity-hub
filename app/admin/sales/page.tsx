@@ -60,95 +60,295 @@ function getStatusBadge(status: string) {
   }
 }
 
-/* ── Print Receipt ── */
+/* ── Print Report ── */
 
-function buildPrintHTML(sales: Reservation[], summary: { total: number; paid: number; pending: number; refunded: number; declined: number }, filters: { date: string; paymentFilter: string }) {
-  const rows = sales
-    .map(
-      (s) => `
-    <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-family:monospace;font-size:12px;">${s.reservation_code}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">${formatDate(s.reservation_date)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">${s.customer_name}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">${s.court_name}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">${formatTime(s.start_time)} – ${formatTime(s.end_time)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;text-transform:capitalize;">${s.payment_status}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;text-align:right;font-weight:600;">₱${s.total_amount.toFixed(2)}</td>
-    </tr>`
-    )
-    .join("")
+function buildPrintHTML(
+  sales: Reservation[],
+  summary: { total: number; paid: number; pending: number; refunded: number; declined: number },
+  filters: { date: string; month: string; paymentFilter: string },
+) {
+  const filterParts: string[] = []
+  if (filters.month) {
+    const [y, m] = filters.month.split("-").map(Number)
+    filterParts.push(new Date(y, m - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }))
+  }
+  if (filters.date) filterParts.push(formatDate(filters.date))
+  if (filters.paymentFilter) filterParts.push(filters.paymentFilter.charAt(0).toUpperCase() + filters.paymentFilter.slice(1))
+  const periodLabel = filterParts.length ? filterParts.join("  ·  ") : "All Time"
+  const generatedAt = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 
-  const filterLabel = filters.date
-    ? formatDate(filters.date)
-    : filters.paymentFilter
-      ? filters.paymentFilter.charAt(0).toUpperCase() + filters.paymentFilter.slice(1)
-      : "All"
+  /* ── Aggregate breakdowns ── */
+
+  // By court
+  const byCourt = new Map<string, { bookings: number; hours: number; revenue: number; paid: number }>()
+  // By reservation status
+  const byStatus = new Map<string, { bookings: number; revenue: number }>()
+  // By reservation type
+  const byType = new Map<string, { bookings: number; revenue: number }>()
+  // By court type
+  const byCourtType = new Map<string, { bookings: number; revenue: number; paid: number }>()
+
+  for (const s of sales) {
+    // court
+    const court = byCourt.get(s.court_name) ?? { bookings: 0, hours: 0, revenue: 0, paid: 0 }
+    court.bookings++
+    court.hours += s.duration_hours
+    if (s.payment_status === "paid") { court.revenue += s.total_amount; court.paid += s.total_amount }
+    byCourt.set(s.court_name, court)
+
+    // status
+    const st = byStatus.get(s.status) ?? { bookings: 0, revenue: 0 }
+    st.bookings++
+    if (s.payment_status === "paid") st.revenue += s.total_amount
+    byStatus.set(s.status, st)
+
+    // type
+    const tp = byType.get(s.reservation_type) ?? { bookings: 0, revenue: 0 }
+    tp.bookings++
+    if (s.payment_status === "paid") tp.revenue += s.total_amount
+    byType.set(s.reservation_type, tp)
+
+    // court type
+    const ct = byCourtType.get(s.court_type) ?? { bookings: 0, revenue: 0, paid: 0 }
+    ct.bookings++
+    if (s.payment_status === "paid") { ct.revenue += s.total_amount; ct.paid += s.total_amount }
+    byCourtType.set(s.court_type, ct)
+  }
+
+  const fmt = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
+  const pct = (n: number, total: number) => total > 0 ? `${((n / total) * 100).toFixed(1)}%` : "0%"
+
+  const totalBookings = sales.length
+  const totalHours = sales.reduce((a, s) => a + s.duration_hours, 0)
+
+  const courtRows = [...byCourt.entries()]
+    .sort((a, b) => b[1].paid - a[1].paid)
+    .map(([name, d], i) => `
+      <tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"};">
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:600;color:#111827;">${name}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">${d.bookings}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">${d.hours}h</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:700;color:#15803d;text-align:right;">${fmt(d.paid)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280;text-align:right;">${pct(d.paid, summary.total)}</td>
+      </tr>`).join("")
+
+  const statusOrder = ["completed", "confirmed", "pending", "cancelled", "no-show"]
+  const statusColors: Record<string, string> = {
+    completed: "#15803d", confirmed: "#1d4ed8", pending: "#a16207", cancelled: "#dc2626", "no-show": "#7c3aed"
+  }
+  const statusRows = statusOrder
+    .filter(s => byStatus.has(s))
+    .map((s, i) => {
+      const d = byStatus.get(s)!
+      return `
+      <tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"};">
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;">
+          <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${statusColors[s] ?? "#374151"};background:${statusColors[s] ?? "#374151"}18;">${s}</span>
+        </td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">${d.bookings}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280;text-align:center;">${pct(d.bookings, totalBookings)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:700;color:#111827;text-align:right;">${fmt(d.revenue)}</td>
+      </tr>`
+    }).join("")
+
+  const typeLabels: Record<string, string> = { regular: "Regular", "walk-in": "Walk-in", priority: "Priority" }
+  const typeRows = [...byType.entries()]
+    .sort((a, b) => b[1].bookings - a[1].bookings)
+    .map(([type, d], i) => `
+      <tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"};">
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:600;color:#111827;">${typeLabels[type] ?? type}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">${d.bookings}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280;text-align:center;">${pct(d.bookings, totalBookings)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:700;color:#111827;text-align:right;">${fmt(d.revenue)}</td>
+      </tr>`).join("")
+
+  const courtTypeRows = [...byCourtType.entries()]
+    .sort((a, b) => b[1].paid - a[1].paid)
+    .map(([type, d], i) => `
+      <tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"};">
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:600;color:#111827;text-transform:capitalize;">${type}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">${d.bookings}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280;text-align:center;">${pct(d.bookings, totalBookings)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:700;color:#111827;text-align:right;">${fmt(d.paid)}</td>
+      </tr>`).join("")
 
   return `<!DOCTYPE html>
 <html>
 <head>
-  <title>Velocity Pickleball Hub — Sales Report</title>
+  <meta charset="UTF-8">
+  <title>Sales Summary — Velocity Pickleball Hub</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 40px; color: #1a1a1a; }
-    @media print { body { padding: 20px; } }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #fff; color: #111827; }
+    @page { margin: 18mm 16mm; size: A4 portrait; }
+    @media print { body { font-size: 11px; } tr { page-break-inside: avoid; } }
+    .page { padding: 32px 40px 48px; max-width: 780px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 18px; border-bottom: 3px solid #111827; margin-bottom: 28px; }
+    .brand-name { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; }
+    .brand-sub { font-size: 10px; color: #6b7280; margin-top: 3px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+    .meta-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; text-align: right; }
+    .meta-line { font-size: 11px; color: #6b7280; margin-top: 3px; text-align: right; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .kpi { padding: 14px 16px; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .kpi-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: #6b7280; }
+    .kpi-value { font-size: 22px; font-weight: 900; margin-top: 5px; letter-spacing: -0.5px; }
+    .kpi-sub { font-size: 10px; color: #9ca3af; margin-top: 3px; }
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #6b7280; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; margin-bottom: 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 8px 14px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; font-weight: 700; background: #f9fafb; }
+    th:not(:first-child) { text-align: center; }
+    th:last-child { text-align: right; }
+    .cols-2grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+    .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; }
+    .footer span { font-size: 9px; color: #d1d5db; text-transform: uppercase; letter-spacing: 1px; }
   </style>
 </head>
 <body>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;">
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
     <div>
-      <h1 style="margin:0;font-size:22px;font-weight:800;letter-spacing:-0.5px;">Sales Report</h1>
-      <p style="margin:4px 0 0;font-size:13px;color:#666;">Velocity Pickleball Hub</p>
+      <div class="brand-name">Velocity Pickleball Hub</div>
+      <div class="brand-sub">Sales Summary Report</div>
     </div>
-    <div style="text-align:right;">
-      <p style="margin:0;font-size:12px;color:#666;">Filter: ${filterLabel}</p>
-      <p style="margin:4px 0 0;font-size:12px;color:#666;">Generated: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
-    </div>
-  </div>
-
-  <div style="display:flex;gap:16px;margin-bottom:28px;">
-    <div style="flex:1;padding:14px 18px;background:#f8f8f8;border-radius:8px;">
-      <p style="margin:0;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Total Revenue</p>
-      <p style="margin:6px 0 0;font-size:20px;font-weight:800;">₱${summary.total.toFixed(2)}</p>
-    </div>
-    <div style="flex:1;padding:14px 18px;background:#f8f8f8;border-radius:8px;">
-      <p style="margin:0;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Paid</p>
-      <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#16A34A;">₱${summary.paid.toFixed(2)}</p>
-    </div>
-    <div style="flex:1;padding:14px 18px;background:#f8f8f8;border-radius:8px;">
-      <p style="margin:0;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Pending</p>
-      <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#D97706;">₱${summary.pending.toFixed(2)}</p>
-    </div>
-    <div style="flex:1;padding:14px 18px;background:#f8f8f8;border-radius:8px;">
-      <p style="margin:0;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Refunded</p>
-      <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#DC2626;">₱${summary.refunded.toFixed(2)}</p>
+    <div>
+      <div class="meta-title">Summary Report</div>
+      <div class="meta-line">Period: ${periodLabel}</div>
+      <div class="meta-line">Generated: ${generatedAt}</div>
     </div>
   </div>
 
-  <table style="width:100%;border-collapse:collapse;">
-    <thead>
-      <tr style="border-bottom:2px solid #e5e5e5;">
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Code</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Date</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Customer</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Court</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Time</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Payment</th>
-        <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;">Amount</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="6" style="padding:12px;text-align:right;font-size:13px;font-weight:700;border-top:2px solid #e5e5e5;">Total</td>
-        <td style="padding:12px;text-align:right;font-size:15px;font-weight:800;border-top:2px solid #e5e5e5;">₱${summary.total.toFixed(2)}</td>
-      </tr>
-    </tfoot>
-  </table>
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi" style="border-color:#e5e7eb;">
+      <div class="kpi-label">Total Revenue (Paid)</div>
+      <div class="kpi-value" style="color:#111827;">${fmt(summary.total)}</div>
+      <div class="kpi-sub">${totalBookings} booking${totalBookings !== 1 ? "s" : ""}  ·  ${totalHours}h total</div>
+    </div>
+    <div class="kpi" style="border-color:#bbf7d0;">
+      <div class="kpi-label">Paid</div>
+      <div class="kpi-value" style="color:#15803d;">${fmt(summary.paid)}</div>
+      <div class="kpi-sub">${pct(summary.paid, summary.paid + summary.pending + summary.refunded + summary.declined)} of all charges</div>
+    </div>
+    <div class="kpi" style="border-color:#fde68a;">
+      <div class="kpi-label">Pending</div>
+      <div class="kpi-value" style="color:#a16207;">${fmt(summary.pending)}</div>
+      <div class="kpi-sub">Awaiting payment</div>
+    </div>
+    <div class="kpi" style="border-color:#fecaca;">
+      <div class="kpi-label">Refunded</div>
+      <div class="kpi-value" style="color:#dc2626;">${fmt(summary.refunded)}</div>
+      <div class="kpi-sub">&nbsp;</div>
+    </div>
+    <div class="kpi" style="border-color:#fecaca;">
+      <div class="kpi-label">Declined</div>
+      <div class="kpi-value" style="color:#dc2626;">${fmt(summary.declined)}</div>
+      <div class="kpi-sub">&nbsp;</div>
+    </div>
+    <div class="kpi" style="border-color:#e5e7eb;">
+      <div class="kpi-label">Avg. per Booking</div>
+      <div class="kpi-value" style="color:#111827;">${fmt(totalBookings > 0 ? summary.total / totalBookings : 0)}</div>
+      <div class="kpi-sub">Paid bookings only</div>
+    </div>
+  </div>
 
-  <p style="margin-top:40px;font-size:10px;color:#aaa;text-align:center;">Velocity Pickleball Hub — Sales Report</p>
-  <script>window.onload = function() { window.print(); }</script>
+  <!-- Revenue by Court -->
+  <div class="section">
+    <div class="section-title">Revenue by Court</div>
+    <table>
+      <thead><tr>
+        <th>Court</th><th>Bookings</th><th>Hours</th><th style="text-align:right;">Revenue (Paid)</th><th style="text-align:right;">Share</th>
+      </tr></thead>
+      <tbody>${courtRows || '<tr><td colspan="5" style="padding:12px 14px;font-size:12px;color:#9ca3af;">No data</td></tr>'}</tbody>
+    </table>
+  </div>
+
+  <!-- Side-by-side: Status + Type -->
+  <div class="cols-2grid">
+    <div>
+      <div class="section-title">Bookings by Status</div>
+      <table>
+        <thead><tr><th>Status</th><th>Bookings</th><th>%</th><th style="text-align:right;">Revenue</th></tr></thead>
+        <tbody>${statusRows || '<tr><td colspan="4" style="padding:12px 14px;font-size:12px;color:#9ca3af;">No data</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div>
+      <div class="section-title">Bookings by Type</div>
+      <table>
+        <thead><tr><th>Type</th><th>Bookings</th><th>%</th><th style="text-align:right;">Revenue</th></tr></thead>
+        <tbody>${typeRows || '<tr><td colspan="4" style="padding:12px 14px;font-size:12px;color:#9ca3af;">No data</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- By Court Type -->
+  <div class="section">
+    <div class="section-title">Revenue by Court Type</div>
+    <table>
+      <thead><tr><th>Court Type</th><th>Bookings</th><th>%</th><th style="text-align:right;">Revenue (Paid)</th></tr></thead>
+      <tbody>${courtTypeRows || '<tr><td colspan="4" style="padding:12px 14px;font-size:12px;color:#9ca3af;">No data</td></tr>'}</tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <span>Velocity Pickleball Hub</span>
+    <span>Computer-generated — no signature required</span>
+  </div>
+</div>
+<script>window.onload = function() { window.print(); }</script>
 </body>
 </html>`
+}
+
+/* ── CSV Export ── */
+
+function exportCSV(sales: Reservation[], filters: { date: string; month: string; paymentFilter: string }) {
+  const headers = [
+    "Code", "Date", "Customer Name", "Email", "Phone",
+    "Court", "Court Type", "Start Time", "End Time", "Duration (hrs)",
+    "Reservation Type", "Status", "Payment Status",
+    "Rate/hr (PHP)", "Total Amount (PHP)", "Notes", "Created At",
+  ]
+
+  const escape = (v: string | number | null | undefined) => {
+    const s = String(v ?? "")
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
+
+  const rows = sales.map((s) => [
+    s.reservation_code,
+    s.reservation_date,
+    s.customer_name,
+    s.customer_email,
+    s.customer_phone,
+    s.court_name,
+    s.court_type,
+    s.start_time,
+    s.end_time,
+    s.duration_hours,
+    s.reservation_type,
+    s.status,
+    s.payment_status,
+    s.price_per_hour.toFixed(2),
+    s.total_amount.toFixed(2),
+    s.notes ?? "",
+    new Date(s.created_at).toISOString(),
+  ].map(escape).join(","))
+
+  const csv = [headers.join(","), ...rows].join("\n")
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  const datePart = filters.month ? `_${filters.month}` : filters.date ? `_${filters.date}` : ""
+  const payPart = filters.paymentFilter ? `_${filters.paymentFilter}` : ""
+  a.href = url
+  a.download = `sales_report${datePart}${payPart}_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /* ── Sale Detail Modal ── */
@@ -324,12 +524,14 @@ function SaleDetailModal({
 export default function SalesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [dateFilter, setDateFilter] = useState("")
+  const [monthFilter, setMonthFilter] = useState("")
   const [paymentFilter, setPaymentFilter] = useState("")
   const [detailSale, setDetailSale] = useState<Reservation | null>(null)
 
   const filters = {
     payment_status: (paymentFilter || undefined) as PaymentStatus | undefined,
     date: dateFilter || undefined,
+    month: monthFilter || undefined,
     page: currentPage,
     limit: PAGE_SIZE,
   }
@@ -372,12 +574,16 @@ export default function SalesPage() {
   })
 
   function handlePrint() {
-    const html = buildPrintHTML(allSales, summary, { date: dateFilter, paymentFilter })
+    const html = buildPrintHTML(allSales, summary, { date: dateFilter, month: monthFilter, paymentFilter })
     const printWindow = window.open("", "_blank")
     if (printWindow) {
       printWindow.document.write(html)
       printWindow.document.close()
     }
+  }
+
+  function handleExportCSV() {
+    exportCSV(allSales, { date: dateFilter, month: monthFilter, paymentFilter })
   }
 
   return (
@@ -400,12 +606,24 @@ export default function SalesPage() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+              Month
+            </span>
+            <input
+              type="month"
+              value={monthFilter}
+              onChange={(e) => { setMonthFilter(e.target.value); setDateFilter(""); setCurrentPage(1) }}
+              className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
               Date
             </span>
             <input
               type="date"
               value={dateFilter}
-              onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1) }}
+              onChange={(e) => { setDateFilter(e.target.value); setMonthFilter(""); setCurrentPage(1) }}
               className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
             />
           </div>
@@ -427,9 +645,9 @@ export default function SalesPage() {
             </select>
           </div>
 
-          {(dateFilter || paymentFilter) && (
+          {(dateFilter || monthFilter || paymentFilter) && (
             <button
-              onClick={() => { setDateFilter(""); setPaymentFilter(""); setCurrentPage(1) }}
+              onClick={() => { setDateFilter(""); setMonthFilter(""); setPaymentFilter(""); setCurrentPage(1) }}
               className="mt-auto flex h-[38px] items-center gap-1.5 rounded-md bg-surface-container-high px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -439,6 +657,18 @@ export default function SalesPage() {
               Clear
             </button>
           )}
+
+          <button
+            onClick={handleExportCSV}
+            className="mt-auto flex h-[38px] items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 font-nav text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-[#16A34A] hover:text-[#16A34A]"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export CSV
+          </button>
 
           <button
             onClick={handlePrint}
@@ -591,7 +821,7 @@ export default function SalesPage() {
                         No sales found
                       </p>
                       <p className="font-body text-xs text-outline">
-                        {dateFilter || paymentFilter
+                        {dateFilter || monthFilter || paymentFilter
                           ? "Try adjusting your filters"
                           : "Sales will appear here once payments are processed"}
                       </p>

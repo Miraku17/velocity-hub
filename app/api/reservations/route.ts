@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
 
   const date = params.get("date")
+  const dateFrom = params.get("date_from")
+  const dateTo = params.get("date_to")
   const status = params.get("status")
   const courtType = params.get("court_type")
   const courtId = params.get("court_id")
@@ -27,6 +29,8 @@ export async function GET(request: NextRequest) {
     .order("start_time", { ascending: false })
 
   if (date) query = query.eq("reservation_date", date)
+  if (dateFrom) query = query.gte("reservation_date", dateFrom)
+  if (dateTo) query = query.lte("reservation_date", dateTo)
   if (status) query = query.eq("status", status)
   if (courtType) query = query.eq("court_type", courtType)
   if (courtId) query = query.eq("court_id", courtId)

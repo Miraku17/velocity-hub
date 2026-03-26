@@ -1,4 +1,6 @@
+import { useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { createClient } from "@/lib/supabase/client"
 
 /* ── Types ── */
 
@@ -31,6 +33,7 @@ export interface Reservation {
 
 export interface ReservationFilters {
   date?: string
+  month?: string   // "YYYY-MM" — filters by full calendar month
   status?: ReservationStatus
   court_type?: CourtType
   search?: string
@@ -73,6 +76,14 @@ export interface ReservationUpdate {
 async function fetchReservations(filters?: ReservationFilters): Promise<PaginatedResponse> {
   const url = new URL("/api/reservations", window.location.origin)
   if (filters?.date) url.searchParams.set("date", filters.date)
+  if (filters?.month) {
+    // "YYYY-MM" → first and last day of that month
+    const [y, m] = filters.month.split("-").map(Number)
+    const firstDay = `${filters.month}-01`
+    const lastDay = new Date(y, m, 0).toISOString().slice(0, 10) // last day of month
+    url.searchParams.set("date_from", firstDay)
+    url.searchParams.set("date_to", lastDay)
+  }
   if (filters?.status) url.searchParams.set("status", filters.status)
   if (filters?.court_type) url.searchParams.set("court_type", filters.court_type)
   if (filters?.search) url.searchParams.set("search", filters.search)
@@ -156,4 +167,34 @@ export function useUpdateReservation() {
       queryClient.invalidateQueries({ queryKey: ["reservations"] })
     },
   })
+}
+
+/**
+ * Subscribe to Supabase Realtime on the `reservations` table.
+ * Any INSERT, UPDATE, or DELETE will invalidate the TanStack Query cache
+ * so the page refetches automatically.
+ *
+ * Call this once at the top of the admin reservations page.
+ */
+export function useReservationsRealtime() {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel("reservations-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reservations" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["reservations"] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 }
