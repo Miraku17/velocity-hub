@@ -6,6 +6,7 @@ import {
   type PaymentStatus,
   type Reservation,
 } from "@/lib/hooks/useReservations"
+import { useManualEntries } from "@/lib/hooks/useManualEntries"
 import { LoadingPage } from "@/components/ui/loading"
 
 /* ── Helpers ── */
@@ -549,6 +550,14 @@ export default function SalesPage() {
   const allSales = allResult?.data ?? []
   const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
 
+  const manualFilters = { date: dateFilter || undefined, month: monthFilter || undefined }
+  const { data: manualEntries = [] } = useManualEntries(manualFilters)
+  const showManualEntries = !paymentFilter || paymentFilter === "paid"
+  const manualTotal = useMemo(
+    () => (showManualEntries ? manualEntries.reduce((sum, e) => sum + (e.amount ?? 0), 0) : 0),
+    [manualEntries, showManualEntries]
+  )
+
   const summary = useMemo(() => {
     const s = { total: 0, paid: 0, pending: 0, refunded: 0, declined: 0 }
     for (const r of allSales) {
@@ -563,8 +572,9 @@ export default function SalesPage() {
         s.declined += r.total_amount
       }
     }
+    s.total += manualTotal
     return s
-  }, [allSales])
+  }, [allSales, manualTotal])
 
   const totalPages = pagination.totalPages
   const pageNumbers = Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
@@ -710,12 +720,12 @@ export default function SalesPage() {
             ₱{summary.pending.toFixed(2)}
           </p>
         </div>
-        <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
-          <p className="font-label text-[10px] font-bold uppercase tracking-widest text-error">
-            Refunded
+        <div className="rounded-xl border border-[#7C3AED]/20 bg-surface-container-lowest p-4">
+          <p className="font-label text-[10px] font-bold uppercase tracking-widest text-[#7C3AED]">
+            Manual Entries
           </p>
-          <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-error">
-            ₱{summary.refunded.toFixed(2)}
+          <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#7C3AED]">
+            ₱{manualTotal.toFixed(2)}
           </p>
         </div>
       </div>
@@ -831,6 +841,56 @@ export default function SalesPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Manual Entries ── */}
+      {showManualEntries && manualEntries.length > 0 && (
+        <div className="mt-8">
+          <div className="mb-3 flex items-center gap-2">
+            <h3 className="font-headline text-lg font-bold text-on-surface">Manual Entries</h3>
+            <span className="rounded bg-[#7C3AED]/10 px-2 py-0.5 font-label text-[9px] font-extrabold uppercase tracking-widest text-[#7C3AED]">
+              {manualEntries.filter((e) => e.amount != null).length} with amount
+            </span>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-outline-variant/15 bg-surface-container-lowest">
+            <table className="w-full min-w-[500px]">
+              <thead>
+                <tr className="border-b border-outline-variant/15">
+                  <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">Date</th>
+                  <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">Description</th>
+                  <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">Notes</th>
+                  <th className="px-6 py-4 text-right font-label text-[10px] font-bold uppercase tracking-widest text-outline">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {manualEntries.map((e) => (
+                  <tr key={e.id} className="border-b border-outline-variant/10 transition-colors hover:bg-surface-container-low/50">
+                    <td className="px-6 py-4">
+                      <span className="font-body text-sm text-on-surface">{formatDate(e.entry_date)}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-body text-sm text-on-surface">{e.description}</span>
+                    </td>
+                    <td className="max-w-[200px] px-6 py-4">
+                      {e.notes ? (
+                        <p className="truncate font-body text-xs text-on-surface-variant" title={e.notes}>{e.notes}</p>
+                      ) : (
+                        <span className="font-body text-xs text-on-surface-variant/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {e.amount != null ? (
+                        <span className="font-headline text-sm font-bold text-[#16A34A]">₱{e.amount.toFixed(2)}</span>
+                      ) : (
+                        <span className="font-body text-xs text-on-surface-variant/40">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
