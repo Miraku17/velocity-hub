@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   useBlockedSlots,
   useCreateBlockedSlot,
@@ -64,6 +65,8 @@ function BlockFormModal({
   onClose,
   onSave,
   saving,
+  conflictError,
+  onClearError,
 }: {
   courts: Court[]
   onClose: () => void
@@ -75,6 +78,8 @@ function BlockFormModal({
     reason: string
   }[]) => void
   saving: boolean
+  conflictError?: string | null
+  onClearError?: () => void
 }) {
   const [date, setDate] = useState(todayISO())
   const [courtId, setCourtId] = useState("")
@@ -99,6 +104,12 @@ function BlockFormModal({
     return () => window.removeEventListener("keydown", handleKey)
   }, [stableOnClose])
 
+  useEffect(() => {
+    if (!conflictError) return
+    const timer = setTimeout(() => onClearError?.(), 4000)
+    return () => clearTimeout(timer)
+  }, [conflictError, onClearError])
+
   // Get selected court and its schedule for the selected date
   const selectedCourt = courts.find((c) => c.id === courtId)
   const dayOfWeek = date ? new Date(date + "T00:00:00").getDay() : -1
@@ -108,6 +119,41 @@ function BlockFormModal({
   const timeSlots = courtSchedule
     ? generateTimeSlots(courtSchedule.open_time, courtSchedule.close_time)
     : []
+
+  // Fetch existing reservations for selected court + date (to show as unavailable)
+  const { data: existingReservations = [] } = useQuery<{ start_time: string; end_time: string }[]>({
+    queryKey: ["admin-block-reservations", courtId, date],
+    queryFn: async () => {
+      if (!courtId || !date) return []
+      const res = await fetch(`/api/reservations?court_id=${courtId}&date=${date}&fields=start_time,end_time,status&limit=100`)
+      if (!res.ok) return []
+      const json = await res.json()
+      return (json.data || []).filter((r: { status: string }) => r.status !== "cancelled")
+    },
+    enabled: !!courtId && !!date && blockType === "slots",
+    staleTime: 0,
+  })
+
+  // Map booked hours from existing reservations
+  const bookedSlots = useMemo(() => {
+    const booked = new Set<string>()
+    const toMinutes = (t: string) => {
+      const [h] = t.split(":").map(Number)
+      return h === 0 ? 24 : h
+    }
+    for (const r of existingReservations) {
+      const startH = parseInt(r.start_time.split(":")[0], 10)
+      let endH = toMinutes(r.end_time)
+      if (endH <= startH) endH += 24
+      for (let h = startH; h < endH; h++) {
+        const displayHour = h % 24
+        const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour
+        const ampm = displayHour < 12 ? "AM" : "PM"
+        booked.add(`${hour12}:00 ${ampm}`)
+      }
+    }
+    return booked
+  }, [existingReservations])
 
   // Reset selected slots when court or date changes
   useEffect(() => {
@@ -121,7 +167,7 @@ function BlockFormModal({
   }
 
   function selectAllSlots() {
-    setSelectedSlots(timeSlots)
+    setSelectedSlots(timeSlots.filter((s) => !bookedSlots.has(s)))
   }
 
   function clearAllSlots() {
@@ -322,23 +368,25 @@ function BlockFormModal({
                   <div className="grid grid-cols-3 gap-2">
                     {timeSlots.map((slot) => {
                       const isSelected = selectedSlots.includes(slot)
+                      const isBooked = bookedSlots.has(slot)
                       return (
                         <button
                           key={slot}
                           type="button"
-                          onClick={() => toggleSlot(slot)}
+                          disabled={isBooked}
+                          onClick={() => !isBooked && toggleSlot(slot)}
                           className={`rounded-lg border py-2.5 px-2 text-center transition-all ${
-                            isSelected
+                            isBooked
+                              ? "cursor-not-allowed border-outline-variant/10 bg-surface-container-low opacity-50"
+                              : isSelected
                               ? "border-error bg-error/10 text-error"
                               : "border-outline-variant/20 text-on-surface-variant hover:border-error/40 hover:bg-error/5"
                           }`}
                         >
-                          <span className="block font-body text-xs font-bold">{slot}</span>
-                          {isSelected && (
-                            <span className="block font-label text-[8px] font-extrabold uppercase tracking-widest mt-0.5">
-                              Blocked
-                            </span>
-                          )}
+                          <span className="block font-body text-xs font-bold" style={{ textDecoration: isBooked ? "line-through" : "none" }}>{slot}</span>
+                          <span className="block font-label text-[8px] font-extrabold uppercase tracking-widest mt-0.5">
+                            {isBooked ? "Booked" : isSelected ? "Blocked" : ""}
+                          </span>
                         </button>
                       )
                     })}
@@ -361,6 +409,18 @@ function BlockFormModal({
               />
             </div>
           </div>
+
+          {/* Conflict Error */}
+          {conflictError && (
+            <div className="mx-6 mb-2 flex gap-3 rounded-lg border border-error/30 bg-error/8 px-4 py-3">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-error">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <p className="font-body text-xs text-error">{conflictError}</p>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex justify-end gap-3 border-t border-outline-variant/15 px-6 py-4 shrink-0">
@@ -460,6 +520,7 @@ export default function BlockedSlotsPage() {
   const [monthFilter, setMonthFilter] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [unblockItem, setUnblockItem] = useState<BlockedSlot | null>(null)
+  const [conflictError, setConflictError] = useState<string | null>(null)
 
   const filters = {
     date: dateFilter || undefined,
@@ -485,13 +546,16 @@ export default function BlockedSlotsPage() {
     end_time: string | null
     reason: string
   }[]) {
-    // Create all blocks sequentially, close form when all done
+    setConflictError(null)
     let completed = 0
     for (const block of blocks) {
       createMutation.mutate(block, {
         onSuccess: () => {
           completed++
           if (completed === blocks.length) setShowForm(false)
+        },
+        onError: (err) => {
+          setConflictError(err.message)
         },
       })
     }
@@ -510,9 +574,11 @@ export default function BlockedSlotsPage() {
       {showForm && (
         <BlockFormModal
           courts={courts}
-          onClose={() => setShowForm(false)}
+          onClose={() => { setShowForm(false); setConflictError(null) }}
           onSave={handleSave}
           saving={createMutation.isPending}
+          conflictError={conflictError}
+          onClearError={() => setConflictError(null)}
         />
       )}
 
