@@ -236,7 +236,12 @@ function BookingPage() {
   }, [court, selectedDayOfWeek]);
 
   // Fetch existing reservations for selected court + date
-  const dateStr = useMemo(() => selectedDate.toISOString().split("T")[0], [selectedDate]);
+  const dateStr = useMemo(() => {
+    const y = selectedDate.getFullYear();
+    const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const d = String(selectedDate.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, [selectedDate]);
   const { data: existingReservations = [], isFetching: isFetchingSlots } = useQuery<
     { start_time: string; end_time: string; status: string }[]
   >({
@@ -258,9 +263,47 @@ function BookingPage() {
     gcTime: 0,
   });
 
+  // Fetch blocked slots for selected court + date
+  const { data: blockedSlots = [] } = useQuery<
+    { id: string; court_id: string | null; start_time: string | null; end_time: string | null }[]
+  >({
+    queryKey: ["blocked-slots-booking", selectedCourt, dateStr],
+    queryFn: async () => {
+      if (!selectedCourt) return [];
+      const res = await fetch(
+        `/api/blocked-slots?date=${dateStr}&court_id=${selectedCourt}`
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedCourt,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // Check if the entire day is blocked for this court
+  const isDayBlocked = useMemo(() => {
+    return blockedSlots.some((b) => !b.start_time && !b.end_time);
+  }, [blockedSlots]);
+
   // Map each time slot hour to its reservation status
   const slotStatusMap = useMemo(() => {
-    const map: Record<string, "booked" | "pending"> = {};
+    const map: Record<string, "booked" | "pending" | "blocked"> = {};
+
+    // Mark blocked time-range slots
+    for (const b of blockedSlots) {
+      if (!b.start_time || !b.end_time) continue; // entire-day blocks handled by isDayBlocked
+      const startH = parseInt(b.start_time.split(":")[0], 10);
+      let endH = parseInt(b.end_time.split(":")[0], 10);
+      if (endH <= startH) endH += 24;
+      for (let h = startH; h < endH; h++) {
+        const displayHour = h % 24;
+        const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
+        const ampm = displayHour < 12 ? "AM" : "PM";
+        map[`${hour12}:00 ${ampm}`] = "blocked";
+      }
+    }
+
     for (const r of existingReservations) {
       // start_time/end_time are like "06:00:00" or "6:00 AM" from the view
       const startH = parseInt(r.start_time.split(":")[0], 10);
@@ -272,11 +315,13 @@ function BookingPage() {
         const ampm = displayHour < 12 ? "AM" : "PM";
         const key = `${hour12}:00 ${ampm}`;
         // "confirmed" or "completed" = booked, "pending" = pending
-        map[key] = r.status === "confirmed" || r.status === "completed" ? "booked" : "pending";
+        if (!map[key]) {
+          map[key] = r.status === "confirmed" || r.status === "completed" ? "booked" : "pending";
+        }
       }
     }
     return map;
-  }, [existingReservations]);
+  }, [existingReservations, blockedSlots]);
 
   // Generate time slots from schedule
   const timeSlots = useMemo(() => {
@@ -339,7 +384,10 @@ function BookingPage() {
 
   async function handleConfirmBooking() {
     if (!court || !parsedTimeRange) return;
-    const dateStr = selectedDate.toISOString().split("T")[0];
+    const y = selectedDate.getFullYear();
+    const mo = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const dy = String(selectedDate.getDate()).padStart(2, "0");
+    const dateStr = `${y}-${mo}-${dy}`;
     createReservation.mutate(
       {
         court_id: court.id,
@@ -754,6 +802,13 @@ function BookingPage() {
                           Closed on {selectedDate.toLocaleDateString("en-US", { weekday: "long" })}
                         </p>
                       </div>
+                    ) : isDayBlocked ? (
+                      <div className="flex flex-col items-center py-10">
+                        <span className="material-symbols-outlined text-3xl mb-2" style={{ color: `${bg}15`, fontVariationSettings: "'FILL' 0, 'wght' 300" }}>block</span>
+                        <p className="font-[Poppins] text-xs text-center" style={{ color: `${bg}30` }}>
+                          This day is unavailable for booking
+                        </p>
+                      </div>
                     ) : timeSlots.length === 0 ? (
                       <p className="font-[Poppins] text-xs py-8 text-center" style={{ color: `${bg}30` }}>
                         No time slots available
@@ -797,9 +852,9 @@ function BookingPage() {
                               {isUnavailable ? (
                                 <span
                                   className="block text-[10px] font-[Poppins] font-bold mt-0.5 uppercase tracking-wider"
-                                  style={{ color: slotStatus === "pending" ? "#c97d00" : "#c44" }}
+                                  style={{ color: slotStatus === "pending" ? "#c97d00" : slotStatus === "blocked" ? "#666" : "#c44" }}
                                 >
-                                  {slotStatus === "pending" ? "Pending" : "Booked"}
+                                  {slotStatus === "pending" ? "Pending" : slotStatus === "blocked" ? "Blocked" : "Booked"}
                                 </span>
                               ) : (
                                 <span className="block text-[10px] font-[Poppins] font-semibold mt-0.5" style={{ color: isSelected ? "rgba(255,255,255,0.75)" : `${bg}66` }}>
