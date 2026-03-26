@@ -57,6 +57,48 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Check for confirmed/pending bookings that would conflict with this block
+  let conflictQuery = supabase
+    .from("reservations")
+    .select("id, customer_name, start_time, end_time, status")
+    .eq("reservation_date", blocked_date)
+    .in("status", ["pending", "confirmed"])
+
+  if (court_id) {
+    conflictQuery = conflictQuery.eq("court_id", court_id)
+  }
+
+  const { data: allReservations } = await conflictQuery
+
+  // Check overlap in JS — handles midnight (00:00:00) correctly by treating it as 1440 min (end of day)
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(":").map(Number)
+    const mins = h * 60 + (m || 0)
+    return mins === 0 ? 1440 : mins
+  }
+
+  let conflicts = allReservations || []
+  if (start_time && end_time) {
+    const blockStart = toMinutes(start_time)
+    const blockEnd = toMinutes(end_time)
+    conflicts = conflicts.filter((r) => {
+      const rStart = toMinutes(r.start_time)
+      const rEnd = toMinutes(r.end_time)
+      return rStart < blockEnd && rEnd > blockStart
+    })
+  }
+
+  if (conflicts.length > 0) {
+    const count = conflicts.length
+    return Response.json(
+      {
+        error: `Cannot block: ${count} existing booking${count > 1 ? "s" : ""} conflict with this time slot. Please review existing bookings first.`,
+        conflicts,
+      },
+      { status: 409 }
+    )
+  }
+
   const { data, error } = await supabase
     .from("blocked_slots")
     .insert({
