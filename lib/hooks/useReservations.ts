@@ -33,6 +33,7 @@ export interface Reservation {
 
 export interface ReservationFilters {
   date?: string
+  week?: string    // "YYYY-Www" — filters by ISO week
   month?: string   // "YYYY-MM" — filters by full calendar month
   status?: ReservationStatus
   court_type?: CourtType
@@ -76,6 +77,21 @@ export interface ReservationUpdate {
 async function fetchReservations(filters?: ReservationFilters): Promise<PaginatedResponse> {
   const url = new URL("/api/reservations", window.location.origin)
   if (filters?.date) url.searchParams.set("date", filters.date)
+  if (filters?.week) {
+    // "YYYY-Www" → Monday to Sunday of that ISO week
+    const [yearStr, weekStr] = filters.week.split("-W")
+    const year = Number(yearStr)
+    const week = Number(weekStr)
+    // Jan 4 is always in ISO week 1
+    const jan4 = new Date(year, 0, 4)
+    const dayOfWeek = jan4.getDay() || 7 // ISO: Mon=1 … Sun=7
+    const monday = new Date(jan4)
+    monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    url.searchParams.set("date_from", monday.toISOString().slice(0, 10))
+    url.searchParams.set("date_to", sunday.toISOString().slice(0, 10))
+  }
   if (filters?.month) {
     // "YYYY-MM" → first and last day of that month
     const [y, m] = filters.month.split("-").map(Number)

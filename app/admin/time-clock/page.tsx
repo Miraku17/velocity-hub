@@ -39,12 +39,157 @@ function formatDuration(hours: number) {
   return `${h}h ${m}m`
 }
 
+/* ── Employee Detail Modal ── */
+
+function EmployeeDetailModal({
+  employee,
+  entries,
+  onClose,
+}: {
+  employee: { id: string; name: string; role: string; isActive: boolean; clockIn: string | null; hoursToday: number } | null
+  entries: TimeEntry[]
+  onClose: () => void
+}) {
+  if (!employee) return null
+
+  const empEntries = entries
+    .filter((e) => e.user_id === employee.id)
+    .sort((a, b) => new Date(b.clock_in).getTime() - new Date(a.clock_in).getTime())
+
+  const totalHours = empEntries.reduce((sum, e) => sum + e.duration_hours, 0)
+  const totalSessions = empEntries.length
+  const activeSessions = empEntries.filter((e) => e.is_active).length
+
+  // Group entries by date
+  const byDate = new Map<string, TimeEntry[]>()
+  for (const entry of empEntries) {
+    const existing = byDate.get(entry.entry_date) ?? []
+    existing.push(entry)
+    byDate.set(entry.entry_date, existing)
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[10vh]">
+        <div className="relative w-full max-w-lg rounded-2xl bg-surface-container-lowest shadow-xl ring-1 ring-outline-variant/20" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="flex items-start gap-4 border-b border-outline-variant/10 px-6 py-5">
+            <div className="relative">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-fixed-dim/30 font-nav text-sm font-bold text-primary">
+                {getInitials(employee.name)}
+              </div>
+              <span
+                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface-container-lowest ${
+                  employee.isActive ? "bg-primary" : "bg-outline"
+                }`}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-headline text-lg font-bold text-on-surface">{employee.name}</h2>
+              <p className="font-body text-xs text-on-surface-variant capitalize">{employee.role}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-3 px-6 py-4 border-b border-outline-variant/10">
+            <div className="rounded-lg bg-surface-container-low/50 px-3 py-2.5 text-center">
+              <p className="font-headline text-lg font-extrabold text-on-surface">{formatDuration(totalHours)}</p>
+              <p className="font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Total Hours</p>
+            </div>
+            <div className="rounded-lg bg-surface-container-low/50 px-3 py-2.5 text-center">
+              <p className="font-headline text-lg font-extrabold text-on-surface">{totalSessions}</p>
+              <p className="font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Sessions</p>
+            </div>
+            <div className="rounded-lg bg-surface-container-low/50 px-3 py-2.5 text-center">
+              <p className={`font-headline text-lg font-extrabold ${employee.isActive ? "text-primary" : "text-on-surface-variant"}`}>
+                {employee.isActive ? "Active" : "Off"}
+              </p>
+              <p className="font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Status</p>
+            </div>
+          </div>
+
+          {/* Entries grouped by date */}
+          <div className="max-h-[50vh] overflow-y-auto px-6 py-4 space-y-4">
+            {Array.from(byDate.entries()).map(([date, dateEntries]) => {
+              const dayTotal = dateEntries.reduce((sum, e) => sum + e.duration_hours, 0)
+              return (
+                <div key={date}>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="font-nav text-[11px] font-semibold text-on-surface">{formatDate(date)}</p>
+                    <span className="font-label text-[10px] font-bold text-on-surface-variant">{formatDuration(dayTotal)}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {dateEntries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center gap-3 rounded-lg bg-surface-container-low/40 px-3 py-2.5"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <svg className="shrink-0 text-primary" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="1 4 1 10 7 10" />
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                          </svg>
+                          <span className="font-nav text-xs font-medium text-primary">{formatTime(entry.clock_in)}</span>
+                          <svg className="shrink-0 text-on-surface-variant" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                          </svg>
+                          {entry.clock_out ? (
+                            <span className="font-nav text-xs font-medium text-on-surface">{formatTime(entry.clock_out)}</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider text-primary">
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-nav text-xs font-semibold text-on-surface-variant">
+                          {entry.clock_out ? formatDuration(entry.duration_hours) : "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+
+            {empEntries.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-8">
+                <p className="font-nav text-xs font-medium text-on-surface-variant">No clock entries found</p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-outline-variant/10 px-6 py-3">
+            <p className="font-body text-[11px] text-on-surface-variant">
+              {empEntries.length} {empEntries.length === 1 ? "entry" : "entries"} across {byDate.size} {byDate.size === 1 ? "day" : "days"}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 /* ── Component ── */
 
 export default function TimeClock() {
   const { data: user, isLoading: userLoading } = useMe()
   const { data: entries, isLoading: entriesLoading } = useTimeEntries()
-  const [logFilter, setLogFilter] = useState<"today" | "all">("today")
+  const [logFilter, setLogFilter] = useState<"today" | "date" | "all">("today")
+  const [logDateFilter, setLogDateFilter] = useState("")
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
 
   if (userLoading) {
     return <LoadingPage message="Loading time clock..." />
@@ -83,9 +228,34 @@ export default function TimeClock() {
   const filteredEntries: TimeEntry[] =
     logFilter === "today"
       ? allEntries.filter((e) => e.entry_date === todayStr)
-      : allEntries
+      : logFilter === "date" && logDateFilter
+        ? allEntries.filter((e) => e.entry_date === logDateFilter)
+        : allEntries
 
   const myHoursToday = todayEntries.reduce((sum, e) => sum + e.duration_hours, 0)
+
+  // Build selected employee info from all entries (not just today)
+  const selectedEmployee = (() => {
+    if (!selectedEmployeeId) return null
+    // Try the today-based employees list first
+    const fromToday = employees.find((e) => e.id === selectedEmployeeId)
+    if (fromToday) return fromToday
+    // Fallback: build from allEntries for employees only visible in the "All" log
+    const empEntries = allEntries.filter((e) => e.user_id === selectedEmployeeId)
+    if (empEntries.length === 0) return null
+    const first = empEntries[0]
+    const todayHours = empEntries
+      .filter((e) => e.entry_date === todayStr)
+      .reduce((sum, e) => sum + e.duration_hours, 0)
+    return {
+      id: selectedEmployeeId,
+      name: first.employee_name,
+      role: first.employee_role,
+      isActive: empEntries.some((e) => e.is_active),
+      clockIn: empEntries.find((e) => e.is_active)?.clock_in ?? null,
+      hoursToday: todayHours,
+    }
+  })()
 
   function handleExport() {
     const rows = filteredEntries.map((e) => ({
@@ -110,13 +280,20 @@ export default function TimeClock() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `time-log-${logFilter === "today" ? todayStr : "all"}.csv`
+    a.download = `time-log-${logFilter === "today" ? todayStr : logFilter === "date" && logDateFilter ? logDateFilter : "all"}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
+      {/* Employee Detail Modal */}
+      <EmployeeDetailModal
+        employee={selectedEmployee}
+        entries={allEntries}
+        onClose={() => setSelectedEmployeeId(null)}
+      />
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -171,91 +348,130 @@ export default function TimeClock() {
       </div>
 
       {/* ── Clock Widget + Team Status ── */}
-      <div className={`grid grid-cols-1 gap-6 ${isAdmin ? "xl:grid-cols-[360px_1fr]" : "max-w-md"}`}>
+      <div className={`grid grid-cols-1 gap-6 ${isAdmin ? "xl:grid-cols-[360px_1fr] xl:items-start" : "max-w-md"}`}>
         <EmployeeClockWidget />
 
         {/* Team Status — Admin only */}
-        {isAdmin && (
-          <div className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
-            <div className="border-b border-outline-variant/10 px-5 py-4">
-              <h2 className="font-headline text-base font-bold text-on-surface">Team Status</h2>
-              <p className="mt-0.5 font-body text-[11px] text-on-surface-variant">Who&apos;s on shift right now</p>
-            </div>
+        {isAdmin && (() => {
+          const clockedIn = employees.filter((e) => e.isActive)
+          const clockedOut = employees.filter((e) => !e.isActive)
 
-            <div className="divide-y divide-outline-variant/8">
-              {employees.length === 0 && !entriesLoading && (
-                <div className="flex flex-col items-center gap-2 px-5 py-12">
-                  <svg className="text-outline/30" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                  </svg>
-                  <p className="font-nav text-xs font-medium text-on-surface-variant">No activity today</p>
-                </div>
-              )}
-
-              {employees.map((emp) => (
-                <div key={emp.id} className="flex items-center gap-3 px-5 py-3.5">
-                  <div className="relative">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed-dim/30 font-nav text-[10px] font-bold text-primary">
-                      {getInitials(emp.name)}
-                    </div>
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-lowest ${
-                        emp.isActive ? "bg-primary" : "bg-outline"
-                      }`}
-                    />
+          return (
+            <div className="space-y-4">
+              {/* Clocked In */}
+              <div className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+                <div className="border-b border-outline-variant/10 px-5 py-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-headline text-base font-bold text-on-surface">Clocked In</h2>
+                    <p className="mt-0.5 font-body text-[11px] text-on-surface-variant">Currently on shift</p>
                   </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-nav text-xs font-semibold text-on-surface">
-                      {emp.name}
-                    </p>
-                    <p className="truncate font-body text-[10px] text-on-surface-variant">
-                      {emp.isActive && emp.clockIn ? (
-                        <>
-                          Since{" "}
-                          <span className="font-medium text-primary">{formatTime(emp.clockIn)}</span>
-                          {" · "}{formatDuration(emp.hoursToday)}
-                        </>
-                      ) : (
-                        <span className="text-outline">
-                          {emp.hoursToday > 0 ? `${formatDuration(emp.hoursToday)} logged` : "No activity"}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider ${
-                      emp.isActive
-                        ? "bg-primary/10 text-primary"
-                        : "bg-surface-container-high text-on-surface-variant"
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${emp.isActive ? "bg-primary animate-pulse" : "bg-outline"}`} />
-                    {emp.isActive ? "On" : "Off"}
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 font-label text-[10px] font-bold uppercase tracking-widest text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                    {clockedIn.length}
                   </span>
                 </div>
-              ))}
+
+                <div className="divide-y divide-outline-variant/8">
+                  {clockedIn.length === 0 && !entriesLoading && (
+                    <div className="flex flex-col items-center gap-2 px-5 py-10">
+                      <svg className="text-outline/30" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      <p className="font-nav text-xs font-medium text-on-surface-variant">No one clocked in</p>
+                    </div>
+                  )}
+
+                  {clockedIn.map((emp) => (
+                    <button key={emp.id} onClick={() => setSelectedEmployeeId(emp.id)} className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-surface-container-low/30 cursor-pointer">
+                      <div className="relative">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed-dim/30 font-nav text-[10px] font-bold text-primary">
+                          {getInitials(emp.name)}
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-lowest bg-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-nav text-xs font-semibold text-on-surface">{emp.name}</p>
+                        <p className="truncate font-body text-[10px] text-on-surface-variant">
+                          Since <span className="font-medium text-primary">{emp.clockIn ? formatTime(emp.clockIn) : "—"}</span>
+                          {" · "}{formatDuration(emp.hoursToday)}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider text-primary">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                        On
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Clocked Out */}
+              <div className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+                <div className="border-b border-outline-variant/10 px-5 py-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-headline text-base font-bold text-on-surface">Clocked Out</h2>
+                    <p className="mt-0.5 font-body text-[11px] text-on-surface-variant">Off shift — hours logged today</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-2.5 py-1 font-label text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                    <span className="h-1.5 w-1.5 rounded-full bg-outline" />
+                    {clockedOut.length}
+                  </span>
+                </div>
+
+                <div className="divide-y divide-outline-variant/8">
+                  {clockedOut.length === 0 && !entriesLoading && (
+                    <div className="flex flex-col items-center gap-2 px-5 py-10">
+                      <svg className="text-outline/30" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                      </svg>
+                      <p className="font-nav text-xs font-medium text-on-surface-variant">No clocked out employees today</p>
+                    </div>
+                  )}
+
+                  {clockedOut.map((emp) => (
+                    <button key={emp.id} onClick={() => setSelectedEmployeeId(emp.id)} className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-surface-container-low/30 cursor-pointer">
+                      <div className="relative">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-container-high font-nav text-[10px] font-bold text-on-surface-variant">
+                          {getInitials(emp.name)}
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-lowest bg-outline" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-nav text-xs font-semibold text-on-surface">{emp.name}</p>
+                        <p className="truncate font-body text-[10px] text-outline">
+                          {emp.hoursToday > 0 ? `${formatDuration(emp.hoursToday)} logged` : "No activity"}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-surface-container-high px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">
+                        <span className="h-1.5 w-1.5 rounded-full bg-outline" />
+                        Off
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
       {/* ── Time Log ── */}
-      <div className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant/10 px-5 py-4">
+      <div>
+        {/* Header + controls */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="font-headline text-base font-bold text-on-surface">
-              {isAdmin ? "Time Log" : "My Time Log"}
+            <h2 className="font-headline text-lg font-bold text-on-surface">
+              {isAdmin ? "Time Logs" : "My Time Log"}
             </h2>
             <p className="mt-0.5 font-body text-[11px] text-on-surface-variant">
-              {isAdmin ? "All employee clock history" : "Your clock in & out history"}
+              {isAdmin ? "Clock history per employee" : "Your clock in & out history"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg bg-surface-container-high p-0.5">
-              {(["today", "all"] as const).map((f) => (
+              {(["today", "date", "all"] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setLogFilter(f)}
@@ -265,10 +481,18 @@ export default function TimeClock() {
                       : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
-                  {f === "today" ? "Today" : "All"}
+                  {f === "today" ? "Today" : f === "date" ? "Date" : "All"}
                 </button>
               ))}
             </div>
+            {logFilter === "date" && (
+              <input
+                type="date"
+                value={logDateFilter}
+                onChange={(e) => setLogDateFilter(e.target.value)}
+                className="h-[32px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-xs text-on-surface outline-none transition-colors focus:border-primary"
+              />
+            )}
             {isAdmin && (
               <button
                 onClick={handleExport}
@@ -286,95 +510,199 @@ export default function TimeClock() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[480px]">
-            <thead>
-              <tr className="border-b border-outline-variant/10 bg-surface-container-low/20">
-                {isAdmin && (
-                  <th className="px-5 py-3 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                    Employee
-                  </th>
-                )}
-                <th className="px-5 py-3 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Date
-                </th>
-                <th className="px-5 py-3 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  In
-                </th>
-                <th className="px-5 py-3 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Out
-                </th>
-                <th className="px-5 py-3 text-right font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Duration
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/8">
-              {entriesLoading && (
-                <tr>
-                  <td colSpan={isAdmin ? 5 : 4} className="px-5 py-12 text-center">
-                    <p className="font-body text-xs text-on-surface-variant animate-pulse">Loading...</p>
-                  </td>
-                </tr>
-              )}
+        {/* Admin: per-employee cards */}
+        {isAdmin ? (() => {
+          // Group filtered entries by employee
+          const byEmployee = new Map<string, { name: string; role: string; isActive: boolean; entries: TimeEntry[] }>()
+          for (const entry of filteredEntries) {
+            const existing = byEmployee.get(entry.user_id)
+            if (existing) {
+              existing.entries.push(entry)
+              if (entry.is_active) existing.isActive = true
+            } else {
+              byEmployee.set(entry.user_id, {
+                name: entry.employee_name,
+                role: entry.employee_role,
+                isActive: entry.is_active,
+                entries: [entry],
+              })
+            }
+          }
 
-              {!entriesLoading && filteredEntries.map((entry) => (
-                <tr key={entry.id} className="transition-colors hover:bg-surface-container-low/30">
-                  {isAdmin && (
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-fixed-dim/30 font-nav text-[9px] font-bold text-primary">
-                          {getInitials(entry.employee_name)}
-                        </div>
-                        <span className="font-nav text-xs font-semibold text-on-surface">
-                          {entry.employee_name}
-                        </span>
+          const employeeGroups = Array.from(byEmployee.entries()).map(([id, data]) => ({
+            id,
+            ...data,
+            totalHours: data.entries.reduce((sum, e) => sum + e.duration_hours, 0),
+          }))
+
+          if (entriesLoading) {
+            return (
+              <div className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest px-5 py-12 text-center">
+                <p className="font-body text-xs text-on-surface-variant animate-pulse">Loading...</p>
+              </div>
+            )
+          }
+
+          if (employeeGroups.length === 0) {
+            return (
+              <div className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest px-5 py-12 text-center">
+                <p className="font-nav text-xs font-medium text-on-surface-variant">No entries</p>
+                <p className="mt-1 font-body text-[11px] text-outline">Clock in to start tracking</p>
+              </div>
+            )
+          }
+
+          return (
+            <div className="space-y-4">
+              {employeeGroups.map((emp) => (
+                <div key={emp.id} className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+                  {/* Employee header */}
+                  <button
+                    onClick={() => setSelectedEmployeeId(emp.id)}
+                    className="flex w-full items-center gap-3 border-b border-outline-variant/10 px-5 py-4 text-left transition-colors hover:bg-surface-container-low/30 cursor-pointer"
+                  >
+                    <div className="relative">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-fixed-dim/30 font-nav text-[10px] font-bold text-primary">
+                        {getInitials(emp.name)}
                       </div>
-                    </td>
-                  )}
-                  <td className="px-5 py-3">
-                    <span className="font-body text-xs text-on-surface-variant">{formatDate(entry.entry_date)}</span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className="font-nav text-xs font-medium text-primary">{formatTime(entry.clock_in)}</span>
-                  </td>
-                  <td className="px-5 py-3">
-                    {entry.clock_out ? (
-                      <span className="font-nav text-xs font-medium text-on-surface">{formatTime(entry.clock_out)}</span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider text-primary">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                        Active
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    {entry.clock_out ? (
-                      <span className="font-nav text-xs font-semibold text-on-surface">{formatDuration(entry.duration_hours)}</span>
-                    ) : (
-                      <span className="font-body text-xs text-outline">—</span>
-                    )}
-                  </td>
-                </tr>
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-lowest ${
+                          emp.isActive ? "bg-primary" : "bg-outline"
+                        }`}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-nav text-sm font-semibold text-on-surface">{emp.name}</p>
+                      <p className="font-body text-[10px] text-on-surface-variant capitalize">{emp.role}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-headline text-sm font-extrabold text-on-surface">{formatDuration(emp.totalHours)}</p>
+                        <p className="font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
+                          {emp.entries.length} {emp.entries.length === 1 ? "entry" : "entries"}
+                        </p>
+                      </div>
+                      {emp.isActive && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider text-primary">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Entries table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[400px]">
+                      <thead>
+                        <tr className="border-b border-outline-variant/10 bg-surface-container-low/20">
+                          <th className="px-5 py-2.5 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Date</th>
+                          <th className="px-5 py-2.5 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">In</th>
+                          <th className="px-5 py-2.5 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Out</th>
+                          <th className="px-5 py-2.5 text-right font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Duration</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant/8">
+                        {emp.entries.map((entry) => (
+                          <tr key={entry.id} className="transition-colors hover:bg-surface-container-low/30">
+                            <td className="px-5 py-2.5">
+                              <span className="font-body text-xs text-on-surface-variant">{formatDate(entry.entry_date)}</span>
+                            </td>
+                            <td className="px-5 py-2.5">
+                              <span className="font-nav text-xs font-medium text-primary">{formatTime(entry.clock_in)}</span>
+                            </td>
+                            <td className="px-5 py-2.5">
+                              {entry.clock_out ? (
+                                <span className="font-nav text-xs font-medium text-on-surface">{formatTime(entry.clock_out)}</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider text-primary">
+                                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                                  Active
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-2.5 text-right">
+                              {entry.clock_out ? (
+                                <span className="font-nav text-xs font-semibold text-on-surface">{formatDuration(entry.duration_hours)}</span>
+                              ) : (
+                                <span className="font-body text-xs text-outline">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               ))}
-
-              {!entriesLoading && filteredEntries.length === 0 && (
-                <tr>
-                  <td colSpan={isAdmin ? 5 : 4} className="px-5 py-12 text-center">
-                    <p className="font-nav text-xs font-medium text-on-surface-variant">No entries</p>
-                    <p className="mt-1 font-body text-[11px] text-outline">Clock in to start tracking</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="border-t border-outline-variant/10 px-5 py-3">
-          <p className="font-body text-[11px] text-on-surface-variant">
-            {filteredEntries.length} {filteredEntries.length === 1 ? "entry" : "entries"}
-          </p>
-        </div>
+            </div>
+          )
+        })() : (
+          /* Non-admin: single table */
+          <div className="rounded-xl ring-1 ring-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[400px]">
+                <thead>
+                  <tr className="border-b border-outline-variant/10 bg-surface-container-low/20">
+                    <th className="px-5 py-3 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Date</th>
+                    <th className="px-5 py-3 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">In</th>
+                    <th className="px-5 py-3 text-left font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Out</th>
+                    <th className="px-5 py-3 text-right font-label text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Duration</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/8">
+                  {entriesLoading && (
+                    <tr>
+                      <td colSpan={4} className="px-5 py-12 text-center">
+                        <p className="font-body text-xs text-on-surface-variant animate-pulse">Loading...</p>
+                      </td>
+                    </tr>
+                  )}
+                  {!entriesLoading && filteredEntries.map((entry) => (
+                    <tr key={entry.id} className="transition-colors hover:bg-surface-container-low/30">
+                      <td className="px-5 py-3">
+                        <span className="font-body text-xs text-on-surface-variant">{formatDate(entry.entry_date)}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="font-nav text-xs font-medium text-primary">{formatTime(entry.clock_in)}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        {entry.clock_out ? (
+                          <span className="font-nav text-xs font-medium text-on-surface">{formatTime(entry.clock_out)}</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider text-primary">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        {entry.clock_out ? (
+                          <span className="font-nav text-xs font-semibold text-on-surface">{formatDuration(entry.duration_hours)}</span>
+                        ) : (
+                          <span className="font-body text-xs text-outline">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!entriesLoading && filteredEntries.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-5 py-12 text-center">
+                        <p className="font-nav text-xs font-medium text-on-surface-variant">No entries</p>
+                        <p className="mt-1 font-body text-[11px] text-outline">Clock in to start tracking</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-outline-variant/10 px-5 py-3">
+              <p className="font-body text-[11px] text-on-surface-variant">
+                {filteredEntries.length} {filteredEntries.length === 1 ? "entry" : "entries"}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
