@@ -66,13 +66,14 @@ function getStatusBadge(status: string) {
 function buildPrintHTML(
   sales: Reservation[],
   summary: { total: number; paid: number; pending: number; refunded: number; declined: number },
-  filters: { date: string; month: string; paymentFilter: string },
+  filters: { date: string; week: string; month: string; paymentFilter: string },
 ) {
   const filterParts: string[] = []
   if (filters.month) {
     const [y, m] = filters.month.split("-").map(Number)
     filterParts.push(new Date(y, m - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }))
   }
+  if (filters.week) filterParts.push(`Week ${filters.week}`)
   if (filters.date) filterParts.push(formatDate(filters.date))
   if (filters.paymentFilter) filterParts.push(filters.paymentFilter.charAt(0).toUpperCase() + filters.paymentFilter.slice(1))
   const periodLabel = filterParts.length ? filterParts.join("  ·  ") : "All Time"
@@ -305,7 +306,7 @@ function buildPrintHTML(
 
 /* ── CSV Export ── */
 
-function exportCSV(sales: Reservation[], filters: { date: string; month: string; paymentFilter: string }) {
+function exportCSV(sales: Reservation[], filters: { date: string; week: string; month: string; paymentFilter: string }) {
   const headers = [
     "Code", "Date", "Customer Name", "Email", "Phone",
     "Court", "Court Type", "Start Time", "End Time", "Duration (hrs)",
@@ -344,7 +345,7 @@ function exportCSV(sales: Reservation[], filters: { date: string; month: string;
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
-  const datePart = filters.month ? `_${filters.month}` : filters.date ? `_${filters.date}` : ""
+  const datePart = filters.month ? `_${filters.month}` : filters.week ? `_${filters.week}` : filters.date ? `_${filters.date}` : ""
   const payPart = filters.paymentFilter ? `_${filters.paymentFilter}` : ""
   a.href = url
   a.download = `sales_report${datePart}${payPart}_${new Date().toISOString().slice(0, 10)}.csv`
@@ -525,6 +526,7 @@ function SaleDetailModal({
 export default function SalesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [dateFilter, setDateFilter] = useState("")
+  const [weekFilter, setWeekFilter] = useState("")
   const [monthFilter, setMonthFilter] = useState("")
   const [paymentFilter, setPaymentFilter] = useState("")
   const [detailSale, setDetailSale] = useState<Reservation | null>(null)
@@ -532,6 +534,7 @@ export default function SalesPage() {
   const filters = {
     payment_status: (paymentFilter || undefined) as PaymentStatus | undefined,
     date: dateFilter || undefined,
+    week: weekFilter || undefined,
     month: monthFilter || undefined,
     page: currentPage,
     limit: PAGE_SIZE,
@@ -550,7 +553,22 @@ export default function SalesPage() {
   const allSales = allResult?.data ?? []
   const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
 
-  const manualFilters = { date: dateFilter || undefined, month: monthFilter || undefined }
+  const manualFilters: import("@/lib/hooks/useManualEntries").ManualEntryFilters = {
+    date: dateFilter || undefined,
+    month: monthFilter || undefined,
+    ...(weekFilter ? (() => {
+      const [yearStr, weekStr] = weekFilter.split("-W")
+      const year = Number(yearStr)
+      const week = Number(weekStr)
+      const jan4 = new Date(year, 0, 4)
+      const dayOfWeek = jan4.getDay() || 7
+      const monday = new Date(jan4)
+      monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7)
+      const sunday = new Date(monday)
+      sunday.setDate(monday.getDate() + 6)
+      return { date_from: monday.toISOString().slice(0, 10), date_to: sunday.toISOString().slice(0, 10) }
+    })() : {}),
+  }
   const { data: manualEntries = [] } = useManualEntries(manualFilters)
   const showManualEntries = !paymentFilter || paymentFilter === "paid"
   const manualTotal = useMemo(
@@ -584,7 +602,7 @@ export default function SalesPage() {
   })
 
   function handlePrint() {
-    const html = buildPrintHTML(allSales, summary, { date: dateFilter, month: monthFilter, paymentFilter })
+    const html = buildPrintHTML(allSales, summary, { date: dateFilter, week: weekFilter, month: monthFilter, paymentFilter })
     const printWindow = window.open("", "_blank")
     if (printWindow) {
       printWindow.document.write(html)
@@ -593,7 +611,7 @@ export default function SalesPage() {
   }
 
   function handleExportCSV() {
-    exportCSV(allSales, { date: dateFilter, month: monthFilter, paymentFilter })
+    exportCSV(allSales, { date: dateFilter, week: weekFilter, month: monthFilter, paymentFilter })
   }
 
   return (
@@ -621,7 +639,19 @@ export default function SalesPage() {
             <input
               type="month"
               value={monthFilter}
-              onChange={(e) => { setMonthFilter(e.target.value); setDateFilter(""); setCurrentPage(1) }}
+              onChange={(e) => { setMonthFilter(e.target.value); setWeekFilter(""); setDateFilter(""); setCurrentPage(1) }}
+              className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+              Week
+            </span>
+            <input
+              type="week"
+              value={weekFilter}
+              onChange={(e) => { setWeekFilter(e.target.value); setMonthFilter(""); setDateFilter(""); setCurrentPage(1) }}
               className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
             />
           </div>
@@ -633,7 +663,7 @@ export default function SalesPage() {
             <input
               type="date"
               value={dateFilter}
-              onChange={(e) => { setDateFilter(e.target.value); setMonthFilter(""); setCurrentPage(1) }}
+              onChange={(e) => { setDateFilter(e.target.value); setWeekFilter(""); setMonthFilter(""); setCurrentPage(1) }}
               className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
             />
           </div>
@@ -655,9 +685,9 @@ export default function SalesPage() {
             </select>
           </div>
 
-          {(dateFilter || monthFilter || paymentFilter) && (
+          {(dateFilter || weekFilter || monthFilter || paymentFilter) && (
             <button
-              onClick={() => { setDateFilter(""); setMonthFilter(""); setPaymentFilter(""); setCurrentPage(1) }}
+              onClick={() => { setDateFilter(""); setWeekFilter(""); setMonthFilter(""); setPaymentFilter(""); setCurrentPage(1) }}
               className="mt-auto flex h-[38px] items-center gap-1.5 rounded-md bg-surface-container-high px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
