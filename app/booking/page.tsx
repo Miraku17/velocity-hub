@@ -363,9 +363,10 @@ function BookingPage() {
   const step1Valid = name.trim() !== "" && email.trim() !== "" && phone.trim() !== "";
   const step2Valid = selectedCourt !== null && selectedSlots.length > 0;
 
-  // Parse selected slots into start_time/end_time for the API
-  const parsedTimeRange = useMemo(() => {
-    if (!selectedSlots.length) return null;
+  // Parse selected slots into contiguous time blocks for the API
+  // e.g. selecting 6 AM, 7 AM, 9 PM → two blocks: [6-8 AM] and [9-10 PM]
+  const parsedTimeRanges = useMemo(() => {
+    if (!selectedSlots.length) return [];
     const parse12 = (t: string) => {
       const [timePart, ampm] = t.split(" ");
       let [h] = timePart.split(":").map(Number);
@@ -374,20 +375,34 @@ function BookingPage() {
       return h;
     };
     const hours = selectedSlots.map(parse12).sort((a, b) => a - b);
-    const startH = hours[0];
-    const endH = hours[hours.length - 1] + 1;
-    return {
-      start_time: `${String(startH).padStart(2, "0")}:00:00`,
-      end_time: `${String(endH).padStart(2, "0")}:00:00`,
-    };
+
+    // Group into contiguous blocks
+    const blocks: { startH: number; endH: number }[] = [];
+    let blockStart = hours[0];
+    let prev = hours[0];
+    for (let i = 1; i < hours.length; i++) {
+      if (hours[i] !== prev + 1) {
+        blocks.push({ startH: blockStart, endH: prev + 1 });
+        blockStart = hours[i];
+      }
+      prev = hours[i];
+    }
+    blocks.push({ startH: blockStart, endH: prev + 1 });
+
+    return blocks.map((b) => ({
+      start_time: `${String(b.startH).padStart(2, "0")}:00:00`,
+      end_time: `${String(b.endH).padStart(2, "0")}:00:00`,
+    }));
   }, [selectedSlots]);
 
   async function handleConfirmBooking() {
-    if (!court || !parsedTimeRange) return;
+    if (!court || parsedTimeRanges.length === 0) return;
     const y = selectedDate.getFullYear();
     const mo = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const dy = String(selectedDate.getDate()).padStart(2, "0");
     const dateStr = `${y}-${mo}-${dy}`;
+
+    // Send all time blocks in a single request (single turnstile verification)
     createReservation.mutate(
       {
         court_id: court.id,
@@ -395,8 +410,9 @@ function BookingPage() {
         customer_email: email,
         customer_phone: phone,
         date: dateStr,
-        start_time: parsedTimeRange.start_time,
-        end_time: parsedTimeRange.end_time,
+        start_time: parsedTimeRanges[0].start_time,
+        end_time: parsedTimeRanges[0].end_time,
+        ...(parsedTimeRanges.length > 1 ? { time_blocks: parsedTimeRanges } : {}),
         ...(turnstileToken ? { turnstile_token: turnstileToken } : {}),
       },
       {
@@ -405,7 +421,6 @@ function BookingPage() {
           setReservationId(data.id);
           setBookingConfirmed(true);
           sessionStorage.removeItem(STORAGE_KEY);
-          // Upload receipt if user attached one
           if (receiptFile) {
             await uploadReceiptToServer(data.id);
           }
