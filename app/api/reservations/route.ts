@@ -75,17 +75,19 @@ export async function POST(request: NextRequest) {
     reservation_type,
     notes,
     turnstile_token,
+    time_blocks,
   } = body as {
     court_id: string
     customer_name: string
     customer_email: string
     customer_phone: string
     date: string
-    start_time: string
-    end_time: string
+    start_time?: string
+    end_time?: string
     reservation_type?: string
     notes?: string
     turnstile_token?: string
+    time_blocks?: { start_time: string; end_time: string }[]
   }
 
   // Verify Cloudflare Turnstile token
@@ -124,51 +126,64 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Build the list of time blocks to create
+  const blocks = time_blocks && time_blocks.length > 0
+    ? time_blocks
+    : start_time && end_time
+      ? [{ start_time, end_time }]
+      : []
+
   // Validate required fields
-  if (!court_id || !customer_name || !customer_email || !customer_phone || !date || !start_time || !end_time) {
+  if (!court_id || !customer_name || !customer_email || !customer_phone || !date || blocks.length === 0) {
     return Response.json(
-      { error: "court_id, customer_name, customer_email, customer_phone, date, start_time, and end_time are required" },
+      { error: "court_id, customer_name, customer_email, customer_phone, date, and time block(s) are required" },
       { status: 400 }
     )
   }
 
-  const { data, error } = await supabase.rpc("create_reservation", {
-    p_court_id: court_id,
-    p_customer_name: customer_name,
-    p_customer_email: customer_email,
-    p_customer_phone: customer_phone,
-    p_date: date,
-    p_start_time: start_time,
-    p_end_time: end_time,
-    p_reservation_type: reservation_type || "regular",
-    p_notes: notes || null,
-  })
+  // Create a reservation for each time block
+  const ids: string[] = []
+  for (const block of blocks) {
+    const { data, error } = await supabase.rpc("create_reservation", {
+      p_court_id: court_id,
+      p_customer_name: customer_name,
+      p_customer_email: customer_email,
+      p_customer_phone: customer_phone,
+      p_date: date,
+      p_start_time: block.start_time,
+      p_end_time: block.end_time,
+      p_reservation_type: reservation_type || "regular",
+      p_notes: notes || null,
+    })
 
-  if (error) {
-    return Response.json({ error: error.message }, { status: 400 })
+    if (error) {
+      return Response.json({ error: error.message }, { status: 400 })
+    }
+    ids.push(data as string)
+
+    // Send admin notification email (non-blocking)
+    const [{ data: court }, { data: reservation }] = await Promise.all([
+      supabase.from("courts").select("name, court_type").eq("id", court_id).single(),
+      supabase.from("reservations").select("reservation_code").eq("id", data as string).single(),
+    ])
+
+    sendBookingNotification({
+      reservationCode: reservation?.reservation_code ?? (data as string),
+      customerName: customer_name,
+      customerEmail: customer_email,
+      customerPhone: customer_phone,
+      courtName: court?.name ?? "Unknown Court",
+      courtType: court?.court_type ?? "",
+      date,
+      startTime: block.start_time,
+      endTime: block.end_time,
+      reservationType: reservation_type || "regular",
+      notes,
+    }).catch(console.error)
   }
 
-  // Send admin notification email (non-blocking — don't fail the request if email fails)
-  const [{ data: court }, { data: reservation }] = await Promise.all([
-    supabase.from("courts").select("name, court_type").eq("id", court_id).single(),
-    supabase.from("reservations").select("reservation_code").eq("id", data as string).single(),
-  ])
-
-  sendBookingNotification({
-    reservationCode: reservation?.reservation_code ?? (data as string),
-    customerName: customer_name,
-    customerEmail: customer_email,
-    customerPhone: customer_phone,
-    courtName: court?.name ?? "Unknown Court",
-    courtType: court?.court_type ?? "",
-    date,
-    startTime: start_time,
-    endTime: end_time,
-    reservationType: reservation_type || "regular",
-    notes,
-  }).catch(console.error)
-
-  return Response.json({ id: data }, { status: 201 })
+  // Return first id for backward compatibility, plus all ids
+  return Response.json({ id: ids[0], ids }, { status: 201 })
 }
 
 // PATCH /api/reservations — update reservation status (admin only)
