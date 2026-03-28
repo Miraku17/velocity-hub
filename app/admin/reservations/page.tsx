@@ -1153,10 +1153,9 @@ export default function ReservationsPage() {
               className="rounded-md bg-surface-container-high px-3 py-2 font-body text-xs font-semibold text-on-surface outline-none"
             >
               <option value="">Any Status</option>
+              <option value="pending">Pending</option>
               <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
-              <option value="no-show">No Show</option>
             </select>
           </div>
 
