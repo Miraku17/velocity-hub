@@ -8,6 +8,9 @@ export interface ManualEntry {
   amount: number | null
   description: string
   notes: string | null
+  court_id: string | null
+  start_time: string | null
+  end_time: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -25,6 +28,9 @@ export interface ManualEntryInput {
   amount?: number | null
   description: string
   notes?: string | null
+  court_id?: string | null
+  start_time?: string | null
+  end_time?: string | null
 }
 
 export interface ManualEntryUpdate {
@@ -33,6 +39,9 @@ export interface ManualEntryUpdate {
   amount?: number | null
   description?: string
   notes?: string | null
+  court_id?: string | null
+  start_time?: string | null
+  end_time?: string | null
 }
 
 /* ── Fetch helpers ── */

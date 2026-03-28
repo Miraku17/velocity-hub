@@ -8,6 +8,7 @@ import {
   useDeleteManualEntry,
   type ManualEntry,
 } from "@/lib/hooks/useManualEntries"
+import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
 
 /* ── Helpers ── */
@@ -25,23 +26,46 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function formatTime(t: string) {
+  const [h, m] = t.split(":").map(Number)
+  const ampm = h >= 12 ? "PM" : "AM"
+  const h12 = h % 12 || 12
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`
+}
+
 /* ── Entry Form Modal ── */
+
+interface EntryFormData {
+  entry_date: string
+  amount: number | null
+  description: string
+  notes: string | null
+  court_id: string | null
+  start_time: string | null
+  end_time: string | null
+  id?: string
+}
 
 function EntryFormModal({
   entry,
+  courts,
   onClose,
   onSave,
   saving,
 }: {
   entry: ManualEntry | null // null = create mode
+  courts: Court[]
   onClose: () => void
-  onSave: (data: { entry_date: string; amount: number | null; description: string; notes: string | null; id?: string }) => void
+  onSave: (data: EntryFormData) => void
   saving: boolean
 }) {
   const [date, setDate] = useState(entry?.entry_date ?? todayISO())
   const [amount, setAmount] = useState(entry?.amount?.toString() ?? "")
   const [description, setDescription] = useState(entry?.description ?? "")
   const [notes, setNotes] = useState(entry?.notes ?? "")
+  const [courtId, setCourtId] = useState(entry?.court_id ?? "")
+  const [startTime, setStartTime] = useState(entry?.start_time?.slice(0, 5) ?? "")
+  const [endTime, setEndTime] = useState(entry?.end_time?.slice(0, 5) ?? "")
 
   const stableOnClose = useCallback(onClose, [onClose])
 
@@ -61,6 +85,9 @@ function EntryFormModal({
       amount: amount.trim() ? parseFloat(amount) : null,
       description: description.trim(),
       notes: notes.trim() || null,
+      court_id: courtId || null,
+      start_time: startTime ? `${startTime}:00` : null,
+      end_time: endTime ? `${endTime}:00` : null,
     })
   }
 
@@ -103,6 +130,51 @@ function EntryFormModal({
                 onChange={(e) => setDate(e.target.value)}
                 className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
               />
+            </div>
+
+            {/* Court */}
+            <div>
+              <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                Court <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
+              </label>
+              <select
+                value={courtId}
+                onChange={(e) => setCourtId(e.target.value)}
+                className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+              >
+                <option value="">No court</option>
+                {(courts ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.court_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Time */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                  Start Time <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
+                </label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                  End Time <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
+                </label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+                />
+              </div>
             </div>
 
             {/* Amount */}
@@ -252,6 +324,7 @@ export default function ManualEntriesPage() {
   }
 
   const { data: entries, isLoading } = useManualEntries(filters)
+  const { data: courts = [] } = useCourts()
   const createMutation = useCreateManualEntry()
   const updateMutation = useUpdateManualEntry()
   const deleteMutation = useDeleteManualEntry()
@@ -261,10 +334,19 @@ export default function ManualEntriesPage() {
     return entries.reduce((sum, e) => sum + (e.amount ?? 0), 0)
   }, [entries])
 
-  function handleSave(data: { entry_date: string; amount: number | null; description: string; notes: string | null; id?: string }) {
+  function handleSave(data: EntryFormData) {
+    const payload = {
+      entry_date: data.entry_date,
+      amount: data.amount,
+      description: data.description,
+      notes: data.notes,
+      court_id: data.court_id,
+      start_time: data.start_time,
+      end_time: data.end_time,
+    }
     if (data.id) {
       updateMutation.mutate(
-        { id: data.id, entry_date: data.entry_date, amount: data.amount, description: data.description, notes: data.notes },
+        { id: data.id, ...payload },
         {
           onSuccess: () => {
             setEditEntry(null)
@@ -273,14 +355,11 @@ export default function ManualEntriesPage() {
         }
       )
     } else {
-      createMutation.mutate(
-        { entry_date: data.entry_date, amount: data.amount, description: data.description, notes: data.notes },
-        {
-          onSuccess: () => {
-            setShowForm(false)
-          },
-        }
-      )
+      createMutation.mutate(payload, {
+        onSuccess: () => {
+          setShowForm(false)
+        },
+      })
     }
   }
 
@@ -297,6 +376,7 @@ export default function ManualEntriesPage() {
       {(showForm || editEntry) && (
         <EntryFormModal
           entry={editEntry}
+          courts={courts}
           onClose={() => { setShowForm(false); setEditEntry(null) }}
           onSave={handleSave}
           saving={createMutation.isPending || updateMutation.isPending}
@@ -408,11 +488,17 @@ export default function ManualEntriesPage() {
         <LoadingPage />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-outline-variant/15 bg-surface-container-lowest">
-          <table className="w-full min-w-[600px]">
+          <table className="w-full min-w-[750px]">
             <thead>
               <tr className="border-b border-outline-variant/15">
                 <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                   Date
+                </th>
+                <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                  Court
+                </th>
+                <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                  Time
                 </th>
                 <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                   Description
@@ -439,6 +525,24 @@ export default function ManualEntriesPage() {
                       <span className="font-body text-sm font-medium text-on-surface">
                         {formatDate(entry.entry_date)}
                       </span>
+                    </td>
+                    <td className="px-6 py-5">
+                      {entry.court_id ? (
+                        <span className="font-body text-sm text-on-surface">
+                          {(courts ?? []).find((c) => c.id === entry.court_id)?.name ?? "—"}
+                        </span>
+                      ) : (
+                        <span className="font-body text-xs text-on-surface-variant/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-5">
+                      {entry.start_time && entry.end_time ? (
+                        <span className="font-body text-sm text-on-surface">
+                          {formatTime(entry.start_time)} – {formatTime(entry.end_time)}
+                        </span>
+                      ) : (
+                        <span className="font-body text-xs text-on-surface-variant/40">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-5">
                       <span className="font-body text-sm text-on-surface">
@@ -491,7 +595,7 @@ export default function ManualEntriesPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center">
+                  <td colSpan={7} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-outline/40">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
