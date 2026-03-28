@@ -13,7 +13,8 @@ import { LoadingPage } from "@/components/ui/loading";
 import { useCourts, type Court } from "@/lib/hooks/useCourts";
 import { usePaymentQrCodes } from "@/lib/hooks/usePaymentQrCodes";
 import { useCreateReservation } from "@/lib/hooks/useReservations";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 declare global {
   interface Window {
@@ -116,6 +117,7 @@ function BookingPage() {
   const { data: courts = [], isLoading } = useCourts({ status: "available" });
   const { data: paymentQrCodes = [] } = usePaymentQrCodes();
   const createReservation = useCreateReservation();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -137,6 +139,7 @@ function BookingPage() {
   const [qrLightbox, setQrLightbox] = useState(false);
   const [showSlots, setShowSlots] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
   const receiptInputRef = useRef<HTMLInputElement>(null);
 
   // Turnstile CAPTCHA
@@ -395,12 +398,75 @@ function BookingPage() {
     }));
   }, [selectedSlots]);
 
+  // Re-check slot availability against the latest server data
+  async function checkAvailability(): Promise<boolean> {
+    if (!selectedCourt || selectedSlots.length === 0) return false;
+    try {
+      // Refetch the latest reservations + blocked slots (bypass any cache)
+      const [resRes, blockRes] = await Promise.all([
+        fetch(`/api/reservations?court_id=${selectedCourt}&date=${dateStr}&limit=200&_t=${Date.now()}`, { cache: "no-store" }),
+        fetch(`/api/blocked-slots?date=${dateStr}&court_id=${selectedCourt}&_t=${Date.now()}`, { cache: "no-store" }),
+      ]);
+
+      // Build a set of taken hours
+      const taken = new Set<number>();
+
+      if (resRes.ok) {
+        const json = await resRes.json();
+        const active = (json.data || []).filter(
+          (r: { status: string }) => r.status !== "cancelled"
+        );
+        for (const r of active) {
+          const startH = parseInt(r.start_time.split(":")[0], 10);
+          let endH = parseInt(r.end_time.split(":")[0], 10);
+          if (endH <= startH) endH += 24;
+          for (let h = startH; h < endH; h++) taken.add(h % 24);
+        }
+      }
+
+      if (blockRes.ok) {
+        const blocks = await blockRes.json();
+        for (const b of blocks as { start_time: string | null; end_time: string | null }[]) {
+          if (!b.start_time || !b.end_time) {
+            // Full-day block — mark all hours
+            for (let h = 0; h < 24; h++) taken.add(h);
+          } else {
+            const startH = parseInt(b.start_time.split(":")[0], 10);
+            let endH = parseInt(b.end_time.split(":")[0], 10);
+            if (endH <= startH) endH += 24;
+            for (let h = startH; h < endH; h++) taken.add(h % 24);
+          }
+        }
+      }
+
+      // Parse selected slots to hours
+      const parse12 = (t: string) => {
+        const [timePart, ampm] = t.split(" ");
+        let [h] = timePart.split(":").map(Number);
+        if (ampm === "PM" && h !== 12) h += 12;
+        if (ampm === "AM" && h === 12) h = 0;
+        return h;
+      };
+
+      const conflicts = selectedSlots.filter((s) => taken.has(parse12(s)));
+      if (conflicts.length > 0) {
+        toast.error("This time slot is already booked.");
+        // Refresh the slot grid so the user sees updated availability
+        queryClient.invalidateQueries({ queryKey: ["slot-availability", selectedCourt, dateStr] });
+        return false;
+      }
+      return true;
+    } catch {
+      return true; // on network error, let the RPC guard handle it
+    }
+  }
+
   async function handleConfirmBooking() {
     if (!court || parsedTimeRanges.length === 0) return;
-    const y = selectedDate.getFullYear();
-    const mo = String(selectedDate.getMonth() + 1).padStart(2, "0");
-    const dy = String(selectedDate.getDate()).padStart(2, "0");
-    const dateStr = `${y}-${mo}-${dy}`;
+
+    // Final availability guard before creating
+    const available = await checkAvailability();
+    if (!available) return;
 
     // Send all time blocks in a single request (single turnstile verification)
     createReservation.mutate(
@@ -424,6 +490,10 @@ function BookingPage() {
           if (receiptFile) {
             await uploadReceiptToServer(data.id);
           }
+        },
+        onError: (err) => {
+          toast.error(err.message || "Something went wrong. Please try again.");
+          queryClient.invalidateQueries({ queryKey: ["slot-availability", selectedCourt, dateStr] });
         },
       }
     );
@@ -904,17 +974,23 @@ function BookingPage() {
                   {/* Navigation buttons */}
                   <div className="flex flex-col gap-2">
                     <button
-                      onClick={() => step2Valid && setStep(3)}
-                      disabled={!step2Valid}
+                      onClick={async () => {
+                        if (!step2Valid || checkingAvailability) return;
+                        setCheckingAvailability(true);
+                        const ok = await checkAvailability();
+                        setCheckingAvailability(false);
+                        if (ok) setStep(3);
+                      }}
+                      disabled={!step2Valid || checkingAvailability}
                       className="w-full px-8 py-3.5 rounded-xl font-[Poppins] font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                       style={{
-                        backgroundColor: step2Valid ? bg : `${bg}0a`,
-                        color: step2Valid ? "white" : `${bg}30`,
-                        cursor: step2Valid ? "pointer" : "not-allowed",
+                        backgroundColor: step2Valid && !checkingAvailability ? bg : `${bg}0a`,
+                        color: step2Valid && !checkingAvailability ? "white" : `${bg}30`,
+                        cursor: step2Valid && !checkingAvailability ? "pointer" : "not-allowed",
                       }}
                     >
-                      Review Booking
-                      <span className="material-symbols-outlined text-base">arrow_forward</span>
+                      {checkingAvailability ? "Checking availability..." : "Review Booking"}
+                      {!checkingAvailability && <span className="material-symbols-outlined text-base">arrow_forward</span>}
                     </button>
                     <button
                       onClick={() => setStep(1)}

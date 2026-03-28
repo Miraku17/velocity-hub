@@ -134,6 +134,42 @@ function BlockFormModal({
     staleTime: 0,
   })
 
+  // Fetch existing blocked slots for the selected date (court-specific + all-courts blocks)
+  const { data: existingBlocks = [] } = useBlockedSlots(
+    date ? { date } : undefined
+  )
+
+  // Check if there's a full-day block for this date (matching court or all-courts)
+  const fullDayBlock = useMemo(() => {
+    return existingBlocks.find(
+      (b) =>
+        !b.start_time &&
+        !b.end_time &&
+        (b.court_id === null || b.court_id === courtId)
+    )
+  }, [existingBlocks, courtId])
+
+  // Map already-blocked hours from existing blocked slots
+  const alreadyBlockedSlots = useMemo(() => {
+    const blocked = new Set<string>()
+    for (const b of existingBlocks) {
+      // Skip full-day blocks (handled separately) and blocks for other courts
+      if (!b.start_time || !b.end_time) continue
+      if (b.court_id !== null && b.court_id !== courtId) continue
+
+      const startH = parseInt(b.start_time.split(":")[0], 10)
+      let endH = parseInt(b.end_time.split(":")[0], 10)
+      if (endH <= startH) endH += 24
+      for (let h = startH; h < endH; h++) {
+        const displayHour = h % 24
+        const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour
+        const ampm = displayHour < 12 ? "AM" : "PM"
+        blocked.add(`${hour12}:00 ${ampm}`)
+      }
+    }
+    return blocked
+  }, [existingBlocks, courtId])
+
   // Map booked hours from existing reservations
   const bookedSlots = useMemo(() => {
     const booked = new Set<string>()
@@ -167,7 +203,7 @@ function BlockFormModal({
   }
 
   function selectAllSlots() {
-    setSelectedSlots(timeSlots.filter((s) => !bookedSlots.has(s)))
+    setSelectedSlots(timeSlots.filter((s) => !bookedSlots.has(s) && !alreadyBlockedSlots.has(s)))
   }
 
   function clearAllSlots() {
@@ -316,6 +352,24 @@ function BlockFormModal({
                 onChange={(e) => setDate(e.target.value)}
                 className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
               />
+              {/* Existing blocks info for selected date */}
+              {existingBlocks.length > 0 && blockType === "day" && (
+                <div className="mt-2 flex gap-2.5 rounded-lg border border-[#D97706]/30 bg-[#D97706]/8 px-3 py-2.5">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-[#D97706]">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <div>
+                    <p className="font-body text-[11px] font-semibold text-[#D97706]">
+                      {fullDayBlock
+                        ? `This date already has a full-day block${fullDayBlock.court_id === null ? " (all courts)" : ""}`
+                        : `${existingBlocks.filter((b) => b.court_id === null || b.court_id === courtId || !courtId).length} existing block(s) on this date`
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Time Slots Grid */}
@@ -352,6 +406,26 @@ function BlockFormModal({
                   )}
                 </div>
 
+                {/* Full-day block warning */}
+                {fullDayBlock && (
+                  <div className="flex gap-3 rounded-lg border border-error/30 bg-error/8 px-4 py-3 mb-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-error">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                    </svg>
+                    <div>
+                      <p className="font-body text-xs font-semibold text-error">
+                        This date is fully blocked{fullDayBlock.court_id === null ? " (all courts)" : ""}
+                      </p>
+                      {fullDayBlock.reason && (
+                        <p className="font-body text-[11px] text-error/70 mt-0.5">
+                          Reason: {fullDayBlock.reason}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {!courtSchedule ? (
                   <div className="flex flex-col items-center rounded-lg bg-surface-container-low py-8">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-outline/40 mb-2">
@@ -369,23 +443,29 @@ function BlockFormModal({
                     {timeSlots.map((slot) => {
                       const isSelected = selectedSlots.includes(slot)
                       const isBooked = bookedSlots.has(slot)
+                      const isAlreadyBlocked = alreadyBlockedSlots.has(slot) || !!fullDayBlock
+                      const isDisabled = isBooked || isAlreadyBlocked
                       return (
                         <button
                           key={slot}
                           type="button"
-                          disabled={isBooked}
-                          onClick={() => !isBooked && toggleSlot(slot)}
+                          disabled={isDisabled}
+                          onClick={() => !isDisabled && toggleSlot(slot)}
                           className={`rounded-lg border py-2.5 px-2 text-center transition-all ${
-                            isBooked
+                            isAlreadyBlocked
+                              ? "cursor-not-allowed border-error/20 bg-error/5 opacity-60"
+                              : isBooked
                               ? "cursor-not-allowed border-outline-variant/10 bg-surface-container-low opacity-50"
                               : isSelected
                               ? "border-error bg-error/10 text-error"
                               : "border-outline-variant/20 text-on-surface-variant hover:border-error/40 hover:bg-error/5"
                           }`}
                         >
-                          <span className="block font-body text-xs font-bold" style={{ textDecoration: isBooked ? "line-through" : "none" }}>{slot}</span>
-                          <span className="block font-label text-[8px] font-extrabold uppercase tracking-widest mt-0.5">
-                            {isBooked ? "Booked" : isSelected ? "Blocked" : ""}
+                          <span className="block font-body text-xs font-bold" style={{ textDecoration: isBooked || isAlreadyBlocked ? "line-through" : "none" }}>{slot}</span>
+                          <span className={`block font-label text-[8px] font-extrabold uppercase tracking-widest mt-0.5 ${
+                            isAlreadyBlocked ? "text-error" : ""
+                          }`}>
+                            {isAlreadyBlocked ? "Already Blocked" : isBooked ? "Booked" : isSelected ? "Blocked" : ""}
                           </span>
                         </button>
                       )
@@ -547,14 +627,11 @@ export default function BlockedSlotsPage() {
     reason: string
   }[]) {
     setConflictError(null)
-    let completed = 0
+    setShowForm(false)
     for (const block of blocks) {
       createMutation.mutate(block, {
-        onSuccess: () => {
-          completed++
-          if (completed === blocks.length) setShowForm(false)
-        },
         onError: (err) => {
+          setShowForm(true)
           setConflictError(err.message)
         },
       })
@@ -563,9 +640,9 @@ export default function BlockedSlotsPage() {
 
   function handleUnblock() {
     if (!unblockItem) return
-    deleteMutation.mutate(unblockItem.id, {
-      onSuccess: () => setUnblockItem(null),
-    })
+    const id = unblockItem.id
+    setUnblockItem(null)
+    deleteMutation.mutate(id)
   }
 
   return (
