@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Providers } from "@/lib/providers";
 import { Analytics } from "@vercel/analytics/react";
+import { Toaster } from "@/components/ui/sonner";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -125,6 +126,7 @@ export default function RootLayout({
       </head>
       <body className="bg-surface text-on-surface font-body">
         <Providers>{children}</Providers>
+        <Toaster position="top-center" richColors />
         <Analytics />
       </body>
     </html>
