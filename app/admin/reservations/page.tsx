@@ -451,6 +451,12 @@ function WalkInModal({
   )
 }
 
+/* ── Types ── */
+
+type GroupedReservation = Reservation & {
+  grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number }[]
+}
+
 /* ── Reservation Detail Modal ── */
 
 function ReservationDetailModal({
@@ -461,7 +467,7 @@ function ReservationDetailModal({
   isPending,
   canUpdate,
 }: {
-  reservation: Reservation | null
+  reservation: GroupedReservation | null
   onClose: () => void
   onStatusChange: (id: string, status: ReservationStatus) => void
   onPaymentChange: (id: string, status: "paid" | "refunded") => void
@@ -479,10 +485,12 @@ function ReservationDetailModal({
     return () => window.removeEventListener("keydown", handleKey)
   }, [reservation, stableOnClose])
 
+  // Fetch receipts for all reservation IDs in the group (receipt may be linked to any sibling)
+  const receiptIds = reservation?.grouped_slots?.map((s) => s.id).join(",") ?? reservation?.id ?? ""
   const { data: receipts } = useQuery<{ id: string; image_url: string; created_at: string }[]>({
-    queryKey: ["payment-receipts", reservation?.id],
+    queryKey: ["payment-receipts", receiptIds],
     queryFn: async () => {
-      const res = await fetch(`/api/payment-receipts?reservation_id=${reservation!.id}`)
+      const res = await fetch(`/api/payment-receipts?reservation_id=${receiptIds}`)
       if (!res.ok) return []
       return res.json()
     },
@@ -582,11 +590,32 @@ function ReservationDetailModal({
                 </div>
                 <div>
                   <span className="font-body text-[10px] text-on-surface-variant">Time</span>
-                  <p className="font-nav text-sm font-semibold text-primary">{formatTimeSlot(res.start_time, res.end_time)}</p>
+                  {res.grouped_slots ? (
+                    <div className="mt-0.5 flex flex-col gap-1">
+                      {res.grouped_slots.map((slot, i) => (
+                        <div key={slot.id} className="flex items-center gap-1.5">
+                          <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 font-label text-[9px] font-bold text-primary">
+                            {i + 1}
+                          </span>
+                          <p className="font-nav text-sm font-semibold text-primary">{formatTimeSlot(slot.start_time, slot.end_time)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="font-nav text-sm font-semibold text-primary">{formatTimeSlot(res.start_time, res.end_time)}</p>
+                  )}
                 </div>
                 <div>
                   <span className="font-body text-[10px] text-on-surface-variant">Duration</span>
-                  <p className="font-nav text-sm font-semibold text-on-surface">{res.duration_hours}h</p>
+                  <p className="font-nav text-sm font-semibold text-on-surface">
+                    {res.grouped_slots
+                      ? `${res.grouped_slots.reduce((sum, s) => {
+                          const sh = parseInt(s.start_time.split(":")[0], 10)
+                          const eh = parseInt(s.end_time.split(":")[0], 10)
+                          return sum + (eh > sh ? eh - sh : 24 - sh + eh)
+                        }, 0)}h`
+                      : `${res.duration_hours}h`}
+                  </p>
                 </div>
                 {res.notes && (
                   <div>
@@ -627,10 +656,24 @@ function ReservationDetailModal({
                   <span className="text-on-surface-variant">Rate</span>
                   <span className="text-on-surface">₱{Number(res.price_per_hour).toFixed(2)}/hr</span>
                 </div>
-                <div className="flex justify-between font-body text-xs">
-                  <span className="text-on-surface-variant">Duration</span>
-                  <span className="text-on-surface">{res.duration_hours}h</span>
-                </div>
+                {res.grouped_slots ? (
+                  res.grouped_slots.map((slot, i) => {
+                    const sh = parseInt(slot.start_time.split(":")[0], 10)
+                    const eh = parseInt(slot.end_time.split(":")[0], 10)
+                    const hrs = eh > sh ? eh - sh : 24 - sh + eh
+                    return (
+                      <div key={slot.id} className="flex justify-between font-body text-xs">
+                        <span className="text-on-surface-variant">Slot {i + 1} ({formatTimeSlot(slot.start_time, slot.end_time)})</span>
+                        <span className="text-on-surface">{hrs}h · ₱{Number(slot.total_amount).toFixed(2)}</span>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="flex justify-between font-body text-xs">
+                    <span className="text-on-surface-variant">Duration</span>
+                    <span className="text-on-surface">{res.duration_hours}h</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-outline-variant/30 mt-2.5 pt-2.5 flex justify-between items-center">
@@ -843,7 +886,7 @@ export default function ReservationsPage() {
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
-  const [detailReservation, setDetailReservation] = useState<Reservation | null>(null)
+  const [detailReservation, setDetailReservation] = useState<GroupedReservation | null>(null)
   const [confirmAction, setConfirmAction] = useState<{
     title: string
     message: string
@@ -877,8 +920,27 @@ export default function ReservationsPage() {
   const canCreateBooking = me?.permissions.bookings_create ?? false
   const canUpdateBooking = me?.permissions.bookings_update ?? false
 
-  const reservations = result?.data ?? []
+  const rawReservations = result?.data ?? []
   const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
+
+  // Group reservations sharing a booking_group_id into a single display row
+  // The first reservation in the group is the "primary" (carries status, customer, court, receipt)
+  const reservations: (Reservation & { grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number }[] })[] = []
+  const seenGroupIds = new Set<string>()
+  for (const res of rawReservations) {
+    if (res.booking_group_id) {
+      if (seenGroupIds.has(res.booking_group_id)) continue
+      seenGroupIds.add(res.booking_group_id)
+      const siblings = rawReservations.filter((r) => r.booking_group_id === res.booking_group_id)
+      reservations.push({
+        ...res,
+        total_amount: siblings.reduce((sum, r) => sum + r.total_amount, 0),
+        grouped_slots: siblings.map((r) => ({ id: r.id, start_time: r.start_time, end_time: r.end_time, total_amount: r.total_amount })),
+      })
+    } else {
+      reservations.push(res)
+    }
+  }
 
   const confirmMessages: Record<string, { title: string; message: string; label: string; variant: "primary" | "destructive" }> = {
     confirmed: { title: "Confirm Booking", message: "Are you sure you want to confirm this booking? The payment status will be set to paid.", label: "Confirm", variant: "primary" },
@@ -887,6 +949,15 @@ export default function ReservationsPage() {
     "no-show": { title: "Mark No Show", message: "Are you sure you want to mark this booking as no-show?", label: "Mark No Show", variant: "destructive" },
     paid: { title: "Mark as Paid", message: "Are you sure you want to mark this payment as paid?", label: "Mark Paid", variant: "primary" },
     refunded: { title: "Refund Payment", message: "Are you sure you want to refund this payment?", label: "Refund", variant: "destructive" },
+  }
+
+  // Get all IDs that should be updated (primary + siblings in a group)
+  function getGroupIds(id: string): string[] {
+    const res = reservations.find((r) => r.id === id)
+    if (res?.grouped_slots && res.grouped_slots.length > 1) {
+      return res.grouped_slots.map((s) => s.id)
+    }
+    return [id]
   }
 
   function handleStatusChange(id: string, status: ReservationStatus) {
@@ -902,7 +973,18 @@ export default function ReservationsPage() {
           status === "confirmed" ? { payment_status: "paid" as const } :
           status === "cancelled" ? { payment_status: "declined" as const } :
           {}
-        updateMutation.mutate({ id, status, ...extra }, { onSuccess: (updated) => { setConfirmAction(null); setDetailReservation(prev => prev?.id === updated.id ? updated : prev) } })
+        const ids = getGroupIds(id)
+        let completed = 0
+        for (const gid of ids) {
+          updateMutation.mutate({ id: gid, status, ...extra }, {
+            onSuccess: (updated) => {
+              completed++
+              if (completed === ids.length) {
+                setDetailReservation((prev) => prev?.id === id ? { ...prev, status: updated.status, payment_status: updated.payment_status } : prev)
+              }
+            },
+          })
+        }
       },
     })
   }
@@ -916,7 +998,18 @@ export default function ReservationsPage() {
       confirmLabel: msg.label,
       confirmVariant: msg.variant,
       onConfirm: () => {
-        updateMutation.mutate({ id, payment_status }, { onSuccess: (updated) => { setConfirmAction(null); setDetailReservation(prev => prev?.id === updated.id ? updated : prev) } })
+        const ids = getGroupIds(id)
+        let completed = 0
+        for (const gid of ids) {
+          updateMutation.mutate({ id: gid, payment_status }, {
+            onSuccess: (updated) => {
+              completed++
+              if (completed === ids.length) {
+                setDetailReservation((prev) => prev?.id === id ? { ...prev, payment_status: updated.payment_status } : prev)
+              }
+            },
+          })
+        }
       },
     })
   }
@@ -1146,15 +1239,30 @@ export default function ReservationsPage() {
                       <p className="mb-0.5 text-xs font-medium text-on-surface-variant">
                         {formatDate(res.reservation_date)}
                       </p>
-                      <p
-                        className={`font-headline text-lg font-extrabold tracking-tight ${
-                          isCancelled
-                            ? "text-outline line-through"
-                            : "text-primary"
-                        }`}
-                      >
-                        {formatTimeSlot(res.start_time, res.end_time)}
-                      </p>
+                      {res.grouped_slots ? (
+                        <div className="flex flex-col gap-0.5">
+                          {res.grouped_slots.map((slot) => (
+                            <p
+                              key={slot.id}
+                              className={`font-headline text-base font-extrabold tracking-tight ${
+                                isCancelled ? "text-outline line-through" : "text-primary"
+                              }`}
+                            >
+                              {formatTimeSlot(slot.start_time, slot.end_time)}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p
+                          className={`font-headline text-lg font-extrabold tracking-tight ${
+                            isCancelled
+                              ? "text-outline line-through"
+                              : "text-primary"
+                          }`}
+                        >
+                          {formatTimeSlot(res.start_time, res.end_time)}
+                        </p>
+                      )}
                     </td>
 
                     {/* Court */}
@@ -1377,7 +1485,7 @@ export default function ReservationsPage() {
         message={confirmAction?.message ?? ""}
         confirmLabel={confirmAction?.confirmLabel ?? ""}
         confirmVariant={confirmAction?.confirmVariant ?? "primary"}
-        onConfirm={() => confirmAction?.onConfirm()}
+        onConfirm={() => { setConfirmAction(null); confirmAction?.onConfirm() }}
         onCancel={() => setConfirmAction(null)}
         isPending={updateMutation.isPending}
       />

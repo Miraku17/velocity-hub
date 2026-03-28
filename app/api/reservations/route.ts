@@ -141,6 +141,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Generate a shared group ID when booking multiple non-contiguous blocks
+  const bookingGroupId = blocks.length > 1
+    ? crypto.randomUUID()
+    : null
+
   // Create a reservation for each time block
   const ids: string[] = []
   for (const block of blocks) {
@@ -159,7 +164,17 @@ export async function POST(request: NextRequest) {
     if (error) {
       return Response.json({ error: error.message }, { status: 400 })
     }
-    ids.push(data as string)
+
+    const reservationId = data as string
+    ids.push(reservationId)
+
+    // Stamp the booking_group_id so all blocks are linked as one booking
+    if (bookingGroupId) {
+      await supabase
+        .from("reservations")
+        .update({ booking_group_id: bookingGroupId })
+        .eq("id", reservationId)
+    }
 
     // Send admin notification email (non-blocking)
     const [{ data: court }, { data: reservation }] = await Promise.all([
@@ -182,8 +197,8 @@ export async function POST(request: NextRequest) {
     }).catch(console.error)
   }
 
-  // Return first id for backward compatibility, plus all ids
-  return Response.json({ id: ids[0], ids }, { status: 201 })
+  // Return first id for backward compatibility, plus all ids and group id
+  return Response.json({ id: ids[0], ids, booking_group_id: bookingGroupId }, { status: 201 })
 }
 
 // PATCH /api/reservations — update reservation status (admin only)
