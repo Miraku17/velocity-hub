@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const body = await request.json()
 
-  const { entry_date, amount, description, notes } = body
+  const { entry_date, amount, description, notes, court_id, start_time, end_time } = body
 
   if (!entry_date || !description) {
     return Response.json(
@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
       amount: amount ?? null,
       description,
       notes: notes ?? null,
+      court_id: court_id ?? null,
+      start_time: start_time ?? null,
+      end_time: end_time ?? null,
       created_by: user.id,
     })
     .select()
