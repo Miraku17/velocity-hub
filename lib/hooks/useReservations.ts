@@ -28,6 +28,7 @@ export interface Reservation {
   total_amount: number
   payment_status: PaymentStatus
   notes: string | null
+  booking_group_id: string | null
   created_at: string
 }
 

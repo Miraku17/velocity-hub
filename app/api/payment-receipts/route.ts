@@ -2,19 +2,23 @@ import { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // GET /api/payment-receipts?reservation_id=xxx — fetch receipts for a reservation
+// Supports comma-separated IDs for grouped reservations:
+//   ?reservation_id=id1,id2,id3
 export async function GET(request: NextRequest) {
-  const reservationId = request.nextUrl.searchParams.get("reservation_id")
+  const param = request.nextUrl.searchParams.get("reservation_id")
 
-  if (!reservationId) {
+  if (!param) {
     return Response.json({ error: "reservation_id is required" }, { status: 400 })
   }
+
+  const ids = param.split(",").map((s) => s.trim()).filter(Boolean)
 
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from("payment_receipts")
     .select("*")
-    .eq("reservation_id", reservationId)
+    .in("reservation_id", ids)
     .order("created_at", { ascending: false })
 
   if (error) {
