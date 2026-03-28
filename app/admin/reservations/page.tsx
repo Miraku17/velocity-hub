@@ -931,9 +931,13 @@ export default function ReservationsPage() {
     if (res.booking_group_id) {
       if (seenGroupIds.has(res.booking_group_id)) continue
       seenGroupIds.add(res.booking_group_id)
-      const siblings = rawReservations.filter((r) => r.booking_group_id === res.booking_group_id)
+      const siblings = rawReservations
+        .filter((r) => r.booking_group_id === res.booking_group_id)
+        .sort((a, b) => a.start_time.localeCompare(b.start_time))
+      // Use the earliest slot as the primary so the reservation code matches the one in emails
+      const primary = siblings[0]
       reservations.push({
-        ...res,
+        ...primary,
         total_amount: siblings.reduce((sum, r) => sum + r.total_amount, 0),
         grouped_slots: siblings.map((r) => ({ id: r.id, start_time: r.start_time, end_time: r.end_time, total_amount: r.total_amount })),
       })
