@@ -22,6 +22,11 @@ const formatDate = (date: string) =>
     day: "numeric",
   })
 
+export interface TimeSlot {
+  startTime: string
+  endTime: string
+}
+
 export interface BookingEmailData {
   customerName: string
   customerEmail: string
@@ -34,6 +39,8 @@ export interface BookingEmailData {
   reservationType: string
   notes?: string | null
   reservationCode: string
+  /** Additional time slots for grouped bookings */
+  slots?: TimeSlot[]
 }
 
 export interface ReceiptEmailData {
@@ -48,6 +55,8 @@ export interface ReceiptEmailData {
   reservationCode: string
   totalAmount: number
   notes?: string | null
+  /** Per-slot breakdown for grouped bookings */
+  slots?: (TimeSlot & { amount: number })[]
 }
 
 export async function sendBookingNotification(data: BookingEmailData) {
@@ -68,14 +77,21 @@ export async function sendBookingNotification(data: BookingEmailData) {
     reservationType,
     notes,
     reservationCode,
+    slots,
   } = data
 
   const formattedDate = formatDate(date)
+  const allSlots: TimeSlot[] = slots && slots.length > 1 ? slots : [{ startTime: startTime, endTime: endTime }]
+  const isGrouped = allSlots.length > 1
+
+  const slotsTimeHtml = isGrouped
+    ? allSlots.map((s, i) => `<span style="display:block;font-size:14px;font-weight:700;color:#065f46;">${i + 1}. ${formatTime(s.startTime)} – ${formatTime(s.endTime)}</span>`).join("")
+    : `${formatTime(startTime)} – ${formatTime(endTime)}`
 
   await resend.emails.send({
     from: `Velocity Pickleball Hub <${FROM_EMAIL}>`,
     to: ADMIN_EMAIL,
-    subject: `New Booking — ${customerName} · ${formattedDate}`,
+    subject: `New Booking — ${customerName} · ${formattedDate}${isGrouped ? ` (${allSlots.length} slots)` : ""}`,
     html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -93,7 +109,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
                 <td>
                   <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.5);">Velocity Pickleball Hub</p>
                   <h1 style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;">New Court Booking</h1>
-                  <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.6);">A new reservation has been confirmed.</p>
+                  <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.6);">A new reservation has been ${isGrouped ? `submitted with ${allSlots.length} time slots.` : "confirmed."}</p>
                 </td>
                 <td align="right" valign="top">
                   <img src="${LOGO_URL}" alt="Velocity Pickleball Hub" width="48" height="48" style="border-radius:10px;display:block;" />
@@ -109,7 +125,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="font-size:15px;font-weight:700;color:#065f46;">${formattedDate}</td>
-                <td align="right" style="font-size:15px;font-weight:700;color:#065f46;">${formatTime(startTime)} – ${formatTime(endTime)}</td>
+                <td align="right" style="font-size:15px;font-weight:700;color:#065f46;">${slotsTimeHtml}</td>
               </tr>
               <tr>
                 <td style="font-size:13px;color:#047857;padding-top:2px;">${courtName} <span style="color:#6ee7b7;">&nbsp;·&nbsp;</span> <span style="text-transform:capitalize;">${courtType}</span></td>
@@ -194,6 +210,7 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
     reservationCode,
     totalAmount,
     notes,
+    slots: receiptSlots,
   } = data
 
   const formattedDate = formatDate(date)
@@ -201,6 +218,7 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
     style: "currency",
     currency: "PHP",
   }).format(totalAmount)
+  const isGroupedReceipt = receiptSlots && receiptSlots.length > 1
 
   await resend.emails.send({
     from: `Velocity Pickleball Hub <${FROM_EMAIL}>`,
@@ -285,12 +303,32 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
                     </tr>
 
                     <!-- Row: Time -->
+                    ${isGroupedReceipt ? `
+                    <tr>
+                      <td colspan="2" style="padding:11px 0;border-bottom:1px dashed #e5e7eb;">
+                        <p style="margin:0;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Time Slots (${receiptSlots.length})</p>
+                        ${receiptSlots.map((s, i) => {
+                          const amt = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(s.amount)
+                          return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;">
+                            <tr>
+                              <td style="font-size:14px;font-weight:600;color:#111827;">
+                                <span style="display:inline-block;width:18px;height:18px;background:#d1fae5;border-radius:50%;text-align:center;line-height:18px;font-size:10px;font-weight:700;color:#059669;margin-right:6px;">${i + 1}</span>
+                                ${formatTime(s.startTime)} &ndash; ${formatTime(s.endTime)}
+                              </td>
+                              <td align="right" style="font-size:13px;font-weight:600;color:#6b7280;">${amt}</td>
+                            </tr>
+                          </table>`
+                        }).join("")}
+                      </td>
+                    </tr>
+                    ` : `
                     <tr>
                       <td colspan="2" style="padding:11px 0;border-bottom:1px dashed #e5e7eb;">
                         <p style="margin:0;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Time Slot</p>
                         <p style="margin:3px 0 0;font-size:14px;font-weight:600;color:#111827;">${formatTime(startTime)} &ndash; ${formatTime(endTime)}</p>
                       </td>
                     </tr>
+                    `}
 
                   </table>
                 </td>

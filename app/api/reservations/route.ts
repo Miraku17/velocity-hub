@@ -175,27 +175,28 @@ export async function POST(request: NextRequest) {
         .update({ booking_group_id: bookingGroupId })
         .eq("id", reservationId)
     }
-
-    // Send admin notification email (non-blocking)
-    const [{ data: court }, { data: reservation }] = await Promise.all([
-      supabase.from("courts").select("name, court_type").eq("id", court_id).single(),
-      supabase.from("reservations").select("reservation_code").eq("id", data as string).single(),
-    ])
-
-    sendBookingNotification({
-      reservationCode: reservation?.reservation_code ?? (data as string),
-      customerName: customer_name,
-      customerEmail: customer_email,
-      customerPhone: customer_phone,
-      courtName: court?.name ?? "Unknown Court",
-      courtType: court?.court_type ?? "",
-      date,
-      startTime: block.start_time,
-      endTime: block.end_time,
-      reservationType: reservation_type || "regular",
-      notes,
-    }).catch(console.error)
   }
+
+  // Send ONE admin notification email with all slots (non-blocking)
+  const [{ data: court }, { data: firstReservation }] = await Promise.all([
+    supabase.from("courts").select("name, court_type").eq("id", court_id).single(),
+    supabase.from("reservations").select("reservation_code").eq("id", ids[0]).single(),
+  ])
+
+  sendBookingNotification({
+    reservationCode: firstReservation?.reservation_code ?? ids[0],
+    customerName: customer_name,
+    customerEmail: customer_email,
+    customerPhone: customer_phone,
+    courtName: court?.name ?? "Unknown Court",
+    courtType: court?.court_type ?? "",
+    date,
+    startTime: blocks[0].start_time,
+    endTime: blocks[0].end_time,
+    reservationType: reservation_type || "regular",
+    notes,
+    slots: blocks.map((b) => ({ startTime: b.start_time, endTime: b.end_time })),
+  }).catch(console.error)
 
   // Return first id for backward compatibility, plus all ids and group id
   return Response.json({ id: ids[0], ids, booking_group_id: bookingGroupId }, { status: 201 })
@@ -253,6 +254,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   // Send receipt to customer when admin confirms the booking
+  // For grouped bookings, only send once (from the first sibling) with all slot details
   if (status === "confirmed") {
     const { data: reservation } = await supabase
       .from("reservations_view")
@@ -261,18 +263,49 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (reservation) {
+      // Check if this is part of a group
+      let siblings: typeof reservation[] = []
+      if (reservation.booking_group_id) {
+        const { data: groupRows } = await supabase
+          .from("reservations_view")
+          .select("*")
+          .eq("booking_group_id", reservation.booking_group_id)
+          .order("start_time", { ascending: true })
+
+        siblings = groupRows ?? []
+
+        // Only send the email once — skip if this isn't the first sibling
+        if (siblings.length > 0 && siblings[0].id !== id) {
+          return Response.json(data)
+        }
+      }
+
+      const isGrouped = siblings.length > 1
+      // Use the earliest slot as the primary (matches admin table and booking notification)
+      const primary = isGrouped ? siblings[0] : reservation
+      const groupTotal = isGrouped
+        ? siblings.reduce((sum: number, r: typeof reservation) => sum + Number(r.total_amount), 0)
+        : reservation.total_amount
+
       sendReceiptEmail({
-        customerName: reservation.customer_name,
-        customerEmail: reservation.customer_email,
-        courtName: reservation.court_name,
-        courtType: reservation.court_type,
-        date: reservation.reservation_date,
-        startTime: reservation.start_time,
-        endTime: reservation.end_time,
-        reservationType: reservation.reservation_type,
-        reservationCode: reservation.reservation_code,
-        totalAmount: reservation.total_amount,
-        notes: reservation.notes,
+        customerName: primary.customer_name,
+        customerEmail: primary.customer_email,
+        courtName: primary.court_name,
+        courtType: primary.court_type,
+        date: primary.reservation_date,
+        startTime: primary.start_time,
+        endTime: primary.end_time,
+        reservationType: primary.reservation_type,
+        reservationCode: primary.reservation_code,
+        totalAmount: groupTotal,
+        notes: primary.notes,
+        slots: isGrouped
+          ? siblings.map((r: typeof reservation) => ({
+              startTime: r.start_time,
+              endTime: r.end_time,
+              amount: Number(r.total_amount),
+            }))
+          : undefined,
       }).catch(console.error)
     }
   }
