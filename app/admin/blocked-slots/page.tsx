@@ -10,6 +10,13 @@ import {
 } from "@/lib/hooks/useBlockedSlots"
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 /* ── Helpers ── */
 
@@ -320,19 +327,25 @@ function BlockFormModal({
                   <span className="normal-case tracking-normal text-on-surface-variant"> — optional</span>
                 )}
               </label>
-              <select
-                required={blockType === "slots"}
-                value={courtId}
-                onChange={(e) => setCourtId(e.target.value)}
-                className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-              >
-                {blockType === "day" && <option value="">All Courts</option>}
-                {courts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} — {c.court_type}
-                  </option>
-                ))}
-              </select>
+              <Select value={courtId} onValueChange={(v) => setCourtId(v ?? "")}>
+                <SelectTrigger className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface">
+                  <SelectValue placeholder={blockType === "day" ? "All Courts" : "Select a court"}>
+                    {courtId
+                      ? (() => { const c = courts.find((c) => c.id === courtId); return c ? `${c.name} — ${c.court_type}` : courtId })()
+                      : (blockType === "day" ? "All Courts" : "Select a court")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {blockType === "day" && (
+                    <SelectItem value="">All Courts</SelectItem>
+                  )}
+                  {courts.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} — {c.court_type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {blockType === "day" && !courtId && (
                 <p className="mt-1 font-body text-[10px] text-on-surface-variant">
                   Blocks all courts on this date

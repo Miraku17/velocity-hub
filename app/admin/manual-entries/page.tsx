@@ -10,6 +10,13 @@ import {
 } from "@/lib/hooks/useManualEntries"
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 /* ── Helpers ── */
 
@@ -137,18 +144,19 @@ function EntryFormModal({
               <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                 Court <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
               </label>
-              <select
-                value={courtId}
-                onChange={(e) => setCourtId(e.target.value)}
-                className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-              >
-                <option value="">No court</option>
-                {(courts ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.court_type})
-                  </option>
-                ))}
-              </select>
+              <Select value={courtId} onValueChange={(v) => setCourtId(v ?? "")}>
+                <SelectTrigger className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface">
+                  <SelectValue placeholder="No court" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No court</SelectItem>
+                  {(courts ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} ({c.court_type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Time */}
