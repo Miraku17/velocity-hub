@@ -3,7 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
+  forbiddenResponse,
 } from "@/lib/supabase/auth"
 
 // GET /api/payment-qr-codes — public, returns active QR codes
@@ -28,6 +30,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const body = await request.json()
   const { name, type, image_url, sort_order } = body

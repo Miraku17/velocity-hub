@@ -14,6 +14,14 @@ const formatTime = (t: string) => {
   return `${hour}:${m.toString().padStart(2, "0")} ${period}`
 }
 
+const escapeHtml = (str: string) =>
+  str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+
 const formatDate = (date: string) =>
   new Date(date + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "long",
@@ -91,7 +99,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
   await resend.emails.send({
     from: `Velocity Pickleball Hub <${FROM_EMAIL}>`,
     to: ADMIN_EMAIL,
-    subject: `New Booking — ${customerName} · ${formattedDate}${isGrouped ? ` (${allSlots.length} slots)` : ""}`,
+    subject: `New Booking — ${escapeHtml(customerName)} · ${formattedDate}${isGrouped ? ` (${allSlots.length} slots)` : ""}`,
     html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -145,14 +153,14 @@ export async function sendBookingNotification(data: BookingEmailData) {
               <tr>
                 <td style="padding:10px 14px;background:#f9fafb;border-radius:8px 8px 0 0;border-bottom:1px solid #f3f4f6;">
                   <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Name</p>
-                  <p style="margin:3px 0 0;font-size:15px;font-weight:600;color:#111827;">${customerName}</p>
+                  <p style="margin:3px 0 0;font-size:15px;font-weight:600;color:#111827;">${escapeHtml(customerName)}</p>
                 </td>
               </tr>
               <tr>
                 <td style="padding:10px 14px;background:#f9fafb;border-bottom:1px solid #f3f4f6;">
                   <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Email</p>
                   <p style="margin:3px 0 0;font-size:14px;font-weight:500;">
-                    <a href="mailto:${customerEmail}" style="color:#2d6a4f;text-decoration:none;">${customerEmail}</a>
+                    <a href="mailto:${escapeHtml(customerEmail)}" style="color:#2d6a4f;text-decoration:none;">${escapeHtml(customerEmail)}</a>
                   </p>
                 </td>
               </tr>
@@ -160,7 +168,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
                 <td style="padding:10px 14px;background:#f9fafb;border-radius:0 0 8px 8px;">
                   <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Phone</p>
                   <p style="margin:3px 0 0;font-size:14px;font-weight:500;">
-                    <a href="tel:${customerPhone}" style="color:#2d6a4f;text-decoration:none;">${customerPhone}</a>
+                    <a href="tel:${escapeHtml(customerPhone)}" style="color:#2d6a4f;text-decoration:none;">${escapeHtml(customerPhone)}</a>
                   </p>
                 </td>
               </tr>
@@ -170,7 +178,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
             <!-- Notes -->
             <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af;">Notes</p>
             <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:28px;">
-              <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">${notes}</p>
+              <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">${escapeHtml(notes)}</p>
             </div>` : ""}
 
           </td>
@@ -252,7 +260,7 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
             </table>
             <div style="margin-top:24px;">
               <h1 style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;">Court Booking Receipt</h1>
-              <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.55);">Hi ${customerName.split(" ")[0]}, your reservation is all set.</p>
+              <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.55);">Hi ${escapeHtml(customerName.split(" ")[0])}, your reservation is all set.</p>
             </div>
           </td>
         </tr>

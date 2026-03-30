@@ -5,6 +5,7 @@ import {
   unauthorizedResponse,
 } from "@/lib/supabase/auth"
 import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
+import { rateLimit } from "@/lib/rate-limit"
 
 // GET /api/reservations — list reservations (admin: all via view, public: by email)
 export async function GET(request: NextRequest) {
@@ -35,9 +36,13 @@ export async function GET(request: NextRequest) {
   if (courtType) query = query.eq("court_type", courtType)
   if (courtId) query = query.eq("court_id", courtId)
   if (search) {
-    query = query.or(
-      `customer_name.ilike.%${search}%,customer_email.ilike.%${search}%,customer_phone.ilike.%${search}%,reservation_code.ilike.%${search}%`
-    )
+    // Sanitize search input: remove characters that could manipulate PostgREST filter syntax
+    const sanitized = search.replace(/[,.()"'\\]/g, "")
+    if (sanitized) {
+      query = query.or(
+        `customer_name.ilike.%${sanitized}%,customer_email.ilike.%${sanitized}%,customer_phone.ilike.%${sanitized}%,reservation_code.ilike.%${sanitized}%`
+      )
+    }
   }
 
   query = query.range(offset, offset + limit - 1)
@@ -61,6 +66,23 @@ export async function GET(request: NextRequest) {
 
 // POST /api/reservations — create a reservation (public, no auth required)
 export async function POST(request: NextRequest) {
+  // Rate limit by IP: max 10 bookings per 15 minutes
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? request.headers.get("x-real-ip")
+    ?? "unknown"
+
+  const { limited, retryAfter } = rateLimit(ip, "POST:/api/reservations", {
+    maxRequests: 10,
+    windowMs: 15 * 60 * 1000,
+  })
+
+  if (limited) {
+    return Response.json(
+      { error: "Too many booking attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    )
+  }
+
   const supabase = await createClient()
   const body = await request.json()
 
@@ -100,10 +122,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-      ?? request.headers.get("x-real-ip")
-      ?? ""
-
     const verifyRes = await fetch(
       "https://challenges.cloudflare.com/turnstile/v0/siteverify",
       {
@@ -139,6 +157,28 @@ export async function POST(request: NextRequest) {
       { error: "court_id, customer_name, customer_email, customer_phone, date, and time block(s) are required" },
       { status: 400 }
     )
+  }
+
+  // Validate input formats
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const PHONE_RE = /^[\d\-+\s()]{7,20}$/
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+  if (!UUID_RE.test(court_id)) {
+    return Response.json({ error: "Invalid court ID" }, { status: 400 })
+  }
+  if (customer_name.trim().length < 1 || customer_name.length > 100) {
+    return Response.json({ error: "Name must be between 1 and 100 characters" }, { status: 400 })
+  }
+  if (!EMAIL_RE.test(customer_email)) {
+    return Response.json({ error: "Invalid email address" }, { status: 400 })
+  }
+  if (!PHONE_RE.test(customer_phone)) {
+    return Response.json({ error: "Invalid phone number" }, { status: 400 })
+  }
+  if (!DATE_RE.test(date)) {
+    return Response.json({ error: "Invalid date format" }, { status: 400 })
   }
 
   // Generate a shared group ID when booking multiple non-contiguous blocks

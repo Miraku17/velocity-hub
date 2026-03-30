@@ -2,7 +2,9 @@ import { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
+  forbiddenResponse,
 } from "@/lib/supabase/auth"
 
 type RouteParams = { params: Promise<{ id: string }> }
@@ -11,6 +13,7 @@ type RouteParams = { params: Promise<{ id: string }> }
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const { id } = await params
   const body = await request.json()
@@ -43,6 +46,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const { id } = await params
   const supabase = createAdminClient()

@@ -2,7 +2,9 @@ import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
+  forbiddenResponse,
 } from "@/lib/supabase/auth"
 
 // GET /api/manual-entries — list entries, optionally filtered by date range
@@ -36,10 +38,11 @@ export async function GET(request: NextRequest) {
   return Response.json(data)
 }
 
-// POST /api/manual-entries — create a new entry
+// POST /api/manual-entries — create a new entry (admin only)
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const supabase = await createClient()
   const body = await request.json()
@@ -75,10 +78,11 @@ export async function POST(request: NextRequest) {
   return Response.json(data, { status: 201 })
 }
 
-// PATCH /api/manual-entries — update an entry
+// PATCH /api/manual-entries — update an entry (admin only)
 export async function PATCH(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const supabase = await createClient()
   const body = await request.json()
@@ -102,10 +106,11 @@ export async function PATCH(request: NextRequest) {
   return Response.json(data)
 }
 
-// DELETE /api/manual-entries?id=... — delete an entry
+// DELETE /api/manual-entries?id=... — delete an entry (admin only)
 export async function DELETE(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const supabase = await createClient()
   const id = request.nextUrl.searchParams.get("id")

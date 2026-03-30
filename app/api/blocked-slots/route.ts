@@ -2,7 +2,9 @@ import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
+  forbiddenResponse,
 } from "@/lib/supabase/auth"
 
 // GET /api/blocked-slots — list blocks (public: for booking page)
@@ -24,7 +26,13 @@ export async function GET(request: NextRequest) {
   if (date) query = query.eq("blocked_date", date)
   if (dateFrom) query = query.gte("blocked_date", dateFrom)
   if (dateTo) query = query.lte("blocked_date", dateTo)
-  if (courtId) query = query.or(`court_id.eq.${courtId},court_id.is.null`)
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (courtId) {
+    if (!UUID_RE.test(courtId)) {
+      return Response.json({ error: "Invalid court_id" }, { status: 400 })
+    }
+    query = query.or(`court_id.eq.${courtId},court_id.is.null`)
+  }
 
   const { data, error } = await query
 
@@ -39,6 +47,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const supabase = await createClient()
   const body = await request.json()
@@ -123,6 +132,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const supabase = await createClient()
   const id = request.nextUrl.searchParams.get("id")

@@ -2,13 +2,16 @@ import { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
+  forbiddenResponse,
 } from "@/lib/supabase/auth"
 
 // POST /api/upload — upload a file to Supabase Storage
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const formData = await request.formData()
   const file = formData.get("file") as File | null
@@ -37,8 +40,14 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // Generate unique filename
-  const ext = file.name.split(".").pop() || "jpg"
+  // Generate unique filename — derive extension from validated MIME type, not user filename
+  const mimeToExt: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+  }
+  const ext = mimeToExt[file.type] || "jpg"
   const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
   const arrayBuffer = await file.arrayBuffer()
@@ -65,6 +74,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const { path } = await request.json()
   if (!path) {
