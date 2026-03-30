@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
   const courtType = params.get("court_type")
   const courtId = params.get("court_id")
   const search = params.get("search")?.trim()
-  const page = parseInt(params.get("page") || "1", 10)
-  const limit = parseInt(params.get("limit") || "20", 10)
+  const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1)
+  const limit = Math.max(1, Math.min(100, parseInt(params.get("limit") || "20", 10) || 20))
   const offset = (page - 1) * limit
 
   let query = supabase
@@ -181,6 +181,33 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid date format" }, { status: 400 })
   }
 
+  // Prevent booking in the past (use Philippines timezone)
+  const phNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }))
+  const phToday = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, "0")}-${String(phNow.getDate()).padStart(2, "0")}`
+  if (date < phToday) {
+    return Response.json({ error: "Cannot book dates in the past" }, { status: 400 })
+  }
+
+  // Validate each time block
+  const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/
+  for (const block of blocks) {
+    if (!block.start_time || !block.end_time) {
+      return Response.json({ error: "Each time block must have start_time and end_time" }, { status: 400 })
+    }
+    if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
+      return Response.json({ error: "Invalid time format" }, { status: 400 })
+    }
+    if (block.start_time >= block.end_time) {
+      return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
+    }
+  }
+
+  // Validate reservation type
+  const VALID_RESERVATION_TYPES = ["regular", "walk-in", "priority"]
+  if (reservation_type && !VALID_RESERVATION_TYPES.includes(reservation_type)) {
+    return Response.json({ error: "Invalid reservation type" }, { status: 400 })
+  }
+
   // Generate a shared group ID when booking multiple non-contiguous blocks
   const bookingGroupId = blocks.length > 1
     ? crypto.randomUUID()
@@ -202,6 +229,13 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
+      // Rollback previously created reservations in this group
+      if (ids.length > 0) {
+        await supabase
+          .from("reservations")
+          .update({ status: "cancelled" })
+          .in("id", ids)
+      }
       return Response.json({ error: error.message }, { status: 400 })
     }
 

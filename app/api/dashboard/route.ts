@@ -9,14 +9,13 @@ export async function GET() {
   if (!user) return unauthorizedResponse()
 
   const supabase = await createClient()
-  const today = new Date().toISOString().split("T")[0]
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .split("T")[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    .toISOString()
-    .split("T")[0]
+
+  // Use Philippines timezone for all date calculations
+  const phNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }))
+  const today = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, "0")}-${String(phNow.getDate()).padStart(2, "0")}`
+  const monthStart = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, "0")}-01`
+  const lastDay = new Date(phNow.getFullYear(), phNow.getMonth() + 1, 0).getDate()
+  const monthEnd = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
 
   // Run all queries in parallel
   const [
@@ -103,10 +102,10 @@ export async function GET() {
   )
 
   // Calculate total available hours for the month
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const daysInMonth = new Date(phNow.getFullYear(), phNow.getMonth() + 1, 0).getDate()
   let monthTotalHours = 0
   for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(now.getFullYear(), now.getMonth(), d)
+    const date = new Date(phNow.getFullYear(), phNow.getMonth(), d)
     const dow = date.getDay() // 0=Sun, 6=Sat
     for (const court of courts) {
       const schedule = courtSchedules.find(

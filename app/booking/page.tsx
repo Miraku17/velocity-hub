@@ -468,6 +468,28 @@ function BookingPage() {
     const available = await checkAvailability();
     if (!available) return;
 
+    // Refetch court prices to detect changes since page load
+    const freshCourts = await queryClient.fetchQuery({
+      queryKey: ["courts", { status: "available" as const }],
+      staleTime: 0,
+    }) as typeof courts;
+    const freshCourt = freshCourts.find((c) => c.id === court.id);
+    if (freshCourt) {
+      const freshSchedule = freshCourt.court_schedules?.find(
+        (s) => s.day_of_week === selectedDate.getDay()
+      );
+      const freshTotal = selectedSlots.reduce(
+        (sum, t) => sum + getSlotRate(t, freshSchedule?.hourly_rates, freshCourt.price_per_hour),
+        0
+      );
+      if (freshTotal !== total) {
+        toast.error("Court prices have been updated. Please review the new total before confirming.");
+        queryClient.invalidateQueries({ queryKey: ["courts"] });
+        setShowConfirmModal(false);
+        return;
+      }
+    }
+
     // Send all time blocks in a single request (single turnstile verification)
     createReservation.mutate(
       {
