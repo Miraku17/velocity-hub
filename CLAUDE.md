@@ -38,6 +38,7 @@ types/                # Shared TypeScript types
 - **Components:** PascalCase filenames (`CourtCard.tsx`). Default exports for page/layout, named exports for components.
 - **Utilities / stores / hooks:** camelCase filenames (`useBooking.ts`, `bookingStore.ts`).
 - **Styling:** Tailwind utility classes via shadcn/ui. No custom CSS unless absolutely necessary.
+- **Dropdowns / Selects:** Always use the shadcn `Select` component (`@/components/ui/select`) instead of native HTML `<select>`. Import `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue`.
 - **Server vs Client:** Keep components server-side by default. Add `"use client"` only when state, effects, or browser APIs are needed.
 - **Data fetching:** Use TanStack Query for client-side fetching. Use Next.js server components / `fetch` for server-side data.
 - **State:** Zustand for client-side UI state (booking cart, filters). Do not use Zustand for server-cached data — that's TanStack Query's job.
