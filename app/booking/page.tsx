@@ -134,6 +134,7 @@ function BookingPage() {
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [receiptUploadFailed, setReceiptUploadFailed] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [selectedQrIndex, setSelectedQrIndex] = useState(0);
   const [qrLightbox, setQrLightbox] = useState(false);
@@ -267,7 +268,7 @@ function BookingPage() {
   });
 
   // Fetch blocked slots for selected court + date
-  const { data: blockedSlots = [] } = useQuery<
+  const { data: blockedSlots = [], isFetching: isFetchingBlocked } = useQuery<
     { id: string; court_id: string | null; start_time: string | null; end_time: string | null }[]
   >({
     queryKey: ["blocked-slots-booking", selectedCourt, dateStr],
@@ -468,6 +469,28 @@ function BookingPage() {
     const available = await checkAvailability();
     if (!available) return;
 
+    // Refetch court prices to detect changes since page load
+    const freshCourts = await queryClient.fetchQuery({
+      queryKey: ["courts", { status: "available" as const }],
+      staleTime: 0,
+    }) as typeof courts;
+    const freshCourt = freshCourts.find((c) => c.id === court.id);
+    if (freshCourt) {
+      const freshSchedule = freshCourt.court_schedules?.find(
+        (s) => s.day_of_week === selectedDate.getDay()
+      );
+      const freshTotal = selectedSlots.reduce(
+        (sum, t) => sum + getSlotRate(t, freshSchedule?.hourly_rates, freshCourt.price_per_hour),
+        0
+      );
+      if (freshTotal !== total) {
+        toast.error("Court prices have been updated. Please review the new total before confirming.");
+        queryClient.invalidateQueries({ queryKey: ["courts"] });
+        setShowConfirmModal(false);
+        return;
+      }
+    }
+
     // Send all time blocks in a single request (single turnstile verification)
     createReservation.mutate(
       {
@@ -516,6 +539,7 @@ function BookingPage() {
   async function uploadReceiptToServer(resId: string) {
     if (!receiptFile) return;
     setUploadingReceipt(true);
+    setReceiptUploadFailed(false);
     try {
       const formData = new FormData();
       formData.append("file", receiptFile);
@@ -524,12 +548,17 @@ function BookingPage() {
       if (!res.ok) {
         const err = await res.json();
         console.error("Receipt upload failed:", err.error);
+        setReceiptUploadFailed(true);
+        toast.error("Receipt upload failed. You can retry below.");
       } else {
         const data = await res.json();
         setReceiptUrl(data.image_url);
+        setReceiptUploadFailed(false);
       }
     } catch {
       console.error("Receipt upload failed");
+      setReceiptUploadFailed(true);
+      toast.error("Receipt upload failed. You can retry below.");
     }
     setUploadingReceipt(false);
   }
@@ -890,6 +919,13 @@ function BookingPage() {
                           Closed on {selectedDate.toLocaleDateString("en-US", { weekday: "long" })}
                         </p>
                       </div>
+                    ) : isFetchingSlots || isFetchingBlocked ? (
+                      <div className="flex flex-col items-center justify-center py-10 gap-3">
+                        <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: `${bg}20`, borderTopColor: bg }} />
+                        <p className="font-[Poppins] text-xs font-medium" style={{ color: `${bg}50` }}>
+                          Checking availability...
+                        </p>
+                      </div>
                     ) : isDayBlocked ? (
                       <div className="flex flex-col items-center py-10">
                         <span className="material-symbols-outlined text-3xl mb-2" style={{ color: `${bg}15`, fontVariationSettings: "'FILL' 0, 'wght' 300" }}>block</span>
@@ -901,13 +937,6 @@ function BookingPage() {
                       <p className="font-[Poppins] text-xs py-8 text-center" style={{ color: `${bg}30` }}>
                         No time slots available
                       </p>
-                    ) : isFetchingSlots ? (
-                      <div className="flex flex-col items-center justify-center py-10 gap-3">
-                        <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: `${bg}20`, borderTopColor: bg }} />
-                        <p className="font-[Poppins] text-xs font-medium" style={{ color: `${bg}50` }}>
-                          Checking availability...
-                        </p>
-                      </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-2">
                         {timeSlots.map((t) => {
@@ -1110,7 +1139,7 @@ function BookingPage() {
                       </div>
 
                       {/* Receipt image */}
-                      {receiptUrl && (
+                      {receiptUrl && !receiptUploadFailed && (
                         <div className="py-4" style={{ borderBottom: `1px dashed ${bg}15` }}>
                           <div className="flex items-center gap-1.5 mb-2">
                             <span className="material-symbols-outlined text-[14px]" style={{ color: `${bg}50`, fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
@@ -1124,6 +1153,28 @@ function BookingPage() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={receiptUrl} alt="Receipt" className="w-full max-h-36 object-contain bg-white" />
                           </div>
+                        </div>
+                      )}
+
+                      {/* Receipt upload failed — retry */}
+                      {receiptUploadFailed && reservationId && (
+                        <div className="py-4" style={{ borderBottom: `1px dashed ${bg}15` }}>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <span className="material-symbols-outlined text-[14px]" style={{ color: "#dc2626", fontVariationSettings: "'FILL' 1" }}>error</span>
+                            <span className="font-[Poppins] text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#dc2626" }}>Receipt Upload Failed</span>
+                          </div>
+                          <p className="font-[Poppins] text-[11px] mb-3" style={{ color: `${bg}70` }}>
+                            Your booking is confirmed but the receipt failed to upload. Please retry so the admin can verify your payment.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => uploadReceiptToServer(reservationId)}
+                            disabled={uploadingReceipt}
+                            className="w-full rounded-lg px-4 py-2.5 font-[Poppins] text-xs font-semibold text-white transition-opacity disabled:opacity-50"
+                            style={{ backgroundColor: bg }}
+                          >
+                            {uploadingReceipt ? "Uploading..." : "Retry Upload"}
+                          </button>
                         </div>
                       )}
 
