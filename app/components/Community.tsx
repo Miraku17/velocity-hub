@@ -22,7 +22,6 @@ interface Testimonial {
   quote: string;
   name: string;
   role: string;
-  avatar: string;
   image: string;
 }
 
@@ -30,28 +29,25 @@ const TESTIMONIALS: Testimonial[] = [
   {
     title: "Best courts in the city",
     quote:
-      "I absolutely love playing here! The courts are always in excellent condition, and the location is super convenient. It's the perfect spot to unwind and enjoy a great game every weekend.",
-    name: "Carlo S.",
-    role: "Founding Member",
-    avatar: "https://i.pravatar.cc/150?u=carlo",
+      "The court surface here is top-notch — great grip, perfect bounce, and well-maintained lines. I've played at a lot of venues around Cebu and nothing compares to the quality of these courts.",
+    name: "Earll",
+    role: "Regular Player",
     image: "/hero.png",
   },
   {
-    title: "Transformed my game",
+    title: "Perfect venue for evening games",
     quote:
-      "I started as a total beginner and the coaching clinics here completely changed how I play. In just one month, my serves and volleys improved dramatically. The coaches genuinely care.",
-    name: "Maya R.",
-    role: "Tournament Player",
-    avatar: "https://i.pravatar.cc/150?u=maya",
+      "The lighting is incredible — even during late-night sessions, visibility is crystal clear with zero glare. The covered courts mean we never have to worry about the weather. It's hands down the best place to play after work.",
+    name: "Jun",
+    role: "Regular Player",
     image: "/hero.png",
   },
   {
-    title: "Incredible community",
+    title: "Clean, spacious, and well-kept",
     quote:
-      "Professional setup, great lighting, and the community is super welcoming. Whether you're a beginner or a competitive player, you'll feel right at home. My favorite place to play.",
-    name: "James T.",
-    role: "Weekend Warrior",
-    avatar: "https://i.pravatar.cc/150?u=james",
+      "Everything about this venue is well thought out — clean restrooms, plenty of seating for spectators, and the courts are always swept and ready to go. You can tell the team really takes pride in keeping the facility in great shape.",
+    name: "Mark",
+    role: "Regular Player",
     image: "/hero.png",
   },
 ];
@@ -203,21 +199,11 @@ function TestimonialCarousel() {
                 {testimonial.quote}
               </p>
 
-              <div className="flex items-center gap-4 sm:gap-5 pt-2 sm:pt-4">
-                <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-white/10">
-                  <Image
-                    src={testimonial.avatar}
-                    alt={testimonial.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div>
-                  <p className="font-['Clash_Display'] text-base sm:text-xl font-bold text-white">{testimonial.name}</p>
-                  <p className="font-[Poppins] text-xs sm:text-sm text-primary-fixed-dim font-medium uppercase tracking-wider">
-                    {testimonial.role}
-                  </p>
-                </div>
+              <div className="pt-2 sm:pt-4">
+                <p className="font-['Clash_Display'] text-base sm:text-xl font-bold text-white">{testimonial.name}</p>
+                <p className="font-[Poppins] text-xs sm:text-sm text-primary-fixed-dim font-medium uppercase tracking-wider">
+                  {testimonial.role}
+                </p>
               </div>
             </motion.div>
           </AnimatePresence>

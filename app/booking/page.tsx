@@ -705,15 +705,15 @@ function BookingPage() {
 
       {/* ── Booking Policy ── */}
       <div className="relative z-10 w-full" style={{ backgroundColor: "#182916" }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-4 sm:py-5 flex items-start sm:items-center gap-3 sm:gap-4">
-          <div className="shrink-0 flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full mt-0.5 sm:mt-0" style={{ backgroundColor: "#ff4d4d18", border: "1px solid #ff4d4d40" }}>
-            <span className="material-symbols-outlined text-base sm:text-lg" style={{ color: "#ff6b6b", fontVariationSettings: "'FILL' 1" }}>warning</span>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-6 sm:py-8 flex items-start gap-4 sm:gap-5">
+          <div className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full mt-0.5" style={{ backgroundColor: "#ff4d4d18", border: "1px solid #ff4d4d40" }}>
+            <span className="material-symbols-outlined text-lg sm:text-xl" style={{ color: "#ff6b6b", fontVariationSettings: "'FILL' 1" }}>warning</span>
           </div>
           <div className="flex-1 min-w-0">
-            <span className="font-['Clash_Display'] text-sm sm:text-base font-extrabold uppercase tracking-[0.2em] mr-2" style={{ color: "#ff6b6b" }}>No Cancellation Policy</span>
-            <span className="font-[Poppins] text-sm sm:text-[15px] leading-relaxed" style={{ color: "#d3e9cb99" }}>
+            <p className="font-['Clash_Display'] text-base sm:text-lg md:text-xl font-extrabold uppercase tracking-[0.2em] mb-1.5" style={{ color: "#ff6b6b" }}>No Cancellation Policy</p>
+            <p className="font-[Poppins] text-sm sm:text-base md:text-lg leading-relaxed" style={{ color: "#d3e9cb99" }}>
               Once confirmed, no cancellations or refunds. Can&apos;t make it? Find someone to take your slot and settle payment directly.
-            </span>
+            </p>
           </div>
         </div>
       </div>
