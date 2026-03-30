@@ -6,9 +6,7 @@ import { Facebook, Instagram } from "lucide-react";
 const NAV_COLUMNS = [
   {
     title: "Home",
-    links: [
-      { href: "#", label: "About" },
-    ],
+    links: [],
   },
   {
     title: "Community",
@@ -21,7 +19,7 @@ const NAV_COLUMNS = [
     title: "Support",
     links: [
       { href: "/#faq", label: "FAQ" },
-      { href: "#", label: "Contact Us" },
+      { href: "https://www.facebook.com/velocitypickleballhub", label: "Contact Us" },
       { href: "#", label: "Help Center" },
     ],
   },

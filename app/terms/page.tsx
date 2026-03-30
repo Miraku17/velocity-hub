@@ -22,8 +22,8 @@ const SECTIONS = [
     body: "Payment is due at the time of play unless otherwise arranged. We accept cash and major digital payment methods. Prices are listed in Philippine Peso (₱) and are subject to change without prior notice.",
   },
   {
-    title: "4. Cancellations & Refunds",
-    body: "Cancellations made at least 24 hours before the scheduled session may be eligible for a full credit or rescheduling. Cancellations made less than 24 hours in advance, or no-shows, are non-refundable. Refund eligibility is assessed on a case-by-case basis.",
+    title: "4. No Cancellation Policy",
+    body: "Once confirmed, no cancellations or refunds. Can't make it? Find someone to take your slot and settle payment directly.",
   },
   {
     title: "5. Walk-In Policy",

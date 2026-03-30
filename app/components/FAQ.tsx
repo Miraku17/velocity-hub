@@ -28,19 +28,9 @@ const FAQS = [
       "Court rental starts at ₱300 per hour during off-peak hours and ₱500 per hour during peak hours (5 PM–9 PM weekdays, all day weekends). We also offer monthly membership packages with discounted rates.",
   },
   {
-    question: "Do you provide paddles and balls?",
-    answer:
-      "Yes! We have rental paddles and pickleballs available at the front desk. Rental paddles are ₱50 per session. Balls are provided free of charge for all court bookings.",
-  },
-  {
     question: "Is there parking available?",
     answer:
       "Yes, we have free parking for up to 50 vehicles right next to the facility. Motorcycle parking is also available.",
-  },
-  {
-    question: "Can I host a private event or tournament?",
-    answer:
-      "Definitely! We offer full-facility rental for corporate events, birthday parties, and tournaments. Contact us directly to discuss pricing and availability for your event.",
   },
 ];
 
