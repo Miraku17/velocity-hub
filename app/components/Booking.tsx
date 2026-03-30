@@ -142,6 +142,15 @@ export default function Booking() {
             Professional-grade courts, available for instant reservation.
           </motion.p>
 
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5, ease }}
+            className="font-[Poppins] text-white/40 text-[10px] sm:text-xs -mt-6 sm:-mt-12 mb-10 sm:mb-16"
+          >
+            * Prices are subject to change without prior notice.
+          </motion.p>
+
           {/* ── Rates Grid ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-10 sm:mb-16 w-full max-w-4xl">
             {/* Covered Courts */}

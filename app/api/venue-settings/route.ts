@@ -3,7 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
+  forbiddenResponse,
 } from "@/lib/supabase/auth"
 
 // GET /api/venue-settings — public
@@ -26,6 +28,7 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
+  if (!(await checkIsAdmin())) return forbiddenResponse()
 
   const body = await request.json()
   const {

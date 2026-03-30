@@ -633,6 +633,9 @@ function BookingPage() {
           <h1 className="font-['Clash_Display'] text-xl sm:text-3xl md:text-4xl font-bold text-white">
             Book Your Court
           </h1>
+          <p className="font-[Poppins] text-[10px] sm:text-xs mt-2 sm:mt-3 opacity-60 text-white">
+            * Prices are subject to change without prior notice.
+          </p>
         </div>
       </div>
 
