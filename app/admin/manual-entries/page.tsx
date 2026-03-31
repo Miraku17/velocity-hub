@@ -386,7 +386,7 @@ function EntryFormModal({
             {/* Description */}
             <div>
               <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                Description <span className="text-error">*</span>
+                Description / Customer Name <span className="text-error">*</span>
               </label>
               <input
                 type="text"
