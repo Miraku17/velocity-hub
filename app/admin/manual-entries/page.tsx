@@ -146,7 +146,11 @@ function EntryFormModal({
               </label>
               <Select value={courtId} onValueChange={(v) => setCourtId(v ?? "")}>
                 <SelectTrigger className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface">
-                  <SelectValue placeholder="No court" />
+                  <SelectValue placeholder="No court">
+                    {courtId
+                      ? (() => { const c = courts.find((c) => c.id === courtId); return c ? `${c.name} (${c.court_type})` : courtId })()
+                      : "No court"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">No court</SelectItem>

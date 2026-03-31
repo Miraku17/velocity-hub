@@ -53,8 +53,9 @@ async function fetchManualEntries(filters?: ManualEntryFilters): Promise<ManualE
   if (filters?.date_to) url.searchParams.set("date_to", filters.date_to)
   if (filters?.month) {
     const [y, m] = filters.month.split("-").map(Number)
+    const lastDayNum = new Date(y, m, 0).getDate()
     url.searchParams.set("date_from", `${filters.month}-01`)
-    url.searchParams.set("date_to", new Date(y, m, 0).toISOString().slice(0, 10))
+    url.searchParams.set("date_to", `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`)
   }
 
   const res = await fetch(url)
