@@ -38,6 +38,7 @@ export interface ReservationFilters {
   month?: string   // "YYYY-MM" — filters by full calendar month
   status?: ReservationStatus
   court_type?: CourtType
+  court_id?: string
   search?: string
   page?: number
   limit?: number
@@ -76,6 +77,10 @@ export interface ReservationUpdate {
 
 /* ── Fetch helpers ── */
 
+function formatLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
 async function fetchReservations(filters?: ReservationFilters): Promise<PaginatedResponse> {
   const url = new URL("/api/reservations", window.location.origin)
   if (filters?.date) url.searchParams.set("date", filters.date)
@@ -91,19 +96,21 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
     monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7)
     const sunday = new Date(monday)
     sunday.setDate(monday.getDate() + 6)
-    url.searchParams.set("date_from", monday.toISOString().slice(0, 10))
-    url.searchParams.set("date_to", sunday.toISOString().slice(0, 10))
+    url.searchParams.set("date_from", formatLocalDate(monday))
+    url.searchParams.set("date_to", formatLocalDate(sunday))
   }
   if (filters?.month) {
     // "YYYY-MM" → first and last day of that month
     const [y, m] = filters.month.split("-").map(Number)
     const firstDay = `${filters.month}-01`
-    const lastDay = new Date(y, m, 0).toISOString().slice(0, 10) // last day of month
+    const lastDayDate = new Date(y, m, 0)
+    const lastDay = `${y}-${String(m).padStart(2, "0")}-${String(lastDayDate.getDate()).padStart(2, "0")}`
     url.searchParams.set("date_from", firstDay)
     url.searchParams.set("date_to", lastDay)
   }
   if (filters?.status) url.searchParams.set("status", filters.status)
   if (filters?.court_type) url.searchParams.set("court_type", filters.court_type)
+  if (filters?.court_id) url.searchParams.set("court_id", filters.court_id)
   if (filters?.search) url.searchParams.set("search", filters.search)
   if (filters?.page) url.searchParams.set("page", filters.page.toString())
   if (filters?.limit) url.searchParams.set("limit", filters.limit.toString())

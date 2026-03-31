@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   useManualEntries,
   useCreateManualEntry,
@@ -17,6 +18,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+
+/* ── Time slot helpers ── */
+
+function generateTimeSlots(openTime: string, closeTime: string): string[] {
+  const openHour = parseInt(openTime.split(":")[0], 10)
+  let closeHour = parseInt(closeTime.split(":")[0], 10)
+  if (closeHour <= openHour) closeHour += 24
+  const slots: string[] = []
+  for (let h = openHour; h < closeHour; h++) {
+    const displayHour = h % 24
+    const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour
+    const ampm = displayHour < 12 ? "AM" : "PM"
+    slots.push(`${hour12}:00 ${ampm}`)
+  }
+  return slots
+}
+
+function parse12Hour(slot: string): number {
+  const [timePart, ampm] = slot.split(" ")
+  let hour = parseInt(timePart.split(":")[0], 10)
+  if (ampm === "PM" && hour !== 12) hour += 12
+  if (ampm === "AM" && hour === 12) hour = 0
+  return hour
+}
 
 /* ── Helpers ── */
 
@@ -71,8 +96,112 @@ function EntryFormModal({
   const [description, setDescription] = useState(entry?.description ?? "")
   const [notes, setNotes] = useState(entry?.notes ?? "")
   const [courtId, setCourtId] = useState(entry?.court_id ?? "")
-  const [startTime, setStartTime] = useState(entry?.start_time?.slice(0, 5) ?? "")
-  const [endTime, setEndTime] = useState(entry?.end_time?.slice(0, 5) ?? "")
+  const [selectedSlots, setSelectedSlots] = useState<string[]>(() => {
+    if (!entry?.start_time || !entry?.end_time) return []
+    const startH = parseInt(entry.start_time.split(":")[0], 10)
+    const endH = parseInt(entry.end_time.split(":")[0], 10)
+    const slots: string[] = []
+    for (let h = startH; h < endH; h++) {
+      const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+      const ampm = h < 12 ? "AM" : "PM"
+      slots.push(`${hour12}:00 ${ampm}`)
+    }
+    return slots
+  })
+
+  const selectedCourt = courts.find((c) => c.id === courtId)
+  const dayOfWeek = useMemo(() => new Date(date + "T00:00:00").getDay(), [date])
+  const courtSchedule = useMemo(() => {
+    if (!selectedCourt?.court_schedules) return null
+    return selectedCourt.court_schedules.find((s) => s.day_of_week === dayOfWeek) ?? null
+  }, [selectedCourt, dayOfWeek])
+
+  const timeSlots = useMemo(() => {
+    if (!courtSchedule || courtSchedule.is_closed) return []
+    return generateTimeSlots(courtSchedule.open_time, courtSchedule.close_time)
+  }, [courtSchedule])
+
+  // Fetch existing reservations for selected court + date
+  const { data: existingReservations = [] } = useQuery<
+    { start_time: string; end_time: string; status: string }[]
+  >({
+    queryKey: ["manual-entry-slots", courtId, date],
+    queryFn: async () => {
+      if (!courtId) return []
+      const res = await fetch(
+        `/api/reservations?court_id=${courtId}&date=${date}&fields=start_time,end_time,status`
+      )
+      if (!res.ok) return []
+      const json = await res.json()
+      return (json.data || []).filter(
+        (r: { status: string }) => r.status !== "cancelled"
+      )
+    },
+    enabled: !!courtId,
+    staleTime: 0,
+    gcTime: 0,
+  })
+
+  // Fetch blocked slots for selected court + date
+  const { data: blockedSlots = [] } = useQuery<
+    { id: string; court_id: string | null; start_time: string | null; end_time: string | null }[]
+  >({
+    queryKey: ["manual-entry-blocked", courtId, date],
+    queryFn: async () => {
+      if (!courtId) return []
+      const res = await fetch(`/api/blocked-slots?date=${date}&court_id=${courtId}`)
+      if (!res.ok) return []
+      return res.json()
+    },
+    enabled: !!courtId,
+    staleTime: 0,
+    gcTime: 0,
+  })
+
+  const isDayBlocked = useMemo(() => {
+    return blockedSlots.some((b) => !b.start_time && !b.end_time)
+  }, [blockedSlots])
+
+  // Build slot status map (same logic as booking page)
+  const slotStatusMap = useMemo(() => {
+    const map: Record<string, "booked" | "pending" | "blocked"> = {}
+    for (const b of blockedSlots) {
+      if (!b.start_time || !b.end_time) continue
+      const startH = parseInt(b.start_time.split(":")[0], 10)
+      let endH = parseInt(b.end_time.split(":")[0], 10)
+      if (endH <= startH) endH += 24
+      for (let h = startH; h < endH; h++) {
+        const dh = h % 24
+        const h12 = dh === 0 ? 12 : dh > 12 ? dh - 12 : dh
+        const ampm = dh < 12 ? "AM" : "PM"
+        map[`${h12}:00 ${ampm}`] = "blocked"
+      }
+    }
+    for (const r of existingReservations) {
+      const startH = parseInt(r.start_time.split(":")[0], 10)
+      let endH = parseInt(r.end_time.split(":")[0], 10)
+      if (endH <= startH) endH += 24
+      for (let h = startH; h < endH; h++) {
+        const dh = h % 24
+        const h12 = dh === 0 ? 12 : dh > 12 ? dh - 12 : dh
+        const ampm = dh < 12 ? "AM" : "PM"
+        const key = `${h12}:00 ${ampm}`
+        if (!map[key]) {
+          map[key] = r.status === "confirmed" || r.status === "completed" ? "booked" : "pending"
+        }
+      }
+    }
+    return map
+  }, [existingReservations, blockedSlots])
+
+  // Clear selected slots when court or date changes
+  useEffect(() => { setSelectedSlots([]) }, [courtId, date])
+
+  function toggleSlot(slot: string) {
+    setSelectedSlots((prev) =>
+      prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]
+    )
+  }
 
   const stableOnClose = useCallback(onClose, [onClose])
 
@@ -86,6 +215,13 @@ function EntryFormModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    let startTime: string | null = null
+    let endTime: string | null = null
+    if (selectedSlots.length > 0) {
+      const hours = selectedSlots.map(parse12Hour).sort((a, b) => a - b)
+      startTime = `${String(hours[0]).padStart(2, "0")}:00:00`
+      endTime = `${String(hours[hours.length - 1] + 1).padStart(2, "0")}:00:00`
+    }
     onSave({
       id: entry?.id,
       entry_date: date,
@@ -93,8 +229,8 @@ function EntryFormModal({
       description: description.trim(),
       notes: notes.trim() || null,
       court_id: courtId || null,
-      start_time: startTime ? `${startTime}:00` : null,
-      end_time: endTime ? `${endTime}:00` : null,
+      start_time: startTime,
+      end_time: endTime,
     })
   }
 
@@ -104,7 +240,7 @@ function EntryFormModal({
       <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
         <form
           onSubmit={handleSubmit}
-          className="relative w-full max-w-md rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
+          className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -146,7 +282,11 @@ function EntryFormModal({
               </label>
               <Select value={courtId} onValueChange={(v) => setCourtId(v ?? "")}>
                 <SelectTrigger className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface">
-                  <SelectValue placeholder="No court" />
+                  <SelectValue placeholder="No court">
+                    {courtId
+                      ? (() => { const c = courts.find((c) => c.id === courtId); return c ? `${c.name} (${c.court_type})` : courtId })()
+                      : "No court"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">No court</SelectItem>
@@ -159,31 +299,68 @@ function EntryFormModal({
               </Select>
             </div>
 
-            {/* Time */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Time Slots Grid */}
+            {courtId && (
               <div>
                 <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                  Start Time <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
+                  Time Slots
+                  {selectedSlots.length > 0 && (
+                    <span className="normal-case tracking-normal text-primary"> — {selectedSlots.length} selected</span>
+                  )}
                 </label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-                />
+                {isDayBlocked ? (
+                  <div className="flex items-center justify-center rounded-lg border border-error/20 bg-error/5 py-6">
+                    <p className="font-body text-xs text-error">This day is blocked</p>
+                  </div>
+                ) : timeSlots.length === 0 ? (
+                  <div className="flex items-center justify-center rounded-lg border border-outline-variant/20 bg-surface-container py-6">
+                    <p className="font-body text-xs text-on-surface-variant">No time slots available for this day</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {timeSlots.map((t) => {
+                      const isSelected = selectedSlots.includes(t)
+                      const slotStatus = slotStatusMap[t]
+                      const isUnavailable = !!slotStatus
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => !isUnavailable && toggleSlot(t)}
+                          disabled={isUnavailable}
+                          className={`relative rounded-lg py-2.5 px-2 text-center transition-all ${
+                            isUnavailable
+                              ? "cursor-not-allowed border border-error/15 bg-error/5"
+                              : isSelected
+                              ? "border border-primary bg-primary text-on-primary"
+                              : "border border-outline-variant/20 bg-surface-container-lowest hover:border-primary/40"
+                          }`}
+                        >
+                          <span
+                            className={`block font-body text-xs font-bold ${
+                              isUnavailable
+                                ? "text-error/40 line-through"
+                                : isSelected
+                                ? "text-on-primary"
+                                : "text-on-surface"
+                            }`}
+                          >
+                            {t}
+                          </span>
+                          {isUnavailable && (
+                            <span className={`block font-label text-[9px] font-bold uppercase tracking-wider ${
+                              slotStatus === "pending" ? "text-[#D97706]" : slotStatus === "blocked" ? "text-on-surface-variant" : "text-error"
+                            }`}>
+                              {slotStatus === "pending" ? "Pending" : slotStatus === "blocked" ? "Blocked" : "Booked"}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                  End Time <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
-                </label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-                />
-              </div>
-            </div>
+            )}
 
             {/* Amount */}
             <div>
@@ -209,7 +386,7 @@ function EntryFormModal({
             {/* Description */}
             <div>
               <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                Description <span className="text-error">*</span>
+                Description / Customer Name <span className="text-error">*</span>
               </label>
               <input
                 type="text"

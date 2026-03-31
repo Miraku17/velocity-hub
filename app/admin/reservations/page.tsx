@@ -882,7 +882,7 @@ export default function ReservationsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [dateFilter, setDateFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
-  const [courtTypeFilter, setCourtTypeFilter] = useState("")
+  const [courtFilter, setCourtFilter] = useState("")
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
@@ -904,10 +904,12 @@ export default function ReservationsPage() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
+  const { data: filterCourts = [] } = useCourts()
+
   const filters = {
     date: dateFilter || undefined,
     status: (statusFilter || undefined) as ReservationStatus | undefined,
-    court_type: (courtTypeFilter || undefined) as CourtType | undefined,
+    court_id: courtFilter || undefined,
     search: searchQuery || undefined,
     page: currentPage,
     limit: PAGE_SIZE,
@@ -1120,23 +1122,28 @@ export default function ReservationsPage() {
             />
           </div>
 
-          {/* Court Type */}
+          {/* Court */}
           <div className="flex flex-col gap-1">
             <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-              Court Type
+              Court
             </span>
-            <select
-              value={courtTypeFilter}
-              onChange={(e) => {
-                setCourtTypeFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="rounded-md bg-surface-container-high px-3 py-2 font-body text-xs font-semibold text-on-surface outline-none"
-            >
-              <option value="">All Courts</option>
-              <option value="indoor">Indoor</option>
-              <option value="outdoor">Outdoor</option>
-            </select>
+            <Select value={courtFilter} onValueChange={(v) => { setCourtFilter(v ?? ""); setCurrentPage(1) }}>
+              <SelectTrigger className="h-[34px] min-w-[140px] rounded-md bg-surface-container-high px-3 font-body text-xs font-semibold text-on-surface border-none">
+                <SelectValue placeholder="All Courts">
+                  {courtFilter
+                    ? (() => { const c = filterCourts.find((c) => c.id === courtFilter); return c ? `${c.name}` : "All Courts" })()
+                    : "All Courts"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Courts</SelectItem>
+                {filterCourts.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status */}
@@ -1144,28 +1151,30 @@ export default function ReservationsPage() {
             <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
               Status
             </span>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="rounded-md bg-surface-container-high px-3 py-2 font-body text-xs font-semibold text-on-surface outline-none"
-            >
-              <option value="">Any Status</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v ?? ""); setCurrentPage(1) }}>
+              <SelectTrigger className="h-[34px] min-w-[130px] rounded-md bg-surface-container-high px-3 font-body text-xs font-semibold text-on-surface border-none">
+                <SelectValue placeholder="Any Status">
+                  {statusFilter
+                    ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)
+                    : "Any Status"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Any Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Clear filters */}
-          {(dateFilter || statusFilter || courtTypeFilter) && (
+          {(dateFilter || statusFilter || courtFilter) && (
             <button
               onClick={() => {
                 setDateFilter("")
                 setStatusFilter("")
-                setCourtTypeFilter("")
+                setCourtFilter("")
                 setCurrentPage(1)
               }}
               className="mt-auto flex h-[34px] items-center gap-1.5 rounded-md bg-surface-container-high px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container"
@@ -1292,20 +1301,13 @@ export default function ReservationsPage() {
 
                     {/* Customer */}
                     <td className="border-l border-outline-variant/15 px-6 py-6">
-                      <div className={`flex items-center gap-3 ${isCancelled ? "grayscale" : ""}`}>
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-nav text-sm font-bold ${avatar.bg} ${avatar.text}`}
-                        >
-                          {getInitials(res.customer_name)}
-                        </div>
-                        <div>
-                          <p className="font-nav text-sm font-bold text-on-surface">
-                            {res.customer_name}
-                          </p>
-                          <p className="font-body text-[11px] text-on-surface-variant">
-                            {res.customer_email}
-                          </p>
-                        </div>
+                      <div className={isCancelled ? "grayscale" : ""}>
+                        <p className="font-nav text-sm font-bold text-on-surface">
+                          {res.customer_name}
+                        </p>
+                        <p className="font-body text-[11px] text-on-surface-variant">
+                          {res.customer_email}
+                        </p>
                       </div>
                     </td>
 
@@ -1421,7 +1423,7 @@ export default function ReservationsPage() {
                         No reservations found
                       </p>
                       <p className="font-body text-xs text-outline">
-                        {dateFilter || statusFilter || courtTypeFilter
+                        {dateFilter || statusFilter || courtFilter
                           ? "Try adjusting your filters"
                           : "Reservations will appear here once customers book"}
                       </p>
