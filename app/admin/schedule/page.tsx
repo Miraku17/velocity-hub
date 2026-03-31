@@ -35,6 +35,15 @@ interface Reservation {
   total_amount: number
 }
 
+interface BlockedSlot {
+  id: string
+  court_id: string | null
+  blocked_date: string
+  start_time: string | null
+  end_time: string | null
+  reason: string
+}
+
 /* ── Fetch ── */
 
 async function fetchCourts(): Promise<Court[]> {
@@ -48,6 +57,12 @@ async function fetchReservations(date: string): Promise<Reservation[]> {
   if (!res.ok) throw new Error("Failed to fetch reservations")
   const json = await res.json()
   return json.data ?? []
+}
+
+async function fetchBlockedSlots(date: string): Promise<BlockedSlot[]> {
+  const res = await fetch(`/api/blocked-slots?date=${date}`)
+  if (!res.ok) throw new Error("Failed to fetch blocked slots")
+  return res.json()
 }
 
 /* ── Helpers ── */
@@ -129,6 +144,12 @@ export default function SchedulePage() {
     refetchInterval: 30000,
   })
 
+  const { data: blockedSlots = [] } = useQuery({
+    queryKey: ["schedule-blocked", dateStr],
+    queryFn: () => fetchBlockedSlots(dateStr),
+    refetchInterval: 30000,
+  })
+
   const activeCourts = courts.filter((c) => c.status !== "maintenance")
   const activeReservations = useMemo(() => reservations.filter((r) => r.status !== "cancelled"), [reservations])
 
@@ -154,6 +175,31 @@ export default function SchedulePage() {
     }
     return map
   }, [activeReservations])
+
+  // Build blocked slots map: court_id -> hour -> BlockedSlot
+  const blockedMap = useMemo(() => {
+    const map: Record<string, Record<number, BlockedSlot>> = {}
+    for (const b of blockedSlots) {
+      if (!b.start_time || !b.end_time) {
+        // Full-day block — mark all hours for the court (or all courts if null)
+        const courtIds = b.court_id ? [b.court_id] : activeCourts.map((c) => c.id)
+        for (const cid of courtIds) {
+          if (!map[cid]) map[cid] = {}
+          for (let h = 0; h < 24; h++) map[cid][h] = b
+        }
+        continue
+      }
+      const startH = timeToHour(b.start_time)
+      let endH = timeToHour(b.end_time)
+      if (endH <= startH) endH += 24
+      const courtIds = b.court_id ? [b.court_id] : activeCourts.map((c) => c.id)
+      for (const cid of courtIds) {
+        if (!map[cid]) map[cid] = {}
+        for (let h = startH; h < endH; h++) map[cid][h % 24] = b
+      }
+    }
+    return map
+  }, [blockedSlots, activeCourts])
 
   // Stats
   const totalBookings = activeReservations.length
@@ -316,6 +362,10 @@ export default function SchedulePage() {
           <span className="font-nav text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">Pending</span>
         </span>
         <span className="flex items-center gap-2">
+          <span className="h-3 w-6 rounded-sm bg-error/10 ring-1 ring-error/20" />
+          <span className="font-nav text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">Blocked</span>
+        </span>
+        <span className="flex items-center gap-2">
           <span className="h-3 w-6 rounded-sm bg-surface-container-high ring-1 ring-outline-variant/20" />
           <span className="font-nav text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">Closed</span>
         </span>
@@ -386,6 +436,8 @@ export default function SchedulePage() {
                     const isBooked = !!reservation
                     const isPending = reservation?.status === "pending"
                     const isConfirmed = reservation?.status === "confirmed" || reservation?.status === "completed"
+                    const blocked = blockedMap[court.id]?.[hour]
+                    const isBlocked = !!blocked && !isBooked
                     const rate = getRateForHour(court, dayOfWeek, hour)
 
                     const isFirstHourOfBooking = isBooked && (
@@ -395,6 +447,15 @@ export default function SchedulePage() {
                     const isLastHourOfBooking = isBooked && (
                       !bookingMap[court.id]?.[(hour + 1) % 24] ||
                       bookingMap[court.id][(hour + 1) % 24]?.id !== reservation.id
+                    )
+
+                    const isFirstHourOfBlock = isBlocked && (
+                      !blockedMap[court.id]?.[(hour - 1 + 24) % 24] ||
+                      blockedMap[court.id][(hour - 1 + 24) % 24]?.id !== blocked.id
+                    )
+                    const isLastHourOfBlock = isBlocked && (
+                      !blockedMap[court.id]?.[(hour + 1) % 24] ||
+                      blockedMap[court.id][(hour + 1) % 24]?.id !== blocked.id
                     )
 
                     if (!isOpen) {
@@ -429,6 +490,31 @@ export default function SchedulePage() {
                                 </p>
                                 <p className={`font-label text-[8px] font-semibold uppercase tracking-widest ${isPending ? "text-[#C49B00]/60" : "text-primary/50"}`}>
                                   {reservation.status}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      )
+                    }
+
+                    if (isBlocked) {
+                      return (
+                        <td
+                          key={court.id}
+                          className="border-b border-r border-outline-variant/10 last:border-r-0 h-[52px] p-0"
+                          title={blocked.reason || "Blocked"}
+                        >
+                          <div
+                            className={`mx-1 flex h-full flex-col items-center justify-center px-2 bg-error/6 border-x border-error/12 ${isFirstHourOfBlock ? "mt-1 rounded-t-lg border-t" : ""} ${isLastHourOfBlock ? "mb-1 rounded-b-lg border-b" : ""}`}
+                          >
+                            {isFirstHourOfBlock && (
+                              <>
+                                <p className="font-nav text-[11px] font-bold truncate max-w-full text-error/70">
+                                  {blocked.reason || "Blocked"}
+                                </p>
+                                <p className="font-label text-[8px] font-semibold uppercase tracking-widest text-error/40">
+                                  Blocked
                                 </p>
                               </>
                             )}
