@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import {
   getAuthenticatedUser,
   checkIsAdmin,
@@ -75,7 +76,36 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  return Response.json(data, { status: 201 })
+  // Also create a reservation when court and time info are provided
+  let reservationId: string | null = null
+  if (court_id && start_time && end_time) {
+    const adminClient = createAdminClient()
+    const { data: resData, error: resError } = await adminClient.rpc(
+      "create_reservation",
+      {
+        p_court_id: court_id,
+        p_customer_name: description,
+        p_customer_email: "Manual Input",
+        p_customer_phone: "Manual Input",
+        p_date: entry_date,
+        p_start_time: start_time,
+        p_end_time: end_time <= start_time ? "23:59:00" : end_time,
+        p_reservation_type: "walk-in",
+        p_notes: description + (notes ? ` — ${notes}` : ""),
+      }
+    )
+
+    if (!resError && resData) {
+      reservationId = resData as string
+      // Auto-confirm the reservation
+      await adminClient
+        .from("reservations")
+        .update({ status: "confirmed" })
+        .eq("id", reservationId)
+    }
+  }
+
+  return Response.json({ ...data, reservation_id: reservationId }, { status: 201 })
 }
 
 // PATCH /api/manual-entries — update an entry (admin only)

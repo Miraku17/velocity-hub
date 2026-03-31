@@ -38,6 +38,7 @@ export interface ReservationFilters {
   month?: string   // "YYYY-MM" — filters by full calendar month
   status?: ReservationStatus
   court_type?: CourtType
+  court_id?: string
   search?: string
   page?: number
   limit?: number
@@ -109,6 +110,7 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
   }
   if (filters?.status) url.searchParams.set("status", filters.status)
   if (filters?.court_type) url.searchParams.set("court_type", filters.court_type)
+  if (filters?.court_id) url.searchParams.set("court_id", filters.court_id)
   if (filters?.search) url.searchParams.set("search", filters.search)
   if (filters?.page) url.searchParams.set("page", filters.page.toString())
   if (filters?.limit) url.searchParams.set("limit", filters.limit.toString())
