@@ -202,7 +202,7 @@ function CalendarDayButton({
 
   const hasSlots = (modifiers as Record<string, boolean>).hasSlots
   const fullyBooked = (modifiers as Record<string, boolean>).fullyBooked
-  const showDot = (hasSlots || fullyBooked) && !modifiers.outside && !modifiers.disabled
+  const showDot = (hasSlots || fullyBooked) && !modifiers.disabled
 
   return (
     <Button

@@ -421,10 +421,10 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadErr) {
-      // Roll back — cancel all reservations created in this request
-      await supabase
+      // Roll back — delete all reservations created in this request
+      await adminClient
         .from("reservations")
-        .update({ status: "cancelled" })
+        .delete()
         .in("id", ids)
       return Response.json({ error: "Receipt upload failed. Please try again." }, { status: 500 })
     }
