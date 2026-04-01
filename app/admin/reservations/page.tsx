@@ -13,6 +13,7 @@ import {
 } from "@/lib/hooks/useReservations"
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { Button } from "@/components/ui/button"
+import { Portal } from "@/components/ui/portal"
 import {
   Select,
   SelectContent,
@@ -208,16 +209,19 @@ function WalkInModal({
   if (!open) return null
 
   return (
-    <>
+    <Portal>
       <div
         className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-        onMouseDown={() => !createMutation.isPending && onClose()}
+        onClick={() => !createMutation.isPending && onClose()}
       />
-      <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 pt-[5vh] pointer-events-none">
+      <div
+        className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 pt-[5vh]"
+        onClick={() => !createMutation.isPending && onClose()}
+      >
         <form
           onSubmit={handleSubmit}
-          className="relative w-full max-w-lg rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
-          onMouseDown={(e) => e.stopPropagation()}
+          className="relative w-full max-w-lg rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-outline-variant/15 px-6 py-5">
@@ -447,14 +451,14 @@ function WalkInModal({
           </div>
         </form>
       </div>
-    </>
+    </Portal>
   )
 }
 
 /* ── Types ── */
 
 type GroupedReservation = Reservation & {
-  grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number }[]
+  grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number; price_per_hour: number }[]
 }
 
 /* ── Reservation Detail Modal ── */
@@ -524,15 +528,18 @@ function ReservationDetailModal({
   const pb = paymentBadge[res.payment_status] ?? paymentBadge.pending
 
   return (
-    <>
+    <Portal>
       <div
         className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-        onMouseDown={onClose}
+        onClick={onClose}
       />
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+        onClick={onClose}
+      >
         <div
-          className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
-          onMouseDown={(e) => e.stopPropagation()}
+          className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-outline-variant/15 bg-surface-container-lowest px-6 py-4">
@@ -652,27 +659,32 @@ function ReservationDetailModal({
                 <div className="flex justify-between font-body text-xs">
                   <span className="text-on-surface-variant">{res.court_name}</span>
                 </div>
-                <div className="flex justify-between font-body text-xs">
-                  <span className="text-on-surface-variant">Rate</span>
-                  <span className="text-on-surface">₱{Number(res.price_per_hour).toFixed(2)}/hr</span>
-                </div>
                 {res.grouped_slots ? (
-                  res.grouped_slots.map((slot, i) => {
-                    const sh = parseInt(slot.start_time.split(":")[0], 10)
-                    const eh = parseInt(slot.end_time.split(":")[0], 10)
-                    const hrs = eh > sh ? eh - sh : 24 - sh + eh
-                    return (
-                      <div key={slot.id} className="flex justify-between font-body text-xs">
-                        <span className="text-on-surface-variant">Slot {i + 1} ({formatTimeSlot(slot.start_time, slot.end_time)})</span>
-                        <span className="text-on-surface">{hrs}h · ₱{Number(slot.total_amount).toFixed(2)}</span>
-                      </div>
-                    )
-                  })
+                  <>
+                    {res.grouped_slots.map((slot, i) => {
+                      const sh = parseInt(slot.start_time.split(":")[0], 10)
+                      const eh = parseInt(slot.end_time.split(":")[0], 10)
+                      const hrs = eh > sh ? eh - sh : 24 - sh + eh
+                      const effectiveRate = hrs > 0 ? slot.total_amount / hrs : slot.price_per_hour
+                      return (
+                        <div key={slot.id} className="flex justify-between font-body text-xs">
+                          <span className="text-on-surface-variant">Slot {i + 1} ({formatTimeSlot(slot.start_time, slot.end_time)})</span>
+                          <span className="text-on-surface">{hrs}h × ₱{Number(effectiveRate).toFixed(2)} = ₱{Number(slot.total_amount).toFixed(2)}</span>
+                        </div>
+                      )
+                    })}
+                  </>
                 ) : (
-                  <div className="flex justify-between font-body text-xs">
-                    <span className="text-on-surface-variant">Duration</span>
-                    <span className="text-on-surface">{res.duration_hours}h</span>
-                  </div>
+                  <>
+                    <div className="flex justify-between font-body text-xs">
+                      <span className="text-on-surface-variant">Rate</span>
+                      <span className="text-on-surface">₱{(res.duration_hours > 0 ? res.total_amount / res.duration_hours : res.price_per_hour).toFixed(2)}/hr</span>
+                    </div>
+                    <div className="flex justify-between font-body text-xs">
+                      <span className="text-on-surface-variant">Duration</span>
+                      <span className="text-on-surface">{res.duration_hours}h</span>
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -781,8 +793,8 @@ function ReservationDetailModal({
                 className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm"
                 onClick={() => setLightboxUrl(null)}
               />
-              <div className="fixed inset-0 z-[80] flex items-center justify-center p-8 pointer-events-none">
-                <div className="relative max-h-[85vh] max-w-[90vw] pointer-events-auto">
+              <div className="fixed inset-0 z-[80] flex items-center justify-center p-8" onClick={() => setLightboxUrl(null)}>
+                <div className="relative max-h-[85vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
                   <img
                     src={lightboxUrl}
                     alt="Payment proof"
@@ -803,7 +815,7 @@ function ReservationDetailModal({
           )}
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 
@@ -840,10 +852,13 @@ function ConfirmationModal({
   if (!open) return null
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
-        <div className="relative w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto">
+      <div className="fixed inset-0 z-[201] flex items-center justify-center p-4" onClick={onCancel}>
+        <div
+          className="relative w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="px-6 pt-6 pb-2">
             <h3 className="font-headline text-base font-bold text-on-surface">{title}</h3>
             <p className="mt-2 font-body text-sm text-on-surface-variant">{message}</p>
@@ -870,7 +885,7 @@ function ConfirmationModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 
@@ -927,7 +942,7 @@ export default function ReservationsPage() {
 
   // Group reservations sharing a booking_group_id into a single display row
   // The first reservation in the group is the "primary" (carries status, customer, court, receipt)
-  const reservations: (Reservation & { grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number }[] })[] = []
+  const reservations: (Reservation & { grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number; price_per_hour: number }[] })[] = []
   const seenGroupIds = new Set<string>()
   for (const res of rawReservations) {
     if (res.booking_group_id) {
@@ -941,7 +956,7 @@ export default function ReservationsPage() {
       reservations.push({
         ...primary,
         total_amount: siblings.reduce((sum, r) => sum + r.total_amount, 0),
-        grouped_slots: siblings.map((r) => ({ id: r.id, start_time: r.start_time, end_time: r.end_time, total_amount: r.total_amount })),
+        grouped_slots: siblings.map((r) => ({ id: r.id, start_time: r.start_time, end_time: r.end_time, total_amount: r.total_amount, price_per_hour: r.price_per_hour })),
       })
     } else {
       reservations.push(res)
@@ -1088,7 +1103,7 @@ export default function ReservationsPage() {
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name, email, phone, or code..."
+            placeholder="Search by name, email, phone, code, or date..."
             className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-2.5 pl-10 pr-10 font-body text-sm text-on-surface placeholder:text-outline outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           {searchInput && (

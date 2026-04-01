@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Portal } from "@/components/ui/portal"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingPage } from "@/components/ui/loading"
@@ -514,7 +515,7 @@ export default function CourtsPage() {
 
       {/* ── Add / Edit Modal ── */}
       {(modalMode === "add" || modalMode === "edit") && (
-        <>
+        <Portal>
           <div
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
             onClick={closeModal}
@@ -893,12 +894,12 @@ export default function CourtsPage() {
               </form>
             </div>
           </div>
-        </>
+        </Portal>
       )}
 
       {/* ── Delete Confirmation Modal ── */}
       {modalMode === "delete" && selectedCourt && (
-        <>
+        <Portal>
           <div
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
             onClick={closeModal}
@@ -958,7 +959,7 @@ export default function CourtsPage() {
               </div>
             </div>
           </div>
-        </>
+        </Portal>
       )}
     </div>
   )

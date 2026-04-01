@@ -3,6 +3,7 @@
 import { useState } from "react"
 import EmployeeClockWidget from "./EmployeeClockWidget"
 import { LoadingPage } from "@/components/ui/loading"
+import { Portal } from "@/components/ui/portal"
 import { useMe, useTimeEntries, type TimeEntry } from "@/lib/hooks/useTimeClock"
 
 /* ── Helpers ── */
@@ -69,7 +70,7 @@ function EmployeeDetailModal({
   }
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[10vh]">
         <div className="relative w-full max-w-lg rounded-2xl bg-surface-container-lowest shadow-xl ring-1 ring-outline-variant/20" onClick={(e) => e.stopPropagation()}>
@@ -178,7 +179,7 @@ function EmployeeDetailModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 

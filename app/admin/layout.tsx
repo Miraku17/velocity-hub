@@ -5,6 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { Portal } from "@/components/ui/portal"
 import { Button } from "@/components/ui/button"
 import { useMe } from "@/lib/hooks/useTimeClock"
 import { useQueryClient } from "@tanstack/react-query"
@@ -323,12 +324,12 @@ export default function AdminLayout({
 
       {/* ── Sign Out Confirmation Modal ── */}
       {signOutModalOpen && (
-        <>
+        <Portal>
           <div
             className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
             onClick={() => !signingOut && setSignOutModalOpen(false)}
           />
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => !signingOut && setSignOutModalOpen(false)}>
             <div
               className="w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
@@ -373,7 +374,7 @@ export default function AdminLayout({
               </div>
             </div>
           </div>
-        </>
+        </Portal>
       )}
     </div>
   )

@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Calendar } from "@/components/ui/calendar"
 import { LoadingPage } from "@/components/ui/loading"
+import { useMe } from "@/lib/hooks/useTimeClock"
 
 /* ── Types ── */
 
@@ -111,6 +112,8 @@ function formatCurrency(n: number) {
 /* ── Component ── */
 
 export default function SchedulePage() {
+  const { data: me } = useMe()
+  const isAdmin = me?.role === "admin"
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [calendarOpen, setCalendarOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -320,7 +323,7 @@ export default function SchedulePage() {
       </div>
 
       {/* ── Quick Stats ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid ${isAdmin ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
         <div className="rounded-xl bg-surface-container-lowest p-4 ring-1 ring-outline-variant/15">
           <p className="font-label text-[9px] font-medium uppercase tracking-widest text-on-surface-variant">
             Bookings
@@ -337,14 +340,16 @@ export default function SchedulePage() {
             {bookedHours}<span className="text-sm font-semibold text-on-surface-variant">h</span>
           </p>
         </div>
-        <div className="rounded-xl bg-surface-container-lowest p-4 ring-1 ring-outline-variant/15">
-          <p className="font-label text-[9px] font-medium uppercase tracking-widest text-on-surface-variant">
-            Revenue
-          </p>
-          <p className="mt-1 font-headline text-2xl font-extrabold tracking-tight text-primary">
-            {formatCurrency(totalRevenue)}
-          </p>
-        </div>
+        {isAdmin && (
+          <div className="rounded-xl bg-surface-container-lowest p-4 ring-1 ring-outline-variant/15">
+            <p className="font-label text-[9px] font-medium uppercase tracking-widest text-on-surface-variant">
+              Revenue
+            </p>
+            <p className="mt-1 font-headline text-2xl font-extrabold tracking-tight text-primary">
+              {formatCurrency(totalRevenue)}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Legend ── */}

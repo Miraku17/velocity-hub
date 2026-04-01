@@ -7,6 +7,7 @@ import {
   type Reservation,
 } from "@/lib/hooks/useReservations"
 import { LoadingPage } from "@/components/ui/loading"
+import { Portal } from "@/components/ui/portal"
 import {
   Select,
   SelectContent,
@@ -341,7 +342,7 @@ function exportCSV(sales: Reservation[], filters: { date: string; week: string; 
     s.reservation_type,
     s.status,
     s.payment_status,
-    s.price_per_hour.toFixed(2),
+    (s.duration_hours > 0 ? s.total_amount / s.duration_hours : s.price_per_hour).toFixed(2),
     s.total_amount.toFixed(2),
     s.notes ?? "",
     new Date(s.created_at).toISOString(),
@@ -385,11 +386,11 @@ function SaleDetailModal({
   const sb = getStatusBadge(res.status)
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <div
-          className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
+          className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -508,7 +509,7 @@ function SaleDetailModal({
                 </div>
                 <div className="flex justify-between font-body text-[11px]">
                   <span className="text-on-surface-variant">Rate</span>
-                  <span className="text-on-surface">₱{res.price_per_hour.toFixed(2)}/hr</span>
+                  <span className="text-on-surface">₱{(res.duration_hours > 0 ? res.total_amount / res.duration_hours : res.price_per_hour).toFixed(2)}/hr</span>
                 </div>
                 <div className="flex justify-between font-body text-[11px]">
                   <span className="text-on-surface-variant">Duration</span>
@@ -523,7 +524,7 @@ function SaleDetailModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 

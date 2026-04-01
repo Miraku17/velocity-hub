@@ -7,6 +7,50 @@ import {
 import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
 import { rateLimit } from "@/lib/rate-limit"
 
+/**
+ * Try to parse a search string as a date and return "YYYY-MM-DD" or null.
+ * Supports: "2026-04-14", "04/14/2026", "Apr 14 2026", "April 14", "Apr 14", etc.
+ */
+function tryParseDate(input: string): string | null {
+  // ISO format: 2026-04-14
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const d = new Date(input + "T00:00:00")
+    if (!isNaN(d.getTime())) return input
+  }
+
+  // MM/DD/YYYY or MM-DD-YYYY
+  const slashMatch = input.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (slashMatch) {
+    const [, m, d, y] = slashMatch
+    const date = new Date(Number(y), Number(m) - 1, Number(d))
+    if (!isNaN(date.getTime())) {
+      return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`
+    }
+  }
+
+  // Natural language: "Apr 14 2026", "April 14, 2026", "Apr 14" (defaults to current year)
+  const monthNames: Record<string, number> = {
+    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+    apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+    aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+    nov: 10, november: 10, dec: 11, december: 11,
+  }
+  const naturalMatch = input.match(/^([a-zA-Z]+)\s+(\d{1,2})(?:\s+(\d{4}))?$/)
+  if (naturalMatch) {
+    const monthIdx = monthNames[naturalMatch[1].toLowerCase()]
+    if (monthIdx !== undefined) {
+      const day = Number(naturalMatch[2])
+      const year = naturalMatch[3] ? Number(naturalMatch[3]) : new Date().getFullYear()
+      const date = new Date(year, monthIdx, day)
+      if (!isNaN(date.getTime()) && date.getMonth() === monthIdx) {
+        return `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      }
+    }
+  }
+
+  return null
+}
+
 // GET /api/reservations — list reservations (admin: all via view, public: by email)
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -41,9 +85,18 @@ export async function GET(request: NextRequest) {
     // Sanitize search input: remove characters that could manipulate PostgREST filter syntax
     const sanitized = search.replace(/[,.()"'\\]/g, "")
     if (sanitized) {
-      query = query.or(
-        `customer_name.ilike.%${sanitized}%,customer_email.ilike.%${sanitized}%,customer_phone.ilike.%${sanitized}%,reservation_code.ilike.%${sanitized}%`
-      )
+      // Try to parse as a date so users can search by date (e.g. "Apr 14", "2026-04-14", "04/14/2026")
+      const parsedDate = tryParseDate(sanitized)
+      const orFilters = [
+        `customer_name.ilike.%${sanitized}%`,
+        `customer_email.ilike.%${sanitized}%`,
+        `customer_phone.ilike.%${sanitized}%`,
+        `reservation_code.ilike.%${sanitized}%`,
+      ]
+      if (parsedDate) {
+        orFilters.push(`reservation_date.eq.${parsedDate}`)
+      }
+      query = query.or(orFilters.join(","))
     }
   }
 
@@ -221,6 +274,25 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid reservation type" }, { status: 400 })
   }
 
+  // Fetch the court's schedule to determine the correct hourly rate per time slot
+  const bookingDayOfWeek = new Date(date + "T00:00:00").getDay()
+  const { data: courtData } = await supabase
+    .from("courts")
+    .select("price_per_hour, court_schedules(*)")
+    .eq("id", court_id)
+    .single()
+
+  const basePrice: number = courtData?.price_per_hour ?? 0
+  const schedule = (courtData?.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
+    ?.find((s) => s.day_of_week === bookingDayOfWeek)
+  const hourlyRates = schedule?.hourly_rates ?? null
+
+  /** Return the correct rate for a given start hour */
+  function getHourRate(startHour: number): number {
+    if (!hourlyRates) return basePrice
+    return hourlyRates[String(startHour)] ?? basePrice
+  }
+
   // Generate a shared group ID when booking multiple non-contiguous blocks
   const bookingGroupId = blocks.length > 1
     ? crypto.randomUUID()
@@ -255,13 +327,26 @@ export async function POST(request: NextRequest) {
     const reservationId = data as string
     ids.push(reservationId)
 
-    // Stamp the booking_group_id so all blocks are linked as one booking
-    if (bookingGroupId) {
-      await supabase
-        .from("reservations")
-        .update({ booking_group_id: bookingGroupId })
-        .eq("id", reservationId)
+    // Compute the correct price_per_hour and total_amount using hourly rates
+    const startHour = parseInt(block.start_time.split(":")[0], 10)
+    const endHour = parseInt(block.end_time.split(":")[0], 10)
+    const durationHours = endHour > startHour ? endHour - startHour : 24 - startHour + endHour
+    let correctTotal = 0
+    for (let h = startHour; h < startHour + durationHours; h++) {
+      correctTotal += getHourRate(h % 24)
     }
+    // For price_per_hour, use the average rate across the block's hours
+    const correctRate = durationHours > 0 ? correctTotal / durationHours : basePrice
+
+    // Update with correct rate, total, and optional group ID
+    await supabase
+      .from("reservations")
+      .update({
+        price_per_hour: correctRate,
+        total_amount: correctTotal,
+        ...(bookingGroupId ? { booking_group_id: bookingGroupId } : {}),
+      })
+      .eq("id", reservationId)
   }
 
   // Send ONE admin notification email with all slots (non-blocking)
