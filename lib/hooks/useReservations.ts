@@ -37,6 +37,7 @@ export interface ReservationFilters {
   week?: string    // "YYYY-Www" — filters by ISO week
   month?: string   // "YYYY-MM" — filters by full calendar month
   status?: ReservationStatus
+  payment_status?: PaymentStatus
   court_type?: CourtType
   court_id?: string
   search?: string
@@ -109,6 +110,7 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
     url.searchParams.set("date_to", lastDay)
   }
   if (filters?.status) url.searchParams.set("status", filters.status)
+  if (filters?.payment_status) url.searchParams.set("payment_status", filters.payment_status)
   if (filters?.court_type) url.searchParams.set("court_type", filters.court_type)
   if (filters?.court_id) url.searchParams.set("court_id", filters.court_id)
   if (filters?.search) url.searchParams.set("search", filters.search)

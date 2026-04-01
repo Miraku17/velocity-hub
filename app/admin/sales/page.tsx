@@ -7,6 +7,13 @@ import {
   type Reservation,
 } from "@/lib/hooks/useReservations"
 import { LoadingPage } from "@/components/ui/loading"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 /* ── Helpers ── */
 
@@ -647,17 +654,18 @@ export default function SalesPage() {
             <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
               Payment
             </span>
-            <select
-              value={paymentFilter}
-              onChange={(e) => { setPaymentFilter(e.target.value); setCurrentPage(1) }}
-              className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 pr-8 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-            >
-              <option value="">All</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="refunded">Refunded</option>
-              <option value="declined">Declined</option>
-            </select>
+            <Select value={paymentFilter || "all"} onValueChange={(v) => { setPaymentFilter(!v || v === "all" ? "" : v); setCurrentPage(1) }}>
+              <SelectTrigger className="h-[38px] w-[140px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest font-body text-sm text-on-surface">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="refunded">Refunded</SelectItem>
+                <SelectItem value="declined">Declined</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {(dateFilter || weekFilter || monthFilter || paymentFilter) && (
@@ -700,13 +708,13 @@ export default function SalesPage() {
       </div>
 
       {/* ── Summary Cards ── */}
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
           <p className="font-label text-[10px] font-bold uppercase tracking-widest text-outline">
             Total Revenue
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-            ₱{summary.total.toFixed(2)}
+            ₱{summary.total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </p>
         </div>
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
@@ -714,7 +722,15 @@ export default function SalesPage() {
             Paid
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#16A34A]">
-            ₱{summary.paid.toFixed(2)}
+            ₱{summary.paid.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
+          <p className="font-label text-[10px] font-bold uppercase tracking-widest text-[#D97706]">
+            Pending
+          </p>
+          <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#D97706]">
+            ₱{summary.pending.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </p>
         </div>
       </div>

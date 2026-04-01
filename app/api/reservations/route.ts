@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const dateFrom = params.get("date_from")
   const dateTo = params.get("date_to")
   const status = params.get("status")
+  const paymentStatus = params.get("payment_status")
   const courtType = params.get("court_type")
   const courtId = params.get("court_id")
   const search = params.get("search")?.trim()
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
   if (dateFrom) query = query.gte("reservation_date", dateFrom)
   if (dateTo) query = query.lte("reservation_date", dateTo)
   if (status) query = query.eq("status", status)
+  if (paymentStatus) query = query.eq("payment_status", paymentStatus)
   if (courtType) query = query.eq("court_type", courtType)
   if (courtId) query = query.eq("court_id", courtId)
   if (search) {
@@ -122,21 +124,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const verifyRes = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          secret: turnstileSecret,
-          response: turnstile_token,
-          remoteip: ip,
-        }),
-      }
-    )
+    let turnstileSuccess = false
+    try {
+      const verifyRes = await fetch(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            secret: turnstileSecret,
+            response: turnstile_token,
+            remoteip: ip,
+          }),
+        }
+      )
 
-    const verification = (await verifyRes.json()) as { success: boolean }
-    if (!verification.success) {
+      const verification = (await verifyRes.json()) as { success: boolean }
+      turnstileSuccess = verification.success
+    } catch {
+      // Network error contacting Cloudflare — fail closed
+      return Response.json(
+        { error: "Unable to verify human check. Please try again." },
+        { status: 503 }
+      )
+    }
+
+    if (!turnstileSuccess) {
       return Response.json(
         { error: "Human verification failed. Please try again." },
         { status: 403 }
