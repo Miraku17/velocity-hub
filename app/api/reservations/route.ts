@@ -172,7 +172,29 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createClient()
-  const body = await request.json()
+
+  // Parse body — supports JSON or FormData (when a receipt file is attached)
+  let body: Record<string, unknown>
+  let receiptFile: File | null = null
+  const contentType = request.headers.get("content-type") ?? ""
+
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData()
+    body = JSON.parse(formData.get("data") as string)
+    const file = formData.get("receipt") as File | null
+    if (file && file.size > 0) {
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+      if (!allowedTypes.includes(file.type)) {
+        return Response.json({ error: "Receipt must be JPEG, PNG, WebP, or GIF" }, { status: 400 })
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return Response.json({ error: "Receipt must be under 10MB" }, { status: 400 })
+      }
+      receiptFile = file
+    }
+  } else {
+    body = await request.json()
+  }
 
   const {
     court_id,
@@ -380,6 +402,45 @@ export async function POST(request: NextRequest) {
         ...(bookingGroupId ? { booking_group_id: bookingGroupId } : {}),
       })
       .eq("id", reservationId)
+  }
+
+  // Upload receipt if provided — if this fails, roll back all reservations
+  if (receiptFile) {
+    const { createAdminClient } = await import("@/lib/supabase/admin")
+    const adminClient = createAdminClient()
+
+    const ext = receiptFile.name.split(".").pop() || "jpg"
+    const storagePath = `${ids[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+    const arrayBuffer = await receiptFile.arrayBuffer()
+    const { data: uploadData, error: uploadErr } = await adminClient.storage
+      .from("receipts")
+      .upload(storagePath, arrayBuffer, {
+        contentType: receiptFile.type,
+        upsert: false,
+      })
+
+    if (uploadErr) {
+      // Roll back — cancel all reservations created in this request
+      await supabase
+        .from("reservations")
+        .update({ status: "cancelled" })
+        .in("id", ids)
+      return Response.json({ error: "Receipt upload failed. Please try again." }, { status: 500 })
+    }
+
+    const { data: urlData } = adminClient.storage
+      .from("receipts")
+      .getPublicUrl(uploadData.path)
+
+    // Save receipt record linked to the first reservation
+    await adminClient
+      .from("payment_receipts")
+      .insert({
+        reservation_id: ids[0],
+        image_url: urlData.publicUrl,
+        storage_path: uploadData.path,
+      })
   }
 
   // Send ONE admin notification email with all slots (non-blocking)

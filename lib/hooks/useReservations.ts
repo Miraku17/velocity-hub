@@ -67,6 +67,7 @@ export interface ReservationInput {
   notes?: string
   turnstile_token?: string
   time_blocks?: { start_time: string; end_time: string }[]
+  receipt?: File
 }
 
 export interface ReservationUpdate {
@@ -126,10 +127,25 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
 }
 
 async function createReservation(input: ReservationInput): Promise<{ id: string; ids?: string[]; booking_group_id?: string | null }> {
+  const { receipt, ...fields } = input
+
+  if (receipt) {
+    // Send as FormData so the receipt file is included in one request
+    const formData = new FormData()
+    formData.append("data", JSON.stringify(fields))
+    formData.append("receipt", receipt)
+    const res = await fetch("/api/reservations", { method: "POST", body: formData })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || "Failed to create reservation")
+    }
+    return res.json()
+  }
+
   const res = await fetch("/api/reservations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify(fields),
   })
   if (!res.ok) {
     const data = await res.json()

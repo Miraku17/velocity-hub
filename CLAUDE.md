@@ -15,6 +15,7 @@ A public-facing website and court booking platform for **Velocity Pickleball Hub
 
 ## Key Constraints
 - **No auth / no user accounts.** Bookings are anonymous — collect only name, email, and phone at checkout.
+- **Timezone: Asia/Manila (UTC+8).** All date/time logic — server-side date iteration, formatting, "today" calculations — must use `Asia/Manila`. Never rely on `toISOString()` for local dates (it converts to UTC and shifts days). Use local date formatting (`getFullYear()`/`getMonth()`/`getDate()`) or explicitly set the timezone.
 - Always read `node_modules/next/dist/docs/` before using Next.js APIs — this version has breaking changes from training data.
 - Use the `@/*` path alias (mapped to project root) for all imports.
 

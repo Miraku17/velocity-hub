@@ -73,12 +73,15 @@ export async function GET(request: NextRequest) {
   // Build a map: date -> { total slots across courts, taken slots }
   const result: Record<string, { total: number; booked: number; available: number }> = {}
 
-  // Iterate each date in the range
-  const start = new Date(dateFrom + "T00:00:00")
-  const end = new Date(dateTo + "T00:00:00")
+  // Iterate each date in the range using date strings to avoid timezone issues
+  const start = new Date(dateFrom + "T12:00:00")
+  const end = new Date(dateTo + "T12:00:00")
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split("T")[0]
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    const dateStr = `${y}-${m}-${day}`
     const dayOfWeek = d.getDay() // 0=Sunday
 
     let totalSlots = 0

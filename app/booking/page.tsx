@@ -142,8 +142,6 @@ function BookingPage() {
   // Payment & receipt state
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  const [uploadingReceipt, setUploadingReceipt] = useState(false);
-  const [receiptUploadFailed, setReceiptUploadFailed] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [selectedQrIndex, setSelectedQrIndex] = useState(0);
   const [qrLightbox, setQrLightbox] = useState(false);
@@ -552,17 +550,7 @@ function BookingPage() {
       }
     }
 
-    // Upload receipt first — if it fails, don't create the reservation
-    let preUploadedPath: string | null = null;
-    if (receiptFile) {
-      preUploadedPath = await preUploadReceipt();
-      if (!preUploadedPath) {
-        toast.error("Receipt upload failed. Please try again.");
-        return;
-      }
-    }
-
-    // Send all time blocks in a single request (single turnstile verification)
+    // Send all time blocks + receipt in a single request
     createReservation.mutate(
       {
         court_id: court.id,
@@ -574,21 +562,10 @@ function BookingPage() {
         end_time: parsedTimeRanges[0].end_time,
         ...(parsedTimeRanges.length > 1 ? { time_blocks: parsedTimeRanges } : {}),
         turnstile_token: turnstileToken || undefined,
+        receipt: receiptFile || undefined,
       },
       {
         onSuccess: async (data) => {
-          // Link pre-uploaded receipt to the reservation
-          if (preUploadedPath) {
-            try {
-              await fetch("/api/payment-receipts/link", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ storage_path: preUploadedPath, reservation_id: data.id }),
-              });
-            } catch {
-              console.error("Failed to link receipt, but reservation is created");
-            }
-          }
           setShowConfirmModal(false);
           setReservationId(data.id);
           setBookingConfirmed(true);
@@ -617,56 +594,6 @@ function BookingPage() {
     if (receiptInputRef.current) receiptInputRef.current.value = "";
   }
 
-  // Upload receipt to server after reservation is created
-  async function uploadReceiptToServer(resId: string): Promise<void> {
-    if (!receiptFile) return;
-    setUploadingReceipt(true);
-    setReceiptUploadFailed(false);
-    try {
-      const formData = new FormData();
-      formData.append("file", receiptFile);
-      formData.append("reservation_id", resId);
-      const res = await fetch("/api/payment-receipts", { method: "POST", body: formData });
-      if (!res.ok) {
-        const err = await res.json();
-        console.error("Receipt upload failed:", err.error);
-        setReceiptUploadFailed(true);
-      } else {
-        const data = await res.json();
-        setReceiptUrl(data.image_url);
-        setReceiptUploadFailed(false);
-      }
-    } catch {
-      console.error("Receipt upload failed");
-      setReceiptUploadFailed(true);
-    }
-    setUploadingReceipt(false);
-  }
-
-  // Pre-upload receipt before creating the reservation
-  // Returns the uploaded image URL, or null on failure
-  async function preUploadReceipt(): Promise<string | null> {
-    if (!receiptFile) return null;
-    setUploadingReceipt(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", receiptFile);
-      const res = await fetch("/api/payment-receipts/pre-upload", { method: "POST", body: formData });
-      if (!res.ok) {
-        const err = await res.json();
-        console.error("Receipt pre-upload failed:", err.error);
-        setUploadingReceipt(false);
-        return null;
-      }
-      const data = await res.json();
-      setUploadingReceipt(false);
-      return data.storage_path as string;
-    } catch {
-      console.error("Receipt pre-upload failed");
-      setUploadingReceipt(false);
-      return null;
-    }
-  }
 
   // Colors
   const bg = "#182916";
@@ -1256,7 +1183,7 @@ function BookingPage() {
                       </div>
 
                       {/* Receipt image */}
-                      {receiptUrl && !receiptUploadFailed && (
+                      {receiptUrl && (
                         <div className="py-4" style={{ borderBottom: `1px dashed ${bg}15` }}>
                           <div className="flex items-center gap-1.5 mb-2">
                             <span className="material-symbols-outlined text-[14px]" style={{ color: `${bg}50`, fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
@@ -1270,28 +1197,6 @@ function BookingPage() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={receiptUrl} alt="Receipt" className="w-full max-h-36 object-contain bg-white" />
                           </div>
-                        </div>
-                      )}
-
-                      {/* Receipt upload failed — retry */}
-                      {receiptUploadFailed && reservationId && (
-                        <div className="py-4" style={{ borderBottom: `1px dashed ${bg}15` }}>
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <span className="material-symbols-outlined text-[14px]" style={{ color: "#dc2626", fontVariationSettings: "'FILL' 1" }}>error</span>
-                            <span className="font-[Poppins] text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#dc2626" }}>Receipt Upload Failed</span>
-                          </div>
-                          <p className="font-[Poppins] text-[11px] mb-3" style={{ color: `${bg}70` }}>
-                            Your booking is confirmed but the receipt failed to upload. Please retry so the admin can verify your payment.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => uploadReceiptToServer(reservationId)}
-                            disabled={uploadingReceipt}
-                            className="w-full rounded-lg px-4 py-2.5 font-[Poppins] text-xs font-semibold text-white transition-opacity disabled:opacity-50"
-                            style={{ backgroundColor: bg }}
-                          >
-                            {uploadingReceipt ? "Uploading..." : "Retry Upload"}
-                          </button>
                         </div>
                       )}
 
@@ -1431,7 +1336,7 @@ function BookingPage() {
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/gif"
                         onChange={handleReceiptUpload}
-                        disabled={uploadingReceipt}
+                        disabled={createReservation.isPending}
                         className="hidden"
                       />
 
@@ -1447,7 +1352,7 @@ function BookingPage() {
                           </div>
                           <button
                             onClick={() => receiptInputRef.current?.click()}
-                            disabled={uploadingReceipt}
+                            disabled={createReservation.isPending}
                             className="font-[Poppins] text-xs font-semibold underline"
                             style={{ color: `${bg}80` }}
                           >
@@ -1457,11 +1362,11 @@ function BookingPage() {
                       ) : (
                         <button
                           onClick={() => receiptInputRef.current?.click()}
-                          disabled={uploadingReceipt}
+                          disabled={createReservation.isPending}
                           className="w-full flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-8 transition-all hover:bg-white/80"
                           style={{ borderColor: `${bg}15`, backgroundColor: `${surface}` }}
                         >
-                          {uploadingReceipt ? (
+                          {createReservation.isPending ? (
                             <>
                               <div className="h-6 w-6 animate-spin rounded-full border-2" style={{ borderColor: `${bg}20`, borderTopColor: bg }} />
                               <span className="font-[Poppins] text-xs font-semibold" style={{ color: bg }}>Uploading...</span>
@@ -1682,29 +1587,36 @@ function BookingPage() {
 
                 {/* Actions */}
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowConfirmModal(false)}
-                    disabled={createReservation.isPending}
-                    className="flex-1 py-3 rounded-xl font-[Poppins] font-semibold text-sm transition-all disabled:opacity-40"
-                    style={{ border: `1px solid ${bg}12`, color: `${bg}80` }}
-                  >
-                    Go Back
-                  </button>
-                  <button
-                    onClick={() => { handleConfirmBooking(); }}
-                    disabled={createReservation.isPending || (!!TURNSTILE_SITE_KEY && !turnstileToken)}
-                    className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60"
-                    style={{ backgroundColor: bg, color: "white" }}
-                  >
-                    {createReservation.isPending ? (
+                  {createReservation.isPending ? (
+                    <button
+                      disabled
+                      className="w-full py-3 rounded-xl font-[Poppins] font-bold text-xs sm:text-sm uppercase tracking-wider transition-all disabled:opacity-80"
+                      style={{ backgroundColor: bg, color: "white" }}
+                    >
                       <span className="flex items-center justify-center gap-2">
                         <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                         Confirming...
                       </span>
-                    ) : (
-                      "Confirm"
-                    )}
-                  </button>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setShowConfirmModal(false)}
+                        className="flex-1 py-3 rounded-xl font-[Poppins] font-semibold text-sm transition-all"
+                        style={{ border: `1px solid ${bg}12`, color: `${bg}80` }}
+                      >
+                        Go Back
+                      </button>
+                      <button
+                        onClick={() => { handleConfirmBooking(); }}
+                        disabled={!!TURNSTILE_SITE_KEY && !turnstileToken}
+                        className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60"
+                        style={{ backgroundColor: bg, color: "white" }}
+                      >
+                        Confirm
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>
