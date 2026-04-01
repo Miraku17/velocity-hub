@@ -221,6 +221,25 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid reservation type" }, { status: 400 })
   }
 
+  // Fetch the court's schedule to determine the correct hourly rate per time slot
+  const bookingDayOfWeek = new Date(date + "T00:00:00").getDay()
+  const { data: courtData } = await supabase
+    .from("courts")
+    .select("price_per_hour, court_schedules(*)")
+    .eq("id", court_id)
+    .single()
+
+  const basePrice: number = courtData?.price_per_hour ?? 0
+  const schedule = (courtData?.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
+    ?.find((s) => s.day_of_week === bookingDayOfWeek)
+  const hourlyRates = schedule?.hourly_rates ?? null
+
+  /** Return the correct rate for a given start hour */
+  function getHourRate(startHour: number): number {
+    if (!hourlyRates) return basePrice
+    return hourlyRates[String(startHour)] ?? basePrice
+  }
+
   // Generate a shared group ID when booking multiple non-contiguous blocks
   const bookingGroupId = blocks.length > 1
     ? crypto.randomUUID()
@@ -255,13 +274,26 @@ export async function POST(request: NextRequest) {
     const reservationId = data as string
     ids.push(reservationId)
 
-    // Stamp the booking_group_id so all blocks are linked as one booking
-    if (bookingGroupId) {
-      await supabase
-        .from("reservations")
-        .update({ booking_group_id: bookingGroupId })
-        .eq("id", reservationId)
+    // Compute the correct price_per_hour and total_amount using hourly rates
+    const startHour = parseInt(block.start_time.split(":")[0], 10)
+    const endHour = parseInt(block.end_time.split(":")[0], 10)
+    const durationHours = endHour > startHour ? endHour - startHour : 24 - startHour + endHour
+    let correctTotal = 0
+    for (let h = startHour; h < startHour + durationHours; h++) {
+      correctTotal += getHourRate(h % 24)
     }
+    // For price_per_hour, use the average rate across the block's hours
+    const correctRate = durationHours > 0 ? correctTotal / durationHours : basePrice
+
+    // Update with correct rate, total, and optional group ID
+    await supabase
+      .from("reservations")
+      .update({
+        price_per_hour: correctRate,
+        total_amount: correctTotal,
+        ...(bookingGroupId ? { booking_group_id: bookingGroupId } : {}),
+      })
+      .eq("id", reservationId)
   }
 
   // Send ONE admin notification email with all slots (non-blocking)

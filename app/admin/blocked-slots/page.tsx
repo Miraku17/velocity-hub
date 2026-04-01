@@ -266,10 +266,10 @@ function BlockFormModal({
   return (
     <>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <form
           onSubmit={handleSubmit}
-          className="relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
+          className="relative w-full max-w-md max-h-[90vh] flex flex-col rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -564,9 +564,9 @@ function UnblockModal({
   return (
     <>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <div
-          className="w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-2xl pointer-events-auto"
+          className="w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-center">

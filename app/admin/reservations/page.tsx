@@ -211,13 +211,16 @@ function WalkInModal({
     <>
       <div
         className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-        onMouseDown={() => !createMutation.isPending && onClose()}
+        onClick={() => !createMutation.isPending && onClose()}
       />
-      <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 pt-[5vh] pointer-events-none">
+      <div
+        className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 pt-[5vh]"
+        onClick={() => !createMutation.isPending && onClose()}
+      >
         <form
           onSubmit={handleSubmit}
-          className="relative w-full max-w-lg rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
-          onMouseDown={(e) => e.stopPropagation()}
+          className="relative w-full max-w-lg rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-outline-variant/15 px-6 py-5">
@@ -527,12 +530,15 @@ function ReservationDetailModal({
     <>
       <div
         className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-        onMouseDown={onClose}
+        onClick={onClose}
       />
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+        onClick={onClose}
+      >
         <div
-          className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
-          onMouseDown={(e) => e.stopPropagation()}
+          className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-outline-variant/15 bg-surface-container-lowest px-6 py-4">
@@ -786,8 +792,8 @@ function ReservationDetailModal({
                 className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm"
                 onClick={() => setLightboxUrl(null)}
               />
-              <div className="fixed inset-0 z-[80] flex items-center justify-center p-8 pointer-events-none">
-                <div className="relative max-h-[85vh] max-w-[90vw] pointer-events-auto">
+              <div className="fixed inset-0 z-[80] flex items-center justify-center p-8" onClick={() => setLightboxUrl(null)}>
+                <div className="relative max-h-[85vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
                   <img
                     src={lightboxUrl}
                     alt="Payment proof"
@@ -847,8 +853,11 @@ function ConfirmationModal({
   return (
     <>
       <div className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
-        <div className="relative w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto">
+      <div className="fixed inset-0 z-[201] flex items-center justify-center p-4" onClick={onCancel}>
+        <div
+          className="relative w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="px-6 pt-6 pb-2">
             <h3 className="font-headline text-base font-bold text-on-surface">{title}</h3>
             <p className="mt-2 font-body text-sm text-on-surface-variant">{message}</p>

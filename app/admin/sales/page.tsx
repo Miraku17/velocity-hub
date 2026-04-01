@@ -387,9 +387,9 @@ function SaleDetailModal({
   return (
     <>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <div
-          className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl pointer-events-auto"
+          className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

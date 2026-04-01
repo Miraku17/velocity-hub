@@ -122,12 +122,36 @@ export async function POST(request: NextRequest) {
 
     if (!resError && resData) {
       reservationId = resData as string
-      // Auto-confirm and override total_amount with the manually entered amount
+
+      // Compute the correct hourly rate from the court's schedule
+      const dayOfWeek = new Date(entry_date + "T00:00:00").getDay()
+      const { data: courtInfo } = await adminClient
+        .from("courts")
+        .select("price_per_hour, court_schedules(*)")
+        .eq("id", court_id)
+        .single()
+
+      const courtBasePrice: number = courtInfo?.price_per_hour ?? 0
+      const daySchedule = (courtInfo?.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
+        ?.find((s) => s.day_of_week === dayOfWeek)
+      const rates = daySchedule?.hourly_rates ?? null
+
+      const sh = parseInt(start_time.split(":")[0], 10)
+      const eh = parseInt(end_time.split(":")[0], 10)
+      const hrs = eh > sh ? eh - sh : 24 - sh + eh
+      let correctTotal = 0
+      for (let h = sh; h < sh + hrs; h++) {
+        correctTotal += rates?.[String(h % 24)] ?? courtBasePrice
+      }
+      const correctRate = hrs > 0 ? correctTotal / hrs : courtBasePrice
+
+      // Auto-confirm and set correct rate; override total_amount if admin provided one
       await adminClient
         .from("reservations")
         .update({
           status: "confirmed",
-          ...(amount != null ? { total_amount: amount } : {}),
+          price_per_hour: correctRate,
+          ...(amount != null ? { total_amount: amount } : { total_amount: correctTotal }),
         })
         .eq("id", reservationId)
     }
