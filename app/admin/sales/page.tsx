@@ -6,7 +6,6 @@ import {
   type PaymentStatus,
   type Reservation,
 } from "@/lib/hooks/useReservations"
-import { useManualEntries } from "@/lib/hooks/useManualEntries"
 import { LoadingPage } from "@/components/ui/loading"
 
 /* ── Helpers ── */
@@ -530,7 +529,6 @@ export default function SalesPage() {
   const [monthFilter, setMonthFilter] = useState("")
   const [paymentFilter, setPaymentFilter] = useState("")
   const [detailSale, setDetailSale] = useState<Reservation | null>(null)
-  const [manualPage, setManualPage] = useState(1)
 
   const filters = {
     payment_status: (paymentFilter || undefined) as PaymentStatus | undefined,
@@ -554,40 +552,6 @@ export default function SalesPage() {
   const allSales = allResult?.data ?? []
   const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
 
-  const manualFilters: import("@/lib/hooks/useManualEntries").ManualEntryFilters = {
-    date: dateFilter || undefined,
-    month: monthFilter || undefined,
-    ...(weekFilter ? (() => {
-      const [yearStr, weekStr] = weekFilter.split("-W")
-      const year = Number(yearStr)
-      const week = Number(weekStr)
-      const jan4 = new Date(year, 0, 4)
-      const dayOfWeek = jan4.getDay() || 7
-      const monday = new Date(jan4)
-      monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7)
-      const sunday = new Date(monday)
-      sunday.setDate(monday.getDate() + 6)
-      return { date_from: monday.toISOString().slice(0, 10), date_to: sunday.toISOString().slice(0, 10) }
-    })() : {}),
-  }
-  const { data: manualEntries = [] } = useManualEntries(manualFilters)
-  const showManualEntries = !paymentFilter || paymentFilter === "paid"
-  const manualTotal = useMemo(
-    () => (showManualEntries ? manualEntries.reduce((sum, e) => sum + (e.amount ?? 0), 0) : 0),
-    [manualEntries, showManualEntries]
-  )
-
-  const MANUAL_PAGE_SIZE = 10
-  const manualVisible = manualPage * MANUAL_PAGE_SIZE
-  const paginatedManualEntries = useMemo(
-    () => manualEntries.slice(0, manualVisible),
-    [manualEntries, manualVisible]
-  )
-  const hasMoreManual = manualVisible < manualEntries.length
-
-  // Reset manual entries visible count when filters change
-  useEffect(() => { setManualPage(1) }, [dateFilter, weekFilter, monthFilter, paymentFilter])
-
   const summary = useMemo(() => {
     const s = { total: 0, paid: 0, pending: 0, refunded: 0, declined: 0 }
     for (const r of allSales) {
@@ -602,9 +566,8 @@ export default function SalesPage() {
         s.declined += r.total_amount
       }
     }
-    s.total += manualTotal
     return s
-  }, [allSales, manualTotal])
+  }, [allSales])
 
   const totalPages = pagination.totalPages
   const pageNumbers = Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
@@ -737,7 +700,7 @@ export default function SalesPage() {
       </div>
 
       {/* ── Summary Cards ── */}
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
           <p className="font-label text-[10px] font-bold uppercase tracking-widest text-outline">
             Total Revenue
@@ -752,22 +715,6 @@ export default function SalesPage() {
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#16A34A]">
             ₱{summary.paid.toFixed(2)}
-          </p>
-        </div>
-        <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
-          <p className="font-label text-[10px] font-bold uppercase tracking-widest text-[#D97706]">
-            Pending
-          </p>
-          <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#D97706]">
-            ₱{summary.pending.toFixed(2)}
-          </p>
-        </div>
-        <div className="rounded-xl border border-[#7C3AED]/20 bg-surface-container-lowest p-4">
-          <p className="font-label text-[10px] font-bold uppercase tracking-widest text-[#7C3AED]">
-            Manual Entries
-          </p>
-          <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#7C3AED]">
-            ₱{manualTotal.toFixed(2)}
           </p>
         </div>
       </div>
@@ -930,74 +877,6 @@ export default function SalesPage() {
               </svg>
             </button>
           </div>
-        </div>
-      )}
-
-      {/* ── Manual Entries ── */}
-      {showManualEntries && manualEntries.length > 0 && (
-        <div className="mt-8">
-          <div className="mb-3 flex items-center gap-2">
-            <h3 className="font-headline text-lg font-bold text-on-surface">Manual Entries</h3>
-            <span className="rounded bg-[#7C3AED]/10 px-2 py-0.5 font-label text-[9px] font-extrabold uppercase tracking-widest text-[#7C3AED]">
-              {manualEntries.filter((e) => e.amount != null).length} with amount
-            </span>
-          </div>
-          <div className="overflow-x-auto rounded-xl border border-outline-variant/15 bg-surface-container-lowest">
-            <table className="w-full min-w-[500px]">
-              <thead>
-                <tr className="border-b border-outline-variant/15">
-                  <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">Date</th>
-                  <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">Description</th>
-                  <th className="px-6 py-4 text-left font-label text-[10px] font-bold uppercase tracking-widest text-outline">Notes</th>
-                  <th className="px-6 py-4 text-right font-label text-[10px] font-bold uppercase tracking-widest text-outline">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedManualEntries.map((e) => (
-                  <tr key={e.id} className="border-b border-outline-variant/10 transition-colors hover:bg-surface-container-low/50">
-                    <td className="px-6 py-4">
-                      <span className="font-body text-sm text-on-surface">{formatDate(e.entry_date)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-body text-sm text-on-surface">{e.description}</span>
-                    </td>
-                    <td className="max-w-[200px] px-6 py-4">
-                      {e.notes ? (
-                        <p className="truncate font-body text-xs text-on-surface-variant" title={e.notes}>{e.notes}</p>
-                      ) : (
-                        <span className="font-body text-xs text-on-surface-variant/40">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {e.amount != null ? (
-                        <span className="font-headline text-sm font-bold text-[#16A34A]">₱{e.amount.toFixed(2)}</span>
-                      ) : (
-                        <span className="font-body text-xs text-on-surface-variant/40">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Load More */}
-          {hasMoreManual && (
-            <div className="mt-4 flex flex-col items-center gap-1.5">
-              <button
-                onClick={() => setManualPage((p) => p + 1)}
-                className="flex h-10 items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-6 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-                Load More
-              </button>
-              <span className="font-body text-[10px] text-on-surface-variant/60">
-                Showing {paginatedManualEntries.length} of {manualEntries.length}
-              </span>
-            </div>
-          )}
         </div>
       )}
 

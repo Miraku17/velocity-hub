@@ -19,24 +19,49 @@ export async function GET(request: NextRequest) {
   const date = params.get("date")
   const dateFrom = params.get("date_from")
   const dateTo = params.get("date_to")
+  const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1)
+  const limit = Math.max(1, Math.min(100, parseInt(params.get("limit") || "20", 10) || 20))
+  const offset = (page - 1) * limit
 
   let query = supabase
     .from("manual_entries")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("entry_date", { ascending: false })
     .order("created_at", { ascending: false })
 
-  if (date) query = query.eq("entry_date", date)
-  if (dateFrom) query = query.gte("entry_date", dateFrom)
-  if (dateTo) query = query.lte("entry_date", dateTo)
+  // Build a matching query for aggregates (no pagination)
+  let statsQuery = supabase
+    .from("manual_entries")
+    .select("amount")
 
-  const { data, error } = await query
+  if (date) { query = query.eq("entry_date", date); statsQuery = statsQuery.eq("entry_date", date) }
+  if (dateFrom) { query = query.gte("entry_date", dateFrom); statsQuery = statsQuery.gte("entry_date", dateFrom) }
+  if (dateTo) { query = query.lte("entry_date", dateTo); statsQuery = statsQuery.lte("entry_date", dateTo) }
+
+  query = query.range(offset, offset + limit - 1)
+
+  const [{ data, error, count }, { data: allEntries }] = await Promise.all([query, statsQuery])
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  return Response.json(data)
+  const totalAmount = (allEntries ?? []).reduce((sum, e) => sum + (e.amount ?? 0), 0)
+  const notesOnly = (allEntries ?? []).filter((e) => !e.amount).length
+
+  return Response.json({
+    data,
+    pagination: {
+      page,
+      limit,
+      total: count ?? 0,
+      totalPages: Math.ceil((count ?? 0) / limit),
+    },
+    stats: {
+      totalAmount,
+      notesOnly,
+    },
+  })
 }
 
 // POST /api/manual-entries — create a new entry (admin only)
@@ -89,7 +114,7 @@ export async function POST(request: NextRequest) {
         p_customer_phone: "Manual Input",
         p_date: entry_date,
         p_start_time: start_time,
-        p_end_time: end_time <= start_time ? "23:59:00" : end_time,
+        p_end_time: end_time,
         p_reservation_type: "walk-in",
         p_notes: description + (notes ? ` — ${notes}` : ""),
       }
@@ -97,10 +122,13 @@ export async function POST(request: NextRequest) {
 
     if (!resError && resData) {
       reservationId = resData as string
-      // Auto-confirm the reservation
+      // Auto-confirm and override total_amount with the manually entered amount
       await adminClient
         .from("reservations")
-        .update({ status: "confirmed" })
+        .update({
+          status: "confirmed",
+          ...(amount != null ? { total_amount: amount } : {}),
+        })
         .eq("id", reservationId)
     }
   }
@@ -147,6 +175,26 @@ export async function DELETE(request: NextRequest) {
 
   if (!id) {
     return Response.json({ error: "id is required" }, { status: 400 })
+  }
+
+  // Fetch the entry first to find its matching reservation
+  const { data: entry } = await supabase
+    .from("manual_entries")
+    .select("court_id, entry_date, start_time, end_time")
+    .eq("id", id)
+    .single()
+
+  // Cancel the matching reservation if one exists
+  if (entry?.court_id && entry?.start_time && entry?.end_time) {
+    const adminClient = createAdminClient()
+    await adminClient
+      .from("reservations")
+      .delete()
+      .eq("court_id", entry.court_id)
+      .eq("reservation_date", entry.entry_date)
+      .eq("start_time", entry.start_time)
+      .eq("end_time", entry.end_time)
+      .eq("customer_email", "Manual Input")
   }
 
   const { error } = await supabase

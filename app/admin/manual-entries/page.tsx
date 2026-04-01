@@ -497,6 +497,8 @@ function DeleteModal({
 /* ── Page ── */
 
 export default function ManualEntriesPage() {
+  const PAGE_SIZE = 20
+  const [currentPage, setCurrentPage] = useState(1)
   const [dateFilter, setDateFilter] = useState("")
   const [monthFilter, setMonthFilter] = useState("")
   const [showForm, setShowForm] = useState(false)
@@ -506,18 +508,18 @@ export default function ManualEntriesPage() {
   const filters = {
     date: dateFilter || undefined,
     month: monthFilter || undefined,
+    page: currentPage,
+    limit: PAGE_SIZE,
   }
 
-  const { data: entries, isLoading } = useManualEntries(filters)
+  const { data: result, isLoading } = useManualEntries(filters)
+  const entries = result?.data
+  const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
+  const stats = result?.stats ?? { totalAmount: 0, notesOnly: 0 }
   const { data: courts = [] } = useCourts()
   const createMutation = useCreateManualEntry()
   const updateMutation = useUpdateManualEntry()
   const deleteMutation = useDeleteManualEntry()
-
-  const totalAmount = useMemo(() => {
-    if (!entries) return 0
-    return entries.reduce((sum, e) => sum + (e.amount ?? 0), 0)
-  }, [entries])
 
   function handleSave(data: EntryFormData) {
     const payload = {
@@ -597,7 +599,7 @@ export default function ManualEntriesPage() {
             <input
               type="month"
               value={monthFilter}
-              onChange={(e) => { setMonthFilter(e.target.value); setDateFilter("") }}
+              onChange={(e) => { setMonthFilter(e.target.value); setDateFilter(""); setCurrentPage(1) }}
               className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
             />
           </div>
@@ -609,14 +611,14 @@ export default function ManualEntriesPage() {
             <input
               type="date"
               value={dateFilter}
-              onChange={(e) => { setDateFilter(e.target.value); setMonthFilter("") }}
+              onChange={(e) => { setDateFilter(e.target.value); setMonthFilter(""); setCurrentPage(1) }}
               className="h-[38px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
             />
           </div>
 
           {(dateFilter || monthFilter) && (
             <button
-              onClick={() => { setDateFilter(""); setMonthFilter("") }}
+              onClick={() => { setDateFilter(""); setMonthFilter(""); setCurrentPage(1) }}
               className="mt-auto flex h-[38px] items-center gap-1.5 rounded-md bg-surface-container-high px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -647,7 +649,7 @@ export default function ManualEntriesPage() {
             Total Entries
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-            {entries?.length ?? 0}
+            {pagination.total.toLocaleString()}
           </p>
         </div>
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
@@ -655,7 +657,7 @@ export default function ManualEntriesPage() {
             Total Amount
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#16A34A]">
-            ₱{totalAmount.toFixed(2)}
+            ₱{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
@@ -663,7 +665,7 @@ export default function ManualEntriesPage() {
             Notes Only
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-            {entries?.filter((e) => !e.amount).length ?? 0}
+            {stats.notesOnly.toLocaleString()}
           </p>
         </div>
       </div>
@@ -737,7 +739,7 @@ export default function ManualEntriesPage() {
                     <td className="px-6 py-5 text-right">
                       {entry.amount != null ? (
                         <span className="font-headline text-sm font-bold text-[#16A34A]">
-                          ₱{entry.amount.toFixed(2)}
+                          ₱{entry.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       ) : (
                         <span className="font-body text-xs text-on-surface-variant">—</span>
@@ -803,6 +805,65 @@ export default function ManualEntriesPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ── Pagination ── */}
+      {!isLoading && pagination.total > 0 && (
+        (() => {
+          const totalPages = pagination.totalPages
+          const pageNumbers = Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+            if (totalPages <= 5) return i + 1
+            const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4))
+            return start + i
+          })
+          return (
+            <div className="mt-4 flex items-center justify-between">
+              <span className="font-body text-xs font-medium tracking-tight text-on-surface-variant">
+                Showing{" "}
+                <span className="font-bold text-on-surface">
+                  {(pagination.page - 1) * pagination.limit + 1}-
+                  {Math.min(pagination.page * pagination.limit, pagination.total)}
+                </span>{" "}
+                of{" "}
+                <span className="font-bold text-on-surface">{pagination.total}</span>{" "}
+                entries
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest text-outline transition-colors disabled:opacity-50 hover:text-primary"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                {pageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg border font-nav text-sm font-bold transition-colors ${
+                      currentPage === page
+                        ? "border-primary bg-primary text-on-primary shadow-sm shadow-primary/20"
+                        : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest text-outline transition-colors disabled:opacity-50 hover:text-primary"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )
+        })()
       )}
     </div>
   )
