@@ -64,6 +64,15 @@ function formatTime12(time: string): string {
   return `${hour12}:00 ${ampm}`;
 }
 
+/** Given a slot like "7:00 AM", return the next hour label e.g. "8:00 AM" */
+function nextHourLabel(slot: string): string {
+  const h24 = parse12Hour(slot);
+  const next = (h24 + 1) % 24;
+  const hour12 = next === 0 ? 12 : next > 12 ? next - 12 : next;
+  const ampm = next < 12 ? "AM" : "PM";
+  return `${hour12}:00 ${ampm}`;
+}
+
 /** Convert "7:00 AM" to 24h hour number (e.g. 7, or "12:00 AM" → 0) */
 function parse12Hour(slot: string): number {
   const [timePart, ampm] = slot.split(" ");
@@ -970,7 +979,7 @@ function BookingPage() {
                                 className="block text-xs sm:text-sm font-bold font-[Poppins]"
                                 style={{ textDecoration: isUnavailable ? "line-through" : "none" }}
                               >
-                                {t}
+                                {t} – {nextHourLabel(t)}
                               </span>
                               {isUnavailable ? (
                                 <span
