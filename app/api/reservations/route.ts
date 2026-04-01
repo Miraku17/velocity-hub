@@ -7,6 +7,50 @@ import {
 import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
 import { rateLimit } from "@/lib/rate-limit"
 
+/**
+ * Try to parse a search string as a date and return "YYYY-MM-DD" or null.
+ * Supports: "2026-04-14", "04/14/2026", "Apr 14 2026", "April 14", "Apr 14", etc.
+ */
+function tryParseDate(input: string): string | null {
+  // ISO format: 2026-04-14
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const d = new Date(input + "T00:00:00")
+    if (!isNaN(d.getTime())) return input
+  }
+
+  // MM/DD/YYYY or MM-DD-YYYY
+  const slashMatch = input.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (slashMatch) {
+    const [, m, d, y] = slashMatch
+    const date = new Date(Number(y), Number(m) - 1, Number(d))
+    if (!isNaN(date.getTime())) {
+      return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`
+    }
+  }
+
+  // Natural language: "Apr 14 2026", "April 14, 2026", "Apr 14" (defaults to current year)
+  const monthNames: Record<string, number> = {
+    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+    apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+    aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+    nov: 10, november: 10, dec: 11, december: 11,
+  }
+  const naturalMatch = input.match(/^([a-zA-Z]+)\s+(\d{1,2})(?:\s+(\d{4}))?$/)
+  if (naturalMatch) {
+    const monthIdx = monthNames[naturalMatch[1].toLowerCase()]
+    if (monthIdx !== undefined) {
+      const day = Number(naturalMatch[2])
+      const year = naturalMatch[3] ? Number(naturalMatch[3]) : new Date().getFullYear()
+      const date = new Date(year, monthIdx, day)
+      if (!isNaN(date.getTime()) && date.getMonth() === monthIdx) {
+        return `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      }
+    }
+  }
+
+  return null
+}
+
 // GET /api/reservations — list reservations (admin: all via view, public: by email)
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -41,9 +85,18 @@ export async function GET(request: NextRequest) {
     // Sanitize search input: remove characters that could manipulate PostgREST filter syntax
     const sanitized = search.replace(/[,.()"'\\]/g, "")
     if (sanitized) {
-      query = query.or(
-        `customer_name.ilike.%${sanitized}%,customer_email.ilike.%${sanitized}%,customer_phone.ilike.%${sanitized}%,reservation_code.ilike.%${sanitized}%`
-      )
+      // Try to parse as a date so users can search by date (e.g. "Apr 14", "2026-04-14", "04/14/2026")
+      const parsedDate = tryParseDate(sanitized)
+      const orFilters = [
+        `customer_name.ilike.%${sanitized}%`,
+        `customer_email.ilike.%${sanitized}%`,
+        `customer_phone.ilike.%${sanitized}%`,
+        `reservation_code.ilike.%${sanitized}%`,
+      ]
+      if (parsedDate) {
+        orFilters.push(`reservation_date.eq.${parsedDate}`)
+      }
+      query = query.or(orFilters.join(","))
     }
   }
 

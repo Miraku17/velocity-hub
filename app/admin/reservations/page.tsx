@@ -1103,7 +1103,7 @@ export default function ReservationsPage() {
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name, email, phone, or code..."
+            placeholder="Search by name, email, phone, code, or date..."
             className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-2.5 pl-10 pr-10 font-body text-sm text-on-surface placeholder:text-outline outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           {searchInput && (
