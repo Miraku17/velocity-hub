@@ -654,7 +654,7 @@ export default function SalesPage() {
             <span className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-outline">
               Payment
             </span>
-            <Select value={paymentFilter || "all"} onValueChange={(v) => { setPaymentFilter(v === "all" ? "" : v); setCurrentPage(1) }}>
+            <Select value={paymentFilter || "all"} onValueChange={(v) => { setPaymentFilter(!v || v === "all" ? "" : v); setCurrentPage(1) }}>
               <SelectTrigger className="h-[38px] w-[140px] rounded-lg border border-outline-variant/30 bg-surface-container-lowest font-body text-sm text-on-surface">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
