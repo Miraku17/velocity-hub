@@ -43,6 +43,17 @@ types/                # Shared TypeScript types
 - **Data fetching:** Use TanStack Query for client-side fetching. Use Next.js server components / `fetch` for server-side data.
 - **State:** Zustand for client-side UI state (booking cart, filters). Do not use Zustand for server-cached data — that's TanStack Query's job.
 
+## API Security
+- **All GET endpoints that return customer PII (name, email, phone) MUST require admin auth.** Use `getAuthenticatedUser()` + `checkIsAdmin()` from `@/lib/supabase/auth`.
+- Public (unauthenticated) API access must be scoped: require specific filters (e.g. `court_id` + `date`) and return only non-sensitive fields (e.g. `start_time`, `end_time`, `status`).
+- The reservations table is accessed via `reservations_view` (not `reservations` directly). The date column is `reservation_date`.
+- POST/PATCH/DELETE on admin resources must verify admin role. POST for public bookings uses rate limiting instead of auth.
+
+## Mobile / Android Compatibility
+- **Never use `pointer-events-none` + `pointer-events-auto` for modal overlays.** Android browsers don't reliably propagate touch events through `pointer-events: none` ancestors. Instead, use `onClick` on the overlay container with `e.stopPropagation()` on the inner card.
+- **Use `onClick` instead of `onMouseDown`** for modal dismiss handlers — `onMouseDown` doesn't reliably fire on touch devices.
+- **Use the `<Portal>` component (`@/components/ui/portal`) for all modals** in admin pages. Modals rendered inside `<main class="overflow-y-auto">` can have broken `fixed` positioning on Android. Portal renders them at `document.body`.
+
 ## Supabase
 - Store the Supabase URL and anon key in `.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Use Row Level Security (RLS) policies — even without auth, RLS should restrict writes appropriately.

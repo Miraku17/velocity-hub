@@ -170,6 +170,52 @@ function BookingPage() {
   const [selectedCourt, setSelectedCourt] = useState<string | null>(saved?.selectedCourt || null);
   const [selectedSlots, setSelectedSlots] = useState<string[]>(saved?.selectedSlots || []);
 
+  // Calendar availability: fetch slot counts for the visible date range
+  const todayStr = useMemo(() => {
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, [today]);
+  const maxDateStr = useMemo(() => {
+    const y = maxDate.getFullYear();
+    const m = String(maxDate.getMonth() + 1).padStart(2, "0");
+    const d = String(maxDate.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, [maxDate]);
+
+  const { data: calendarAvailability } = useQuery<
+    Record<string, { total: number; booked: number; available: number }>
+  >({
+    queryKey: ["calendar-availability", todayStr, maxDateStr, selectedCourt],
+    queryFn: async () => {
+      const params = new URLSearchParams({ date_from: todayStr, date_to: maxDateStr });
+      if (selectedCourt) params.set("court_id", selectedCourt);
+      const res = await fetch(`/api/calendar-availability?${params}`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  // Compute calendar day modifiers for coloring
+  const calendarModifiers = useMemo(() => {
+    if (!calendarAvailability) return {};
+    const hasSlots: Date[] = [];
+    const fullyBooked: Date[] = [];
+    for (const [dateStr, info] of Object.entries(calendarAvailability)) {
+      if (info.total === 0) {
+        // No schedule / all day blocked — treat as unavailable
+        fullyBooked.push(new Date(dateStr + "T00:00:00"));
+      } else if (info.available === 0) {
+        fullyBooked.push(new Date(dateStr + "T00:00:00"));
+      } else {
+        hasSlots.push(new Date(dateStr + "T00:00:00"));
+      }
+    }
+    return { hasSlots, fullyBooked };
+  }, [calendarAvailability]);
+
   // Persist step to URL and all form data to sessionStorage
   const setStep = useCallback((newStep: number) => {
     setStepState(newStep);
@@ -506,6 +552,16 @@ function BookingPage() {
       }
     }
 
+    // Upload receipt first — if it fails, don't create the reservation
+    let preUploadedPath: string | null = null;
+    if (receiptFile) {
+      preUploadedPath = await preUploadReceipt();
+      if (!preUploadedPath) {
+        toast.error("Receipt upload failed. Please try again.");
+        return;
+      }
+    }
+
     // Send all time blocks in a single request (single turnstile verification)
     createReservation.mutate(
       {
@@ -521,17 +577,28 @@ function BookingPage() {
       },
       {
         onSuccess: async (data) => {
+          // Link pre-uploaded receipt to the reservation
+          if (preUploadedPath) {
+            try {
+              await fetch("/api/payment-receipts/link", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ storage_path: preUploadedPath, reservation_id: data.id }),
+              });
+            } catch {
+              console.error("Failed to link receipt, but reservation is created");
+            }
+          }
           setShowConfirmModal(false);
           setReservationId(data.id);
           setBookingConfirmed(true);
           sessionStorage.removeItem(STORAGE_KEY);
-          if (receiptFile) {
-            await uploadReceiptToServer(data.id);
-          }
+          queryClient.invalidateQueries({ queryKey: ["calendar-availability"] });
         },
         onError: (err) => {
           toast.error(err.message || "Something went wrong. Please try again.");
           queryClient.invalidateQueries({ queryKey: ["slot-availability", selectedCourt, dateStr] });
+          queryClient.invalidateQueries({ queryKey: ["calendar-availability"] });
         },
       }
     );
@@ -551,7 +618,7 @@ function BookingPage() {
   }
 
   // Upload receipt to server after reservation is created
-  async function uploadReceiptToServer(resId: string) {
+  async function uploadReceiptToServer(resId: string): Promise<void> {
     if (!receiptFile) return;
     setUploadingReceipt(true);
     setReceiptUploadFailed(false);
@@ -564,7 +631,6 @@ function BookingPage() {
         const err = await res.json();
         console.error("Receipt upload failed:", err.error);
         setReceiptUploadFailed(true);
-        toast.error("Receipt upload failed. You can retry below.");
       } else {
         const data = await res.json();
         setReceiptUrl(data.image_url);
@@ -573,9 +639,33 @@ function BookingPage() {
     } catch {
       console.error("Receipt upload failed");
       setReceiptUploadFailed(true);
-      toast.error("Receipt upload failed. You can retry below.");
     }
     setUploadingReceipt(false);
+  }
+
+  // Pre-upload receipt before creating the reservation
+  // Returns the uploaded image URL, or null on failure
+  async function preUploadReceipt(): Promise<string | null> {
+    if (!receiptFile) return null;
+    setUploadingReceipt(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", receiptFile);
+      const res = await fetch("/api/payment-receipts/pre-upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Receipt pre-upload failed:", err.error);
+        setUploadingReceipt(false);
+        return null;
+      }
+      const data = await res.json();
+      setUploadingReceipt(false);
+      return data.storage_path as string;
+    } catch {
+      console.error("Receipt pre-upload failed");
+      setUploadingReceipt(false);
+      return null;
+    }
   }
 
   // Colors
@@ -817,10 +907,22 @@ function BookingPage() {
                         selected={selectedDate}
                         onSelect={(date) => date && handleDateChange(date)}
                         disabled={{ before: today, after: maxDate }}
+                        modifiers={calendarModifiers}
                         className="bg-white"
                       />
                     </div>
-                    <p className="font-[Poppins] text-[10px] sm:text-[11px] mt-3" style={{ color: `${bg}40` }}>
+                    {/* Calendar legend */}
+                    <div className="flex items-center gap-4 mt-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                        <span className="font-[Poppins] text-[10px]" style={{ color: `${bg}50` }}>Available</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
+                        <span className="font-[Poppins] text-[10px]" style={{ color: `${bg}50` }}>Fully Booked</span>
+                      </div>
+                    </div>
+                    <p className="font-[Poppins] text-[10px] sm:text-[11px] mt-2" style={{ color: `${bg}40` }}>
                       Selected: <span className="font-semibold" style={{ color: `${bg}99` }}>{formattedDate}</span>
                     </p>
                   </div>

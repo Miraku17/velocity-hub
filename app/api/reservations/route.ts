@@ -2,6 +2,7 @@ import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
 } from "@/lib/supabase/auth"
 import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
@@ -51,18 +52,50 @@ function tryParseDate(input: string): string | null {
   return null
 }
 
-// GET /api/reservations — list reservations (admin: all via view, public: by email)
+// GET /api/reservations — list reservations
+// Public: requires court_id + date, returns only slot data (no PII)
+// Admin: full access with search, filters, pagination
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const params = request.nextUrl.searchParams
+  const user = await getAuthenticatedUser()
+  const isAdmin = user ? await checkIsAdmin() : false
 
   const date = params.get("date")
+  const courtId = params.get("court_id")
+
+  // Public (unauthenticated) access: only slot availability lookups
+  if (!isAdmin) {
+    if (!courtId || !date) {
+      return Response.json(
+        { error: "court_id and date are required" },
+        { status: 400 }
+      )
+    }
+
+    const { data, error } = await supabase
+      .from("reservations_view")
+      .select("start_time, end_time, status")
+      .eq("court_id", courtId)
+      .eq("reservation_date", date)
+      .neq("status", "cancelled")
+
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 })
+    }
+
+    return Response.json({
+      data,
+      pagination: { page: 1, limit: data?.length ?? 0, total: data?.length ?? 0, totalPages: 1 },
+    })
+  }
+
+  // Admin: full access
   const dateFrom = params.get("date_from")
   const dateTo = params.get("date_to")
   const status = params.get("status")
   const paymentStatus = params.get("payment_status")
   const courtType = params.get("court_type")
-  const courtId = params.get("court_id")
   const search = params.get("search")?.trim()
   const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1)
   const limit = Math.max(1, Math.min(100, parseInt(params.get("limit") || "20", 10) || 20))

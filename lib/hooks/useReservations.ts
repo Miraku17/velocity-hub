@@ -125,7 +125,7 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
   return res.json()
 }
 
-async function createReservation(input: ReservationInput): Promise<{ id: string }> {
+async function createReservation(input: ReservationInput): Promise<{ id: string; ids?: string[]; booking_group_id?: string | null }> {
   const res = await fetch("/api/reservations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
