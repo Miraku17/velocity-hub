@@ -515,15 +515,11 @@ export default function ManualEntriesPage() {
   const { data: result, isLoading } = useManualEntries(filters)
   const entries = result?.data
   const pagination = result?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 }
+  const stats = result?.stats ?? { totalAmount: 0, notesOnly: 0 }
   const { data: courts = [] } = useCourts()
   const createMutation = useCreateManualEntry()
   const updateMutation = useUpdateManualEntry()
   const deleteMutation = useDeleteManualEntry()
-
-  const totalAmount = useMemo(() => {
-    if (!entries) return 0
-    return entries.reduce((sum, e) => sum + (e.amount ?? 0), 0)
-  }, [entries])
 
   function handleSave(data: EntryFormData) {
     const payload = {
@@ -653,7 +649,7 @@ export default function ManualEntriesPage() {
             Total Entries
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-            {pagination.total}
+            {pagination.total.toLocaleString()}
           </p>
         </div>
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
@@ -661,7 +657,7 @@ export default function ManualEntriesPage() {
             Total Amount
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#16A34A]">
-            ₱{totalAmount.toFixed(2)}
+            ₱{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
@@ -669,7 +665,7 @@ export default function ManualEntriesPage() {
             Notes Only
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-            {entries?.filter((e) => !e.amount).length ?? 0}
+            {stats.notesOnly.toLocaleString()}
           </p>
         </div>
       </div>
@@ -743,7 +739,7 @@ export default function ManualEntriesPage() {
                     <td className="px-6 py-5 text-right">
                       {entry.amount != null ? (
                         <span className="font-headline text-sm font-bold text-[#16A34A]">
-                          ₱{entry.amount.toFixed(2)}
+                          ₱{entry.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       ) : (
                         <span className="font-body text-xs text-on-surface-variant">—</span>

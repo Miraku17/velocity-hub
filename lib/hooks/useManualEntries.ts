@@ -33,6 +33,10 @@ export interface PaginatedManualEntries {
     total: number
     totalPages: number
   }
+  stats?: {
+    totalAmount: number
+    notesOnly: number
+  }
 }
 
 export interface ManualEntryInput {
