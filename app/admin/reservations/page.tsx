@@ -454,7 +454,7 @@ function WalkInModal({
 /* ── Types ── */
 
 type GroupedReservation = Reservation & {
-  grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number }[]
+  grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number; price_per_hour: number }[]
 }
 
 /* ── Reservation Detail Modal ── */
@@ -652,27 +652,32 @@ function ReservationDetailModal({
                 <div className="flex justify-between font-body text-xs">
                   <span className="text-on-surface-variant">{res.court_name}</span>
                 </div>
-                <div className="flex justify-between font-body text-xs">
-                  <span className="text-on-surface-variant">Rate</span>
-                  <span className="text-on-surface">₱{Number(res.price_per_hour).toFixed(2)}/hr</span>
-                </div>
                 {res.grouped_slots ? (
-                  res.grouped_slots.map((slot, i) => {
-                    const sh = parseInt(slot.start_time.split(":")[0], 10)
-                    const eh = parseInt(slot.end_time.split(":")[0], 10)
-                    const hrs = eh > sh ? eh - sh : 24 - sh + eh
-                    return (
-                      <div key={slot.id} className="flex justify-between font-body text-xs">
-                        <span className="text-on-surface-variant">Slot {i + 1} ({formatTimeSlot(slot.start_time, slot.end_time)})</span>
-                        <span className="text-on-surface">{hrs}h · ₱{Number(slot.total_amount).toFixed(2)}</span>
-                      </div>
-                    )
-                  })
+                  <>
+                    {res.grouped_slots.map((slot, i) => {
+                      const sh = parseInt(slot.start_time.split(":")[0], 10)
+                      const eh = parseInt(slot.end_time.split(":")[0], 10)
+                      const hrs = eh > sh ? eh - sh : 24 - sh + eh
+                      const effectiveRate = hrs > 0 ? slot.total_amount / hrs : slot.price_per_hour
+                      return (
+                        <div key={slot.id} className="flex justify-between font-body text-xs">
+                          <span className="text-on-surface-variant">Slot {i + 1} ({formatTimeSlot(slot.start_time, slot.end_time)})</span>
+                          <span className="text-on-surface">{hrs}h × ₱{Number(effectiveRate).toFixed(2)} = ₱{Number(slot.total_amount).toFixed(2)}</span>
+                        </div>
+                      )
+                    })}
+                  </>
                 ) : (
-                  <div className="flex justify-between font-body text-xs">
-                    <span className="text-on-surface-variant">Duration</span>
-                    <span className="text-on-surface">{res.duration_hours}h</span>
-                  </div>
+                  <>
+                    <div className="flex justify-between font-body text-xs">
+                      <span className="text-on-surface-variant">Rate</span>
+                      <span className="text-on-surface">₱{(res.duration_hours > 0 ? res.total_amount / res.duration_hours : res.price_per_hour).toFixed(2)}/hr</span>
+                    </div>
+                    <div className="flex justify-between font-body text-xs">
+                      <span className="text-on-surface-variant">Duration</span>
+                      <span className="text-on-surface">{res.duration_hours}h</span>
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -927,7 +932,7 @@ export default function ReservationsPage() {
 
   // Group reservations sharing a booking_group_id into a single display row
   // The first reservation in the group is the "primary" (carries status, customer, court, receipt)
-  const reservations: (Reservation & { grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number }[] })[] = []
+  const reservations: (Reservation & { grouped_slots?: { id: string; start_time: string; end_time: string; total_amount: number; price_per_hour: number }[] })[] = []
   const seenGroupIds = new Set<string>()
   for (const res of rawReservations) {
     if (res.booking_group_id) {
@@ -941,7 +946,7 @@ export default function ReservationsPage() {
       reservations.push({
         ...primary,
         total_amount: siblings.reduce((sum, r) => sum + r.total_amount, 0),
-        grouped_slots: siblings.map((r) => ({ id: r.id, start_time: r.start_time, end_time: r.end_time, total_amount: r.total_amount })),
+        grouped_slots: siblings.map((r) => ({ id: r.id, start_time: r.start_time, end_time: r.end_time, total_amount: r.total_amount, price_per_hour: r.price_per_hour })),
       })
     } else {
       reservations.push(res)
