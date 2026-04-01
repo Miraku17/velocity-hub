@@ -570,7 +570,8 @@ export default function SalesPage() {
       return { date_from: monday.toISOString().slice(0, 10), date_to: sunday.toISOString().slice(0, 10) }
     })() : {}),
   }
-  const { data: manualEntries = [] } = useManualEntries(manualFilters)
+  const { data: manualResult } = useManualEntries({ ...manualFilters, limit: 100 })
+  const manualEntries = manualResult?.data ?? []
   const showManualEntries = !paymentFilter || paymentFilter === "paid"
   const manualTotal = useMemo(
     () => (showManualEntries ? manualEntries.reduce((sum, e) => sum + (e.amount ?? 0), 0) : 0),

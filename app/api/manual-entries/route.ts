@@ -19,10 +19,13 @@ export async function GET(request: NextRequest) {
   const date = params.get("date")
   const dateFrom = params.get("date_from")
   const dateTo = params.get("date_to")
+  const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1)
+  const limit = Math.max(1, Math.min(100, parseInt(params.get("limit") || "20", 10) || 20))
+  const offset = (page - 1) * limit
 
   let query = supabase
     .from("manual_entries")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("entry_date", { ascending: false })
     .order("created_at", { ascending: false })
 
@@ -30,13 +33,23 @@ export async function GET(request: NextRequest) {
   if (dateFrom) query = query.gte("entry_date", dateFrom)
   if (dateTo) query = query.lte("entry_date", dateTo)
 
-  const { data, error } = await query
+  query = query.range(offset, offset + limit - 1)
+
+  const { data, error, count } = await query
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  return Response.json(data)
+  return Response.json({
+    data,
+    pagination: {
+      page,
+      limit,
+      total: count ?? 0,
+      totalPages: Math.ceil((count ?? 0) / limit),
+    },
+  })
 }
 
 // POST /api/manual-entries — create a new entry (admin only)

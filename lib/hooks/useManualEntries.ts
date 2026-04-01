@@ -21,6 +21,18 @@ export interface ManualEntryFilters {
   date_from?: string
   date_to?: string
   month?: string // "YYYY-MM"
+  page?: number
+  limit?: number
+}
+
+export interface PaginatedManualEntries {
+  data: ManualEntry[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
 export interface ManualEntryInput {
@@ -46,7 +58,7 @@ export interface ManualEntryUpdate {
 
 /* ── Fetch helpers ── */
 
-async function fetchManualEntries(filters?: ManualEntryFilters): Promise<ManualEntry[]> {
+async function fetchManualEntries(filters?: ManualEntryFilters): Promise<PaginatedManualEntries> {
   const url = new URL("/api/manual-entries", window.location.origin)
   if (filters?.date) url.searchParams.set("date", filters.date)
   if (filters?.date_from) url.searchParams.set("date_from", filters.date_from)
@@ -57,6 +69,8 @@ async function fetchManualEntries(filters?: ManualEntryFilters): Promise<ManualE
     url.searchParams.set("date_from", `${filters.month}-01`)
     url.searchParams.set("date_to", `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`)
   }
+  if (filters?.page) url.searchParams.set("page", String(filters.page))
+  if (filters?.limit) url.searchParams.set("limit", String(filters.limit))
 
   const res = await fetch(url)
   if (!res.ok) {
