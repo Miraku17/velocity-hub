@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Input } from "@/components/ui/input"
+import { Portal } from "@/components/ui/portal"
 import { Label } from "@/components/ui/label"
 import { LoadingPage } from "@/components/ui/loading"
 import { useMe } from "@/lib/hooks/useTimeClock"
@@ -103,6 +104,7 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   if (!open) return null
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !submitting && onClose()} />
 
@@ -209,6 +211,7 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         )}
       </div>
     </div>
+    </Portal>
   )
 }
 

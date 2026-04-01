@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { LoadingPage } from "@/components/ui/loading"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useMe } from "@/lib/hooks/useTimeClock"
 
 /* ── Types ── */
 
@@ -126,6 +127,8 @@ function getRelativeTime(dateStr: string) {
 /* ── Component ── */
 
 export default function AdminOverview() {
+  const { data: me } = useMe()
+  const isAdmin = me?.role === "admin"
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
@@ -201,7 +204,7 @@ export default function AdminOverview() {
       </div>
 
       {/* ── Stats Row ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-4 ${isAdmin ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         {/* Total Bookings */}
         <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
           <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant">
@@ -224,18 +227,20 @@ export default function AdminOverview() {
           <p className="mt-1 font-body text-[11px] text-on-surface-variant">Scheduled today</p>
         </div>
 
-        {/* Revenue */}
-        <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
-          <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant">
-            Monthly Revenue
-          </p>
-          <p className="mt-2 font-headline text-3xl font-extrabold tracking-tight text-on-surface">
-            {formatCurrency(stats.month_revenue)}
-          </p>
-          <p className="mt-1 font-body text-[11px] text-on-surface-variant">
-            {now.toLocaleDateString("en-US", { month: "long" })}
-          </p>
-        </div>
+        {/* Revenue — admin only */}
+        {isAdmin && (
+          <div className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/20">
+            <p className="font-label text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface-variant">
+              Monthly Revenue
+            </p>
+            <p className="mt-2 font-headline text-3xl font-extrabold tracking-tight text-on-surface">
+              {formatCurrency(stats.month_revenue)}
+            </p>
+            <p className="mt-1 font-body text-[11px] text-on-surface-variant">
+              {now.toLocaleDateString("en-US", { month: "long" })}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Monthly Insights ── */}

@@ -7,6 +7,7 @@ import {
   type Reservation,
 } from "@/lib/hooks/useReservations"
 import { LoadingPage } from "@/components/ui/loading"
+import { Portal } from "@/components/ui/portal"
 import {
   Select,
   SelectContent,
@@ -385,7 +386,7 @@ function SaleDetailModal({
   const sb = getStatusBadge(res.status)
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <div
@@ -523,7 +524,7 @@ function SaleDetailModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 

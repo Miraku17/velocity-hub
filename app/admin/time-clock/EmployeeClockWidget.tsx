@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useClockIn, useClockOut, useTimeEntries, useMe } from "@/lib/hooks/useTimeClock"
+import { Portal } from "@/components/ui/portal"
 
 /* ── Elapsed Timer ── */
 
@@ -113,6 +114,7 @@ export default function EmployeeClockWidget() {
     <>
       {/* ── Confirmation Modal ── */}
       {confirmAction && (
+        <Portal>
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm"
@@ -187,6 +189,7 @@ export default function EmployeeClockWidget() {
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       {/* ── Widget ── */}

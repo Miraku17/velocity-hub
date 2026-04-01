@@ -10,6 +10,7 @@ import {
 } from "@/lib/hooks/useBlockedSlots"
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
+import { Portal } from "@/components/ui/portal"
 import {
   Select,
   SelectContent,
@@ -264,7 +265,7 @@ function BlockFormModal({
   const canSubmit = blockType === "day" || selectedSlots.length > 0
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <form
@@ -538,7 +539,7 @@ function BlockFormModal({
           </div>
         </form>
       </div>
-    </>
+    </Portal>
   )
 }
 
@@ -562,7 +563,7 @@ function UnblockModal({
     : "All Courts"
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <div
@@ -602,7 +603,7 @@ function UnblockModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 

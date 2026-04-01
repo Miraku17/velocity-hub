@@ -13,6 +13,7 @@ import {
 } from "@/lib/hooks/useReservations"
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { Button } from "@/components/ui/button"
+import { Portal } from "@/components/ui/portal"
 import {
   Select,
   SelectContent,
@@ -208,7 +209,7 @@ function WalkInModal({
   if (!open) return null
 
   return (
-    <>
+    <Portal>
       <div
         className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
         onClick={() => !createMutation.isPending && onClose()}
@@ -450,7 +451,7 @@ function WalkInModal({
           </div>
         </form>
       </div>
-    </>
+    </Portal>
   )
 }
 
@@ -527,7 +528,7 @@ function ReservationDetailModal({
   const pb = paymentBadge[res.payment_status] ?? paymentBadge.pending
 
   return (
-    <>
+    <Portal>
       <div
         className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
         onClick={onClose}
@@ -814,7 +815,7 @@ function ReservationDetailModal({
           )}
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 
@@ -851,7 +852,7 @@ function ConfirmationModal({
   if (!open) return null
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" onClick={onCancel} />
       <div className="fixed inset-0 z-[201] flex items-center justify-center p-4" onClick={onCancel}>
         <div
@@ -884,7 +885,7 @@ function ConfirmationModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 

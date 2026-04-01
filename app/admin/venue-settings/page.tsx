@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { Portal } from "@/components/ui/portal"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingPage } from "@/components/ui/loading"
@@ -704,7 +705,7 @@ export default function VenueSettingsPage() {
 
       {/* ── QR Code Modal ── */}
       {qrModal && (
-        <>
+        <Portal>
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setQrModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
@@ -870,7 +871,7 @@ export default function VenueSettingsPage() {
               </div>
             </div>
           </div>
-        </>
+        </Portal>
       )}
     </div>
   )

@@ -11,6 +11,7 @@ import {
 } from "@/lib/hooks/useManualEntries"
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
+import { Portal } from "@/components/ui/portal"
 import {
   Select,
   SelectContent,
@@ -266,7 +267,7 @@ function EntryFormModal({
   }
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <form
@@ -464,7 +465,7 @@ function EntryFormModal({
           </div>
         </form>
       </div>
-    </>
+    </Portal>
   )
 }
 
@@ -482,7 +483,7 @@ function DeleteModal({
   deleting: boolean
 }) {
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
         <div
@@ -521,7 +522,7 @@ function DeleteModal({
           </div>
         </div>
       </div>
-    </>
+    </Portal>
   )
 }
 
