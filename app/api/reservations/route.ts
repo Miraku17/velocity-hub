@@ -2,6 +2,7 @@ import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   getAuthenticatedUser,
+  checkIsAdmin,
   unauthorizedResponse,
 } from "@/lib/supabase/auth"
 import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
@@ -51,18 +52,50 @@ function tryParseDate(input: string): string | null {
   return null
 }
 
-// GET /api/reservations — list reservations (admin: all via view, public: by email)
+// GET /api/reservations — list reservations
+// Public: requires court_id + date, returns only slot data (no PII)
+// Admin: full access with search, filters, pagination
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const params = request.nextUrl.searchParams
+  const user = await getAuthenticatedUser()
+  const isAdmin = user ? await checkIsAdmin() : false
 
   const date = params.get("date")
+  const courtId = params.get("court_id")
+
+  // Public (unauthenticated) access: only slot availability lookups
+  if (!isAdmin) {
+    if (!courtId || !date) {
+      return Response.json(
+        { error: "court_id and date are required" },
+        { status: 400 }
+      )
+    }
+
+    const { data, error } = await supabase
+      .from("reservations_view")
+      .select("start_time, end_time, status")
+      .eq("court_id", courtId)
+      .eq("reservation_date", date)
+      .neq("status", "cancelled")
+
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 })
+    }
+
+    return Response.json({
+      data,
+      pagination: { page: 1, limit: data?.length ?? 0, total: data?.length ?? 0, totalPages: 1 },
+    })
+  }
+
+  // Admin: full access
   const dateFrom = params.get("date_from")
   const dateTo = params.get("date_to")
   const status = params.get("status")
   const paymentStatus = params.get("payment_status")
   const courtType = params.get("court_type")
-  const courtId = params.get("court_id")
   const search = params.get("search")?.trim()
   const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1)
   const limit = Math.max(1, Math.min(100, parseInt(params.get("limit") || "20", 10) || 20))
@@ -139,7 +172,29 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createClient()
-  const body = await request.json()
+
+  // Parse body — supports JSON or FormData (when a receipt file is attached)
+  let body: Record<string, unknown>
+  let receiptFile: File | null = null
+  const contentType = request.headers.get("content-type") ?? ""
+
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData()
+    body = JSON.parse(formData.get("data") as string)
+    const file = formData.get("receipt") as File | null
+    if (file && file.size > 0) {
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+      if (!allowedTypes.includes(file.type)) {
+        return Response.json({ error: "Receipt must be JPEG, PNG, WebP, or GIF" }, { status: 400 })
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return Response.json({ error: "Receipt must be under 10MB" }, { status: 400 })
+      }
+      receiptFile = file
+    }
+  } else {
+    body = await request.json()
+  }
 
   const {
     court_id,
@@ -347,6 +402,45 @@ export async function POST(request: NextRequest) {
         ...(bookingGroupId ? { booking_group_id: bookingGroupId } : {}),
       })
       .eq("id", reservationId)
+  }
+
+  // Upload receipt if provided — if this fails, roll back all reservations
+  if (receiptFile) {
+    const { createAdminClient } = await import("@/lib/supabase/admin")
+    const adminClient = createAdminClient()
+
+    const ext = receiptFile.name.split(".").pop() || "jpg"
+    const storagePath = `${ids[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+    const arrayBuffer = await receiptFile.arrayBuffer()
+    const { data: uploadData, error: uploadErr } = await adminClient.storage
+      .from("receipts")
+      .upload(storagePath, arrayBuffer, {
+        contentType: receiptFile.type,
+        upsert: false,
+      })
+
+    if (uploadErr) {
+      // Roll back — delete all reservations created in this request
+      await adminClient
+        .from("reservations")
+        .delete()
+        .in("id", ids)
+      return Response.json({ error: "Receipt upload failed. Please try again." }, { status: 500 })
+    }
+
+    const { data: urlData } = adminClient.storage
+      .from("receipts")
+      .getPublicUrl(uploadData.path)
+
+    // Save receipt record linked to the first reservation
+    await adminClient
+      .from("payment_receipts")
+      .insert({
+        reservation_id: ids[0],
+        image_url: urlData.publicUrl,
+        storage_path: uploadData.path,
+      })
   }
 
   // Send ONE admin notification email with all slots (non-blocking)

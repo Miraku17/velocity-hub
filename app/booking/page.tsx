@@ -142,8 +142,6 @@ function BookingPage() {
   // Payment & receipt state
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  const [uploadingReceipt, setUploadingReceipt] = useState(false);
-  const [receiptUploadFailed, setReceiptUploadFailed] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [selectedQrIndex, setSelectedQrIndex] = useState(0);
   const [qrLightbox, setQrLightbox] = useState(false);
@@ -169,6 +167,52 @@ function BookingPage() {
   );
   const [selectedCourt, setSelectedCourt] = useState<string | null>(saved?.selectedCourt || null);
   const [selectedSlots, setSelectedSlots] = useState<string[]>(saved?.selectedSlots || []);
+
+  // Calendar availability: fetch slot counts for the visible date range
+  const todayStr = useMemo(() => {
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, [today]);
+  const maxDateStr = useMemo(() => {
+    const y = maxDate.getFullYear();
+    const m = String(maxDate.getMonth() + 1).padStart(2, "0");
+    const d = String(maxDate.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, [maxDate]);
+
+  const { data: calendarAvailability } = useQuery<
+    Record<string, { total: number; booked: number; available: number }>
+  >({
+    queryKey: ["calendar-availability", todayStr, maxDateStr, selectedCourt],
+    queryFn: async () => {
+      const params = new URLSearchParams({ date_from: todayStr, date_to: maxDateStr });
+      if (selectedCourt) params.set("court_id", selectedCourt);
+      const res = await fetch(`/api/calendar-availability?${params}`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  // Compute calendar day modifiers for coloring
+  const calendarModifiers = useMemo(() => {
+    if (!calendarAvailability) return {};
+    const hasSlots: Date[] = [];
+    const fullyBooked: Date[] = [];
+    for (const [dateStr, info] of Object.entries(calendarAvailability)) {
+      if (info.total === 0) {
+        // No schedule / all day blocked — treat as unavailable
+        fullyBooked.push(new Date(dateStr + "T00:00:00"));
+      } else if (info.available === 0) {
+        fullyBooked.push(new Date(dateStr + "T00:00:00"));
+      } else {
+        hasSlots.push(new Date(dateStr + "T00:00:00"));
+      }
+    }
+    return { hasSlots, fullyBooked };
+  }, [calendarAvailability]);
 
   // Persist step to URL and all form data to sessionStorage
   const setStep = useCallback((newStep: number) => {
@@ -506,7 +550,7 @@ function BookingPage() {
       }
     }
 
-    // Send all time blocks in a single request (single turnstile verification)
+    // Send all time blocks + receipt in a single request
     createReservation.mutate(
       {
         court_id: court.id,
@@ -518,6 +562,7 @@ function BookingPage() {
         end_time: parsedTimeRanges[0].end_time,
         ...(parsedTimeRanges.length > 1 ? { time_blocks: parsedTimeRanges } : {}),
         turnstile_token: turnstileToken || undefined,
+        receipt: receiptFile || undefined,
       },
       {
         onSuccess: async (data) => {
@@ -525,13 +570,12 @@ function BookingPage() {
           setReservationId(data.id);
           setBookingConfirmed(true);
           sessionStorage.removeItem(STORAGE_KEY);
-          if (receiptFile) {
-            await uploadReceiptToServer(data.id);
-          }
+          queryClient.invalidateQueries({ queryKey: ["calendar-availability"] });
         },
         onError: (err) => {
           toast.error(err.message || "Something went wrong. Please try again.");
           queryClient.invalidateQueries({ queryKey: ["slot-availability", selectedCourt, dateStr] });
+          queryClient.invalidateQueries({ queryKey: ["calendar-availability"] });
         },
       }
     );
@@ -550,33 +594,6 @@ function BookingPage() {
     if (receiptInputRef.current) receiptInputRef.current.value = "";
   }
 
-  // Upload receipt to server after reservation is created
-  async function uploadReceiptToServer(resId: string) {
-    if (!receiptFile) return;
-    setUploadingReceipt(true);
-    setReceiptUploadFailed(false);
-    try {
-      const formData = new FormData();
-      formData.append("file", receiptFile);
-      formData.append("reservation_id", resId);
-      const res = await fetch("/api/payment-receipts", { method: "POST", body: formData });
-      if (!res.ok) {
-        const err = await res.json();
-        console.error("Receipt upload failed:", err.error);
-        setReceiptUploadFailed(true);
-        toast.error("Receipt upload failed. You can retry below.");
-      } else {
-        const data = await res.json();
-        setReceiptUrl(data.image_url);
-        setReceiptUploadFailed(false);
-      }
-    } catch {
-      console.error("Receipt upload failed");
-      setReceiptUploadFailed(true);
-      toast.error("Receipt upload failed. You can retry below.");
-    }
-    setUploadingReceipt(false);
-  }
 
   // Colors
   const bg = "#182916";
@@ -817,10 +834,22 @@ function BookingPage() {
                         selected={selectedDate}
                         onSelect={(date) => date && handleDateChange(date)}
                         disabled={{ before: today, after: maxDate }}
+                        modifiers={calendarModifiers}
                         className="bg-white"
                       />
                     </div>
-                    <p className="font-[Poppins] text-[10px] sm:text-[11px] mt-3" style={{ color: `${bg}40` }}>
+                    {/* Calendar legend */}
+                    <div className="flex items-center gap-4 mt-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                        <span className="font-[Poppins] text-[10px]" style={{ color: `${bg}50` }}>Available</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
+                        <span className="font-[Poppins] text-[10px]" style={{ color: `${bg}50` }}>Fully Booked</span>
+                      </div>
+                    </div>
+                    <p className="font-[Poppins] text-[10px] sm:text-[11px] mt-2" style={{ color: `${bg}40` }}>
                       Selected: <span className="font-semibold" style={{ color: `${bg}99` }}>{formattedDate}</span>
                     </p>
                   </div>
@@ -1154,7 +1183,7 @@ function BookingPage() {
                       </div>
 
                       {/* Receipt image */}
-                      {receiptUrl && !receiptUploadFailed && (
+                      {receiptUrl && (
                         <div className="py-4" style={{ borderBottom: `1px dashed ${bg}15` }}>
                           <div className="flex items-center gap-1.5 mb-2">
                             <span className="material-symbols-outlined text-[14px]" style={{ color: `${bg}50`, fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
@@ -1168,28 +1197,6 @@ function BookingPage() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={receiptUrl} alt="Receipt" className="w-full max-h-36 object-contain bg-white" />
                           </div>
-                        </div>
-                      )}
-
-                      {/* Receipt upload failed — retry */}
-                      {receiptUploadFailed && reservationId && (
-                        <div className="py-4" style={{ borderBottom: `1px dashed ${bg}15` }}>
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <span className="material-symbols-outlined text-[14px]" style={{ color: "#dc2626", fontVariationSettings: "'FILL' 1" }}>error</span>
-                            <span className="font-[Poppins] text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#dc2626" }}>Receipt Upload Failed</span>
-                          </div>
-                          <p className="font-[Poppins] text-[11px] mb-3" style={{ color: `${bg}70` }}>
-                            Your booking is confirmed but the receipt failed to upload. Please retry so the admin can verify your payment.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => uploadReceiptToServer(reservationId)}
-                            disabled={uploadingReceipt}
-                            className="w-full rounded-lg px-4 py-2.5 font-[Poppins] text-xs font-semibold text-white transition-opacity disabled:opacity-50"
-                            style={{ backgroundColor: bg }}
-                          >
-                            {uploadingReceipt ? "Uploading..." : "Retry Upload"}
-                          </button>
                         </div>
                       )}
 
@@ -1329,7 +1336,7 @@ function BookingPage() {
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/gif"
                         onChange={handleReceiptUpload}
-                        disabled={uploadingReceipt}
+                        disabled={createReservation.isPending}
                         className="hidden"
                       />
 
@@ -1345,7 +1352,7 @@ function BookingPage() {
                           </div>
                           <button
                             onClick={() => receiptInputRef.current?.click()}
-                            disabled={uploadingReceipt}
+                            disabled={createReservation.isPending}
                             className="font-[Poppins] text-xs font-semibold underline"
                             style={{ color: `${bg}80` }}
                           >
@@ -1355,11 +1362,11 @@ function BookingPage() {
                       ) : (
                         <button
                           onClick={() => receiptInputRef.current?.click()}
-                          disabled={uploadingReceipt}
+                          disabled={createReservation.isPending}
                           className="w-full flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-8 transition-all hover:bg-white/80"
                           style={{ borderColor: `${bg}15`, backgroundColor: `${surface}` }}
                         >
-                          {uploadingReceipt ? (
+                          {createReservation.isPending ? (
                             <>
                               <div className="h-6 w-6 animate-spin rounded-full border-2" style={{ borderColor: `${bg}20`, borderTopColor: bg }} />
                               <span className="font-[Poppins] text-xs font-semibold" style={{ color: bg }}>Uploading...</span>
@@ -1580,29 +1587,36 @@ function BookingPage() {
 
                 {/* Actions */}
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowConfirmModal(false)}
-                    disabled={createReservation.isPending}
-                    className="flex-1 py-3 rounded-xl font-[Poppins] font-semibold text-sm transition-all disabled:opacity-40"
-                    style={{ border: `1px solid ${bg}12`, color: `${bg}80` }}
-                  >
-                    Go Back
-                  </button>
-                  <button
-                    onClick={() => { handleConfirmBooking(); }}
-                    disabled={createReservation.isPending || (!!TURNSTILE_SITE_KEY && !turnstileToken)}
-                    className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60"
-                    style={{ backgroundColor: bg, color: "white" }}
-                  >
-                    {createReservation.isPending ? (
+                  {createReservation.isPending ? (
+                    <button
+                      disabled
+                      className="w-full py-3 rounded-xl font-[Poppins] font-bold text-xs sm:text-sm uppercase tracking-wider transition-all disabled:opacity-80"
+                      style={{ backgroundColor: bg, color: "white" }}
+                    >
                       <span className="flex items-center justify-center gap-2">
                         <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                         Confirming...
                       </span>
-                    ) : (
-                      "Confirm"
-                    )}
-                  </button>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setShowConfirmModal(false)}
+                        className="flex-1 py-3 rounded-xl font-[Poppins] font-semibold text-sm transition-all"
+                        style={{ border: `1px solid ${bg}12`, color: `${bg}80` }}
+                      >
+                        Go Back
+                      </button>
+                      <button
+                        onClick={() => { handleConfirmBooking(); }}
+                        disabled={!!TURNSTILE_SITE_KEY && !turnstileToken}
+                        className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60"
+                        style={{ backgroundColor: bg, color: "white" }}
+                      >
+                        Confirm
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>

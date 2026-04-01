@@ -194,17 +194,22 @@ function CalendarDayButton({
     if (modifiers.focused) ref.current?.focus()
   }, [modifiers.focused])
 
+  const isSelected =
+    modifiers.selected &&
+    !modifiers.range_start &&
+    !modifiers.range_end &&
+    !modifiers.range_middle
+
+  const hasSlots = (modifiers as Record<string, boolean>).hasSlots
+  const fullyBooked = (modifiers as Record<string, boolean>).fullyBooked
+  const showDot = (hasSlots || fullyBooked) && !modifiers.disabled
+
   return (
     <Button
       variant="ghost"
       size="icon"
       data-day={day.date.toLocaleDateString(locale?.code)}
-      data-selected-single={
-        modifiers.selected &&
-        !modifiers.range_start &&
-        !modifiers.range_end &&
-        !modifiers.range_middle
-      }
+      data-selected-single={isSelected}
       data-range-start={modifiers.range_start}
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
@@ -214,7 +219,18 @@ function CalendarDayButton({
         className
       )}
       {...props}
-    />
+    >
+      {props.children}
+      {showDot && (
+        <span
+          className={cn(
+            "absolute bottom-1 left-1/2 -translate-x-1/2 h-[5px] w-[5px] rounded-full",
+            fullyBooked ? "bg-red-400" : "bg-emerald-400",
+            isSelected && "bg-white"
+          )}
+        />
+      )}
+    </Button>
   )
 }
 
