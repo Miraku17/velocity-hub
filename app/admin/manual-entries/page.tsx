@@ -67,6 +67,11 @@ function formatTime(t: string) {
 
 /* ── Entry Form Modal ── */
 
+interface TimeBlock {
+  start_time: string
+  end_time: string
+}
+
 interface EntryFormData {
   entry_date: string
   amount: number | null
@@ -75,6 +80,7 @@ interface EntryFormData {
   court_id: string | null
   start_time: string | null
   end_time: string | null
+  time_blocks?: TimeBlock[]
   id?: string
 }
 
@@ -217,11 +223,35 @@ function EntryFormModal({
     e.preventDefault()
     let startTime: string | null = null
     let endTime: string | null = null
+    let timeBlocks: TimeBlock[] | undefined
+
     if (selectedSlots.length > 0) {
       const hours = selectedSlots.map(parse12Hour).sort((a, b) => a - b)
-      startTime = `${String(hours[0]).padStart(2, "0")}:00:00`
-      endTime = `${String(hours[hours.length - 1] + 1).padStart(2, "0")}:00:00`
+
+      // Group contiguous slots into blocks
+      const blocks: { startH: number; endH: number }[] = []
+      let blockStart = hours[0]
+      let prev = hours[0]
+      for (let i = 1; i < hours.length; i++) {
+        if (hours[i] !== prev + 1) {
+          blocks.push({ startH: blockStart, endH: prev + 1 })
+          blockStart = hours[i]
+        }
+        prev = hours[i]
+      }
+      blocks.push({ startH: blockStart, endH: prev + 1 })
+
+      startTime = `${String(blocks[0].startH).padStart(2, "0")}:00:00`
+      endTime = `${String(blocks[0].endH).padStart(2, "0")}:00:00`
+
+      if (blocks.length > 1) {
+        timeBlocks = blocks.map((b) => ({
+          start_time: `${String(b.startH).padStart(2, "0")}:00:00`,
+          end_time: `${String(b.endH).padStart(2, "0")}:00:00`,
+        }))
+      }
     }
+
     onSave({
       id: entry?.id,
       entry_date: date,
@@ -231,6 +261,7 @@ function EntryFormModal({
       court_id: courtId || null,
       start_time: startTime,
       end_time: endTime,
+      time_blocks: timeBlocks,
     })
   }
 
@@ -522,18 +553,19 @@ export default function ManualEntriesPage() {
   const deleteMutation = useDeleteManualEntry()
 
   function handleSave(data: EntryFormData) {
-    const payload = {
-      entry_date: data.entry_date,
-      amount: data.amount,
-      description: data.description,
-      notes: data.notes,
-      court_id: data.court_id,
-      start_time: data.start_time,
-      end_time: data.end_time,
-    }
     if (data.id) {
+      // Update: single entry
       updateMutation.mutate(
-        { id: data.id, ...payload },
+        {
+          id: data.id,
+          entry_date: data.entry_date,
+          amount: data.amount,
+          description: data.description,
+          notes: data.notes,
+          court_id: data.court_id,
+          start_time: data.start_time,
+          end_time: data.end_time,
+        },
         {
           onSuccess: () => {
             setEditEntry(null)
@@ -541,12 +573,48 @@ export default function ManualEntriesPage() {
           },
         }
       )
+    } else if (data.time_blocks && data.time_blocks.length > 1) {
+      // Create: multiple non-contiguous blocks — one entry per block
+      const blocks = data.time_blocks
+      const amountPerBlock = data.amount != null ? data.amount / blocks.length : null
+      let completed = 0
+      for (const block of blocks) {
+        createMutation.mutate(
+          {
+            entry_date: data.entry_date,
+            amount: amountPerBlock,
+            description: data.description,
+            notes: data.notes,
+            court_id: data.court_id,
+            start_time: block.start_time,
+            end_time: block.end_time,
+          },
+          {
+            onSuccess: () => {
+              completed++
+              if (completed === blocks.length) setShowForm(false)
+            },
+          }
+        )
+      }
     } else {
-      createMutation.mutate(payload, {
-        onSuccess: () => {
-          setShowForm(false)
+      // Create: single block
+      createMutation.mutate(
+        {
+          entry_date: data.entry_date,
+          amount: data.amount,
+          description: data.description,
+          notes: data.notes,
+          court_id: data.court_id,
+          start_time: data.start_time,
+          end_time: data.end_time,
         },
-      })
+        {
+          onSuccess: () => {
+            setShowForm(false)
+          },
+        }
+      )
     }
   }
 

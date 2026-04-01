@@ -465,6 +465,12 @@ function BookingPage() {
   async function handleConfirmBooking() {
     if (!court || parsedTimeRanges.length === 0) return;
 
+    // Block submission if Turnstile is configured but verification hasn't passed
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      toast.error("Please complete the human verification before confirming.");
+      return;
+    }
+
     // Final availability guard before creating
     const available = await checkAvailability();
     if (!available) return;
@@ -502,7 +508,7 @@ function BookingPage() {
         start_time: parsedTimeRanges[0].start_time,
         end_time: parsedTimeRanges[0].end_time,
         ...(parsedTimeRanges.length > 1 ? { time_blocks: parsedTimeRanges } : {}),
-        ...(turnstileToken ? { turnstile_token: turnstileToken } : {}),
+        turnstile_token: turnstileToken || undefined,
       },
       {
         onSuccess: async (data) => {
