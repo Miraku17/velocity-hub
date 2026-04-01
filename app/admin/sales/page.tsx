@@ -714,7 +714,7 @@ export default function SalesPage() {
             Total Revenue
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-            ₱{summary.total.toFixed(2)}
+            ₱{summary.total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </p>
         </div>
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
@@ -722,7 +722,7 @@ export default function SalesPage() {
             Paid
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#16A34A]">
-            ₱{summary.paid.toFixed(2)}
+            ₱{summary.paid.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </p>
         </div>
         <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
@@ -730,7 +730,7 @@ export default function SalesPage() {
             Pending
           </p>
           <p className="mt-2 font-headline text-2xl font-extrabold tracking-tight text-[#D97706]">
-            ₱{summary.pending.toFixed(2)}
+            ₱{summary.pending.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </p>
         </div>
       </div>
