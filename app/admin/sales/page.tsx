@@ -563,6 +563,8 @@ export default function SalesPage() {
   const summary = useMemo(() => {
     const s = { total: 0, paid: 0, pending: 0, refunded: 0, declined: 0 }
     for (const r of allSales) {
+      // Exclude cancelled reservations from revenue summary
+      if (r.status === "cancelled") continue
       if (r.payment_status === "paid") {
         s.paid += r.total_amount
         s.total += r.total_amount

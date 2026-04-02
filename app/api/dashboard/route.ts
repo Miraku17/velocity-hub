@@ -41,11 +41,13 @@ export async function GET() {
       .eq("reservation_date", today)
       .neq("status", "cancelled"),
 
-    // Revenue this month (paid or confirmed)
+    // Revenue this month (paid, excluding cancelled)
     supabase
       .from("reservations")
       .select("total_amount")
       .gte("reservation_date", monthStart)
+      .lte("reservation_date", monthEnd)
+      .neq("status", "cancelled")
       .in("payment_status", ["paid"]),
 
     // All courts with schedules
