@@ -421,13 +421,17 @@ export async function POST(request: NextRequest) {
       .from("receipts")
       .getPublicUrl(uploadData.path)
 
-    await adminClient
+    const { error: receiptDbErr } = await adminClient
       .from("payment_receipts")
       .insert({
         booking_id: bookingId,
         image_url: urlData.publicUrl,
         storage_path: uploadData.path,
       })
+
+    if (receiptDbErr) {
+      console.error("Failed to save payment receipt record:", receiptDbErr.message)
+    }
   }
 
   // Fetch the created booking for the email

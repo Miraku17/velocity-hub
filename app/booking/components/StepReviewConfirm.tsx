@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { useBookingCart, getTotalAmount, groupItemsByCourt, buildBookingPayload } from "@/lib/stores/bookingCartStore";
 import { usePaymentQrCodes } from "@/lib/hooks/usePaymentQrCodes";
@@ -36,7 +37,7 @@ interface StepReviewConfirmProps {
 }
 
 export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
-  const { items, customer, clearCart } = useBookingCart();
+  const { items, customer, clearCart, setStep } = useBookingCart();
   const { data: paymentQrCodes = [] } = usePaymentQrCodes();
   const createReservation = useCreateReservation();
   const queryClient = useQueryClient();
@@ -59,6 +60,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [showSlots, setShowSlots] = useState(false);
+
+  // Snapshot of cart data captured before clearCart() — used in receipt
+  const [confirmedGroups, setConfirmedGroups] = useState<ReturnType<typeof groupItemsByCourt>>([]);
+  const [confirmedTotal, setConfirmedTotal] = useState(0);
+  const [confirmedDate, setConfirmedDate] = useState("");
 
   // Turnstile
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -135,11 +141,15 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
       },
       {
         onSuccess: (data) => {
+          setConfirmedGroups(groups);
+          setConfirmedTotal(total);
+          setConfirmedDate(formattedDate);
           setShowConfirmModal(false);
           setReservationId(data.id);
           setBookingConfirmed(true);
           sessionStorage.removeItem(STORAGE_KEY);
           clearCart();
+          setStep(1);
           queryClient.invalidateQueries({ queryKey: ["calendar-availability"] });
           queryClient.invalidateQueries({ queryKey: ["grid-availability"] });
         },
@@ -164,9 +174,9 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
   if (bookingConfirmed) {
     return <BookingConfirmation
       customer={customer}
-      groups={groups}
-      total={total}
-      formattedDate={formattedDate}
+      groups={confirmedGroups}
+      total={confirmedTotal}
+      formattedDate={confirmedDate}
       receiptUrl={receiptUrl}
       showSlots={showSlots}
       setShowSlots={setShowSlots}
@@ -588,6 +598,18 @@ function BookingConfirmation({
   showSlots: boolean;
   setShowSlots: (v: boolean) => void;
 }) {
+  const router = useRouter();
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      router.push("/");
+      return;
+    }
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, router]);
+
   const totalSlots = groups.reduce((sum, g) => sum + g.ranges.reduce((s, r) => {
     const startH = parseInt(r.start_time.split(":")[0], 10);
     const endH = parseInt(r.end_time.split(":")[0], 10);
@@ -720,7 +742,7 @@ function BookingConfirmation({
         </div>
       </div>
 
-      <div className="text-center mt-6">
+      <div className="text-center mt-6 space-y-2">
         <Link
           href="/"
           className="inline-flex items-center gap-2 rounded-xl px-8 py-3.5 font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] shadow-sm"
@@ -729,6 +751,9 @@ function BookingConfirmation({
           <span className="material-symbols-outlined text-[16px]">home</span>
           Back to Home
         </Link>
+        <p className="font-[Poppins] text-[11px]" style={{ color: `${colors.bg}50` }}>
+          Redirecting in {countdown}s…
+        </p>
       </div>
     </div>
   );
