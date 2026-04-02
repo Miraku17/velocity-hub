@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   getAuthenticatedUser,
-  checkIsAdmin,
+  checkIsStaff,
   unauthorizedResponse,
   forbiddenResponse,
 } from "@/lib/supabase/auth"
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
-  if (!(await checkIsAdmin())) return forbiddenResponse()
+  if (!(await checkIsStaff())) return forbiddenResponse()
 
   const supabase = await createClient()
   const body = await request.json()
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
-  if (!(await checkIsAdmin())) return forbiddenResponse()
+  if (!(await checkIsStaff())) return forbiddenResponse()
 
   const supabase = await createClient()
   const id = request.nextUrl.searchParams.get("id")
