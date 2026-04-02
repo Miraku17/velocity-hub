@@ -484,8 +484,7 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: "Staff access required" }, { status: 403 })
   }
 
-  const { createAdminClient } = await import("@/lib/supabase/admin")
-  const supabase = createAdminClient()
+  const supabase = await createClient()
 
   const body = await request.json()
   const { id, status, payment_status, notes } = body as {

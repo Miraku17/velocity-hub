@@ -486,7 +486,7 @@ function ReservationDetailModal({
 
   // Fetch receipts for this booking
   const bookingId = reservation?.id ?? ""
-  const { data: receipts } = useQuery<{ id: string; image_url: string; created_at: string }[]>({
+  const { data: receipts, isLoading: receiptsLoading } = useQuery<{ id: string; image_url: string; created_at: string }[]>({
     queryKey: ["payment-receipts", bookingId],
     queryFn: async () => {
       const res = await fetch(`/api/payment-receipts?booking_id=${bookingId}`)
@@ -715,7 +715,13 @@ function ReservationDetailModal({
               <p className="mb-3 font-label text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/60">
                 Payment Proof
               </p>
-              {receipts && receipts.length > 0 ? (
+              {receiptsLoading ? (
+                <div className="grid grid-cols-4 gap-2">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <div key={i} className="aspect-square animate-pulse rounded-lg bg-surface-container" />
+                  ))}
+                </div>
+              ) : receipts && receipts.length > 0 ? (
                 <div className="grid grid-cols-4 gap-2">
                   {receipts.map((receipt) => (
                     <button
