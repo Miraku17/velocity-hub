@@ -118,7 +118,6 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("bookings")
     .select("*, booking_items(id, court_id, booking_date, start_time, end_time, duration_hours, price_per_hour, total_amount, courts(name, court_type))", { count: "exact" })
-    .order("booking_date", { ascending: false })
     .order("created_at", { ascending: false })
 
   if (date) query = query.eq("booking_date", date)

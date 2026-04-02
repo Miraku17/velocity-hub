@@ -48,7 +48,7 @@ function formatDate(date: string) {
 
 function formatTime(time: string) {
   const [h, m] = time.split(":")
-  const hour = parseInt(h, 10)
+  const hour = parseInt(h, 10) % 24
   const ampm = hour >= 12 ? "PM" : "AM"
   const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
   return `${h12.toString().padStart(2, "0")}:${m} ${ampm}`
@@ -107,7 +107,7 @@ const TIME_SLOTS = generateTimeSlots()
 
 function formatSlotLabel(slot: string) {
   const [h] = slot.split(":")
-  const hour = parseInt(h, 10)
+  const hour = parseInt(h, 10) % 24
   const ampm = hour >= 12 ? "PM" : "AM"
   const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
   return `${h12}:00 ${ampm}`
@@ -653,10 +653,6 @@ function ReservationDetailModal({
               <div className="border-t border-dashed border-outline-variant/30 pt-2.5 space-y-1.5">
                 {(res.booking_items ?? []).map((item: BookingItem, i: number) => {
                   const courtName = item.courts?.name ?? "Court"
-                  const sh = parseInt(item.start_time.split(":")[0], 10)
-                  const eh = parseInt(item.end_time.split(":")[0], 10)
-                  const hrs = eh > sh ? eh - sh : 24 - sh + eh
-                  const effectiveRate = hrs > 0 ? item.total_amount / hrs : item.price_per_hour
                   return (
                     <div key={item.id}>
                       <div className="flex justify-between font-body text-xs">
@@ -664,7 +660,7 @@ function ReservationDetailModal({
                       </div>
                       <div className="flex justify-between font-body text-xs">
                         <span className="text-on-surface-variant">{(res.booking_items?.length ?? 0) > 1 ? `Slot ${i + 1} ` : ""}({formatTimeSlot(item.start_time, item.end_time)})</span>
-                        <span className="text-on-surface">{hrs}h × ₱{Number(effectiveRate).toFixed(2)} = ₱{Number(item.total_amount).toFixed(2)}</span>
+                        <span className="text-on-surface">₱{Number(item.total_amount).toFixed(2)}</span>
                       </div>
                     </div>
                   )
