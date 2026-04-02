@@ -57,7 +57,26 @@ async function fetchReservations(date: string): Promise<Reservation[]> {
   const res = await fetch(`/api/reservations?date=${date}&limit=100`)
   if (!res.ok) throw new Error("Failed to fetch reservations")
   const json = await res.json()
-  return json.data ?? []
+  // Flatten bookings with booking_items into per-item entries for the schedule grid
+  const bookings = json.data ?? []
+  const flat: Reservation[] = []
+  for (const b of bookings) {
+    if (b.booking_items && b.booking_items.length > 0) {
+      for (const item of b.booking_items) {
+        flat.push({
+          id: item.id,
+          court_id: item.court_id,
+          court_name: item.courts?.name ?? "—",
+          customer_name: b.customer_name,
+          start_time: item.start_time,
+          end_time: item.end_time,
+          status: b.status,
+          total_amount: item.total_amount,
+        })
+      }
+    }
+  }
+  return flat
 }
 
 async function fetchBlockedSlots(date: string): Promise<BlockedSlot[]> {

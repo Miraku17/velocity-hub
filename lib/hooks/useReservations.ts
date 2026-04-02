@@ -9,28 +9,40 @@ export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "complet
 export type PaymentStatus = "pending" | "paid" | "refunded" | "declined"
 export type CourtType = "indoor" | "outdoor"
 
-export interface Reservation {
+export interface BookingItem {
   id: string
-  reservation_code: string
   court_id: string
-  court_name: string
-  court_type: CourtType
-  customer_name: string
-  customer_email: string
-  customer_phone: string
-  reservation_date: string
+  booking_date: string
   start_time: string
   end_time: string
   duration_hours: number
-  reservation_type: ReservationType
-  status: ReservationStatus
   price_per_hour: number
   total_amount: number
-  payment_status: PaymentStatus
-  notes: string | null
-  booking_group_id: string | null
-  created_at: string
+  courts: {
+    name: string
+    court_type: CourtType
+  } | null
 }
+
+export interface Booking {
+  id: string
+  booking_code: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string
+  booking_date: string
+  reservation_type: ReservationType
+  status: ReservationStatus
+  payment_status: PaymentStatus
+  total_amount: number
+  notes: string | null
+  created_at: string
+  updated_at: string
+  booking_items?: BookingItem[]
+}
+
+// Backward-compatible alias
+export type Reservation = Booking
 
 export interface ReservationFilters {
   date?: string
@@ -46,7 +58,7 @@ export interface ReservationFilters {
 }
 
 export interface PaginatedResponse {
-  data: Reservation[]
+  data: Booking[]
   pagination: {
     page: number
     limit: number
@@ -90,13 +102,11 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
   const url = new URL("/api/reservations", window.location.origin)
   if (filters?.date) url.searchParams.set("date", filters.date)
   if (filters?.week) {
-    // "YYYY-Www" → Monday to Sunday of that ISO week
     const [yearStr, weekStr] = filters.week.split("-W")
     const year = Number(yearStr)
     const week = Number(weekStr)
-    // Jan 4 is always in ISO week 1
     const jan4 = new Date(year, 0, 4)
-    const dayOfWeek = jan4.getDay() || 7 // ISO: Mon=1 … Sun=7
+    const dayOfWeek = jan4.getDay() || 7
     const monday = new Date(jan4)
     monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7)
     const sunday = new Date(monday)
@@ -105,7 +115,6 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
     url.searchParams.set("date_to", formatLocalDate(sunday))
   }
   if (filters?.month) {
-    // "YYYY-MM" → first and last day of that month
     const [y, m] = filters.month.split("-").map(Number)
     const firstDay = `${filters.month}-01`
     const lastDayDate = new Date(y, m, 0)
@@ -124,23 +133,22 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
   const res = await fetch(url)
   if (!res.ok) {
     const data = await res.json()
-    throw new Error(data.error || "Failed to fetch reservations")
+    throw new Error(data.error || "Failed to fetch bookings")
   }
   return res.json()
 }
 
-async function createReservation(input: ReservationInput): Promise<{ id: string; ids?: string[]; booking_group_id?: string | null }> {
+async function createReservation(input: ReservationInput): Promise<{ id: string; booking_code?: string }> {
   const { receipt, ...fields } = input
 
   if (receipt) {
-    // Send as FormData so the receipt file is included in one request
     const formData = new FormData()
     formData.append("data", JSON.stringify(fields))
     formData.append("receipt", receipt)
     const res = await fetch("/api/reservations", { method: "POST", body: formData })
     if (!res.ok) {
       const data = await res.json()
-      throw new Error(data.error || "Failed to create reservation")
+      throw new Error(data.error || "Failed to create booking")
     }
     return res.json()
   }
@@ -152,12 +160,12 @@ async function createReservation(input: ReservationInput): Promise<{ id: string;
   })
   if (!res.ok) {
     const data = await res.json()
-    throw new Error(data.error || "Failed to create reservation")
+    throw new Error(data.error || "Failed to create booking")
   }
   return res.json()
 }
 
-async function updateReservation(input: ReservationUpdate): Promise<Reservation> {
+async function updateReservation(input: ReservationUpdate): Promise<Booking> {
   const res = await fetch("/api/reservations", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -165,7 +173,7 @@ async function updateReservation(input: ReservationUpdate): Promise<Reservation>
   })
   if (!res.ok) {
     const data = await res.json()
-    throw new Error(data.error || "Failed to update reservation")
+    throw new Error(data.error || "Failed to update booking")
   }
   return res.json()
 }
@@ -194,8 +202,6 @@ export function useUpdateReservation() {
   return useMutation({
     mutationFn: updateReservation,
     onSuccess: (updated) => {
-      // Immediately patch the cached list so the row reflects the new status
-      // without waiting for the background refetch to complete.
       queryClient.setQueriesData<PaginatedResponse>(
         { queryKey: ["reservations"] },
         (old) => {
@@ -216,11 +222,8 @@ export function useUpdateReservation() {
 }
 
 /**
- * Subscribe to Supabase Realtime on the `reservations` table.
- * Any INSERT, UPDATE, or DELETE will invalidate the TanStack Query cache
- * so the page refetches automatically.
- *
- * Call this once at the top of the admin reservations page.
+ * Subscribe to Supabase Realtime on the `bookings` table.
+ * Any INSERT, UPDATE, or DELETE will invalidate the TanStack Query cache.
  */
 export function useReservationsRealtime() {
   const queryClient = useQueryClient()
@@ -229,10 +232,10 @@ export function useReservationsRealtime() {
     const supabase = createClient()
 
     const channel = supabase
-      .channel("reservations-realtime")
+      .channel("bookings-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "reservations" },
+        { event: "*", schema: "public", table: "bookings" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["reservations"] })
         }
