@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
     return mins === 0 ? 1440 : mins
   }
 
-  let conflicts = (allItems || []) as { id: string; start_time: string; end_time: string; bookings: { id: string; customer_name: string; status: string } }[]
+  type ConflictItem = { id: string; start_time: string; end_time: string; bookings: { id: string; customer_name: string; status: string }[] }
+  let conflicts = (allItems || []) as unknown as ConflictItem[]
   if (start_time && end_time) {
     const blockStart = toMinutes(start_time)
     const blockEnd = toMinutes(end_time)
@@ -103,11 +104,11 @@ export async function POST(request: NextRequest) {
       {
         error: `Cannot block: ${count} existing booking${count > 1 ? "s" : ""} conflict with this time slot. Please review existing bookings first.`,
         conflicts: conflicts.map((c) => ({
-          id: c.bookings.id,
-          customer_name: c.bookings.customer_name,
+          id: c.bookings[0]?.id,
+          customer_name: c.bookings[0]?.customer_name,
           start_time: c.start_time,
           end_time: c.end_time,
-          status: c.bookings.status,
+          status: c.bookings[0]?.status,
         })),
       },
       { status: 409 }
