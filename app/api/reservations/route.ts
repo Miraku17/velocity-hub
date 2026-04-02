@@ -10,16 +10,13 @@ import { rateLimit } from "@/lib/rate-limit"
 
 /**
  * Try to parse a search string as a date and return "YYYY-MM-DD" or null.
- * Supports: "2026-04-14", "04/14/2026", "Apr 14 2026", "April 14", "Apr 14", etc.
  */
 function tryParseDate(input: string): string | null {
-  // ISO format: 2026-04-14
   if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
     const d = new Date(input + "T00:00:00")
     if (!isNaN(d.getTime())) return input
   }
 
-  // MM/DD/YYYY or MM-DD-YYYY
   const slashMatch = input.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
   if (slashMatch) {
     const [, m, d, y] = slashMatch
@@ -29,7 +26,6 @@ function tryParseDate(input: string): string | null {
     }
   }
 
-  // Natural language: "Apr 14 2026", "April 14, 2026", "Apr 14" (defaults to current year)
   const monthNames: Record<string, number> = {
     jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
     apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
@@ -52,7 +48,7 @@ function tryParseDate(input: string): string | null {
   return null
 }
 
-// GET /api/reservations — list reservations
+// GET /api/reservations — list bookings
 // Public: requires court_id + date, returns only slot data (no PII)
 // Admin: full access with search, filters, pagination
 export async function GET(request: NextRequest) {
@@ -90,7 +86,7 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  // Admin: full access
+  // Admin: query bookings table directly
   const dateFrom = params.get("date_from")
   const dateTo = params.get("date_to")
   const status = params.get("status")
@@ -98,36 +94,63 @@ export async function GET(request: NextRequest) {
   const courtType = params.get("court_type")
   const search = params.get("search")?.trim()
   const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1)
-  const limit = Math.max(1, Math.min(100, parseInt(params.get("limit") || "20", 10) || 20))
+  const limit = Math.max(1, Math.min(10000, parseInt(params.get("limit") || "20", 10) || 20))
   const offset = (page - 1) * limit
 
-  let query = supabase
-    .from("reservations_view")
-    .select("*", { count: "exact" })
-    .order("reservation_date", { ascending: false })
-    .order("start_time", { ascending: false })
+  // If court_type filter is set, find matching booking IDs first
+  let courtTypeBookingIds: string[] | null = null
+  if (courtType) {
+    const { data: matchingIds } = await supabase
+      .from("booking_items_view")
+      .select("booking_id")
+      .eq("court_type", courtType)
 
-  if (date) query = query.eq("reservation_date", date)
-  if (dateFrom) query = query.gte("reservation_date", dateFrom)
-  if (dateTo) query = query.lte("reservation_date", dateTo)
+    if (matchingIds && matchingIds.length > 0) {
+      courtTypeBookingIds = [...new Set(matchingIds.map((r: { booking_id: string }) => r.booking_id))]
+    } else {
+      return Response.json({
+        data: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      })
+    }
+  }
+
+  let query = supabase
+    .from("bookings")
+    .select("*, booking_items(id, court_id, booking_date, start_time, end_time, duration_hours, price_per_hour, total_amount, courts(name, court_type))", { count: "exact" })
+    .order("booking_date", { ascending: false })
+    .order("created_at", { ascending: false })
+
+  if (date) query = query.eq("booking_date", date)
+  if (dateFrom) query = query.gte("booking_date", dateFrom)
+  if (dateTo) query = query.lte("booking_date", dateTo)
   if (status) query = query.eq("status", status)
   if (paymentStatus) query = query.eq("payment_status", paymentStatus)
-  if (courtType) query = query.eq("court_type", courtType)
-  if (courtId) query = query.eq("court_id", courtId)
+  if (courtTypeBookingIds) query = query.in("id", courtTypeBookingIds)
+  if (courtId) {
+    // Filter bookings that have an item for this court
+    const { data: courtBookingIds } = await supabase
+      .from("booking_items")
+      .select("booking_id")
+      .eq("court_id", courtId)
+    if (courtBookingIds && courtBookingIds.length > 0) {
+      query = query.in("id", [...new Set(courtBookingIds.map((r: { booking_id: string }) => r.booking_id))])
+    } else {
+      return Response.json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } })
+    }
+  }
   if (search) {
-    // Sanitize search input: remove characters that could manipulate PostgREST filter syntax
     const sanitized = search.replace(/[,.()"'\\]/g, "")
     if (sanitized) {
-      // Try to parse as a date so users can search by date (e.g. "Apr 14", "2026-04-14", "04/14/2026")
       const parsedDate = tryParseDate(sanitized)
       const orFilters = [
         `customer_name.ilike.%${sanitized}%`,
         `customer_email.ilike.%${sanitized}%`,
         `customer_phone.ilike.%${sanitized}%`,
-        `reservation_code.ilike.%${sanitized}%`,
+        `booking_code.ilike.%${sanitized}%`,
       ]
       if (parsedDate) {
-        orFilters.push(`reservation_date.eq.${parsedDate}`)
+        orFilters.push(`booking_date.eq.${parsedDate}`)
       }
       query = query.or(orFilters.join(","))
     }
@@ -152,9 +175,8 @@ export async function GET(request: NextRequest) {
   })
 }
 
-// POST /api/reservations — create a reservation (public, no auth required)
+// POST /api/reservations — create a booking (public, no auth required)
 export async function POST(request: NextRequest) {
-  // Rate limit by IP: max 10 bookings per 15 minutes
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     ?? request.headers.get("x-real-ip")
     ?? "unknown"
@@ -173,7 +195,6 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient()
 
-  // Parse body — supports JSON or FormData (when a receipt file is attached)
   let body: Record<string, unknown>
   let receiptFile: File | null = null
   const contentType = request.headers.get("content-type") ?? ""
@@ -208,8 +229,9 @@ export async function POST(request: NextRequest) {
     notes,
     turnstile_token,
     time_blocks,
+    bookings,
   } = body as {
-    court_id: string
+    court_id?: string
     customer_name: string
     customer_email: string
     customer_phone: string
@@ -220,6 +242,7 @@ export async function POST(request: NextRequest) {
     notes?: string
     turnstile_token?: string
     time_blocks?: { start_time: string; end_time: string }[]
+    bookings?: { court_id: string; time_blocks: { start_time: string; end_time: string }[] }[]
   }
 
   // Verify Cloudflare Turnstile token
@@ -250,7 +273,6 @@ export async function POST(request: NextRequest) {
       const verification = (await verifyRes.json()) as { success: boolean }
       turnstileSuccess = verification.success
     } catch {
-      // Network error contacting Cloudflare — fail closed
       return Response.json(
         { error: "Unable to verify human check. Please try again." },
         { status: 503 }
@@ -265,30 +287,32 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Build the list of time blocks to create
-  const blocks = time_blocks && time_blocks.length > 0
+  const isMultiCourt = Array.isArray(bookings) && bookings.length > 0
+  const legacyBlocks = time_blocks && time_blocks.length > 0
     ? time_blocks
     : start_time && end_time
       ? [{ start_time, end_time }]
       : []
 
-  // Validate required fields
-  if (!court_id || !customer_name || !customer_email || !customer_phone || !date || blocks.length === 0) {
+  if (!customer_name || !customer_email || !customer_phone || !date) {
     return Response.json(
-      { error: "court_id, customer_name, customer_email, customer_phone, date, and time block(s) are required" },
+      { error: "customer_name, customer_email, customer_phone, and date are required" },
       { status: 400 }
     )
   }
 
-  // Validate input formats
+  if (!isMultiCourt && (!court_id || legacyBlocks.length === 0)) {
+    return Response.json(
+      { error: "court_id and time block(s) are required" },
+      { status: 400 }
+    )
+  }
+
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   const PHONE_RE = /^[\d\-+\s()]{7,20}$/
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
-  if (!UUID_RE.test(court_id)) {
-    return Response.json({ error: "Invalid court ID" }, { status: 400 })
-  }
   if (customer_name.trim().length < 1 || customer_name.length > 100) {
     return Response.json({ error: "Name must be between 1 and 100 characters" }, { status: 400 })
   }
@@ -302,115 +326,83 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid date format" }, { status: 400 })
   }
 
-  // Prevent booking in the past (use Philippines timezone)
   const phNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }))
   const phToday = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, "0")}-${String(phNow.getDate()).padStart(2, "0")}`
   if (date < phToday) {
     return Response.json({ error: "Cannot book dates in the past" }, { status: 400 })
   }
 
-  // Validate each time block
-  const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/
-  for (const block of blocks) {
-    if (!block.start_time || !block.end_time) {
-      return Response.json({ error: "Each time block must have start_time and end_time" }, { status: 400 })
-    }
-    if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
-      return Response.json({ error: "Invalid time format" }, { status: 400 })
-    }
-    if (block.start_time >= block.end_time) {
-      return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
-    }
-  }
-
-  // Validate reservation type
   const VALID_RESERVATION_TYPES = ["regular", "walk-in", "priority"]
   if (reservation_type && !VALID_RESERVATION_TYPES.includes(reservation_type)) {
     return Response.json({ error: "Invalid reservation type" }, { status: 400 })
   }
 
-  // Fetch the court's schedule to determine the correct hourly rate per time slot
-  const bookingDayOfWeek = new Date(date + "T00:00:00").getDay()
-  const { data: courtData } = await supabase
-    .from("courts")
-    .select("price_per_hour, court_schedules(*)")
-    .eq("id", court_id)
-    .single()
+  const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/
 
-  const basePrice: number = courtData?.price_per_hour ?? 0
-  const schedule = (courtData?.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
-    ?.find((s) => s.day_of_week === bookingDayOfWeek)
-  const hourlyRates = schedule?.hourly_rates ?? null
+  // Build items array for the RPC
+  const items: { court_id: string; start_time: string; end_time: string }[] = []
 
-  /** Return the correct rate for a given start hour */
-  function getHourRate(startHour: number): number {
-    if (!hourlyRates) return basePrice
-    return hourlyRates[String(startHour)] ?? basePrice
-  }
-
-  // Generate a shared group ID when booking multiple non-contiguous blocks
-  const bookingGroupId = blocks.length > 1
-    ? crypto.randomUUID()
-    : null
-
-  // Create a reservation for each time block
-  const ids: string[] = []
-  for (const block of blocks) {
-    const { data, error } = await supabase.rpc("create_reservation", {
-      p_court_id: court_id,
-      p_customer_name: customer_name,
-      p_customer_email: customer_email,
-      p_customer_phone: customer_phone,
-      p_date: date,
-      p_start_time: block.start_time,
-      p_end_time: block.end_time,
-      p_reservation_type: reservation_type || "regular",
-      p_notes: notes || null,
-    })
-
-    if (error) {
-      // Rollback previously created reservations in this group
-      if (ids.length > 0) {
-        await supabase
-          .from("reservations")
-          .update({ status: "cancelled" })
-          .in("id", ids)
+  if (isMultiCourt) {
+    for (const b of bookings!) {
+      if (!UUID_RE.test(b.court_id)) {
+        return Response.json({ error: "Invalid court ID in bookings" }, { status: 400 })
       }
-      return Response.json({ error: error.message }, { status: 400 })
+      if (!b.time_blocks || b.time_blocks.length === 0) {
+        return Response.json({ error: "Each booking must have at least one time block" }, { status: 400 })
+      }
+      for (const block of b.time_blocks) {
+        if (!block.start_time || !block.end_time) {
+          return Response.json({ error: "Each time block must have start_time and end_time" }, { status: 400 })
+        }
+        if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
+          return Response.json({ error: "Invalid time format" }, { status: 400 })
+        }
+        if (block.start_time >= block.end_time) {
+          return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
+        }
+        items.push({ court_id: b.court_id, start_time: block.start_time, end_time: block.end_time })
+      }
     }
-
-    const reservationId = data as string
-    ids.push(reservationId)
-
-    // Compute the correct price_per_hour and total_amount using hourly rates
-    const startHour = parseInt(block.start_time.split(":")[0], 10)
-    const endHour = parseInt(block.end_time.split(":")[0], 10)
-    const durationHours = endHour > startHour ? endHour - startHour : 24 - startHour + endHour
-    let correctTotal = 0
-    for (let h = startHour; h < startHour + durationHours; h++) {
-      correctTotal += getHourRate(h % 24)
+  } else {
+    if (!UUID_RE.test(court_id!)) {
+      return Response.json({ error: "Invalid court ID" }, { status: 400 })
     }
-    // For price_per_hour, use the average rate across the block's hours
-    const correctRate = durationHours > 0 ? correctTotal / durationHours : basePrice
-
-    // Update with correct rate, total, and optional group ID
-    await supabase
-      .from("reservations")
-      .update({
-        price_per_hour: correctRate,
-        total_amount: correctTotal,
-        ...(bookingGroupId ? { booking_group_id: bookingGroupId } : {}),
-      })
-      .eq("id", reservationId)
+    for (const block of legacyBlocks) {
+      if (!block.start_time || !block.end_time) {
+        return Response.json({ error: "Each time block must have start_time and end_time" }, { status: 400 })
+      }
+      if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
+        return Response.json({ error: "Invalid time format" }, { status: 400 })
+      }
+      if (block.start_time >= block.end_time) {
+        return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
+      }
+      items.push({ court_id: court_id!, start_time: block.start_time, end_time: block.end_time })
+    }
   }
 
-  // Upload receipt if provided — if this fails, roll back all reservations
+  // Single RPC call creates booking + all items in one transaction
+  const { data: bookingId, error } = await supabase.rpc("create_booking", {
+    p_customer_name: customer_name,
+    p_customer_email: customer_email,
+    p_customer_phone: customer_phone,
+    p_date: date,
+    p_reservation_type: reservation_type || "regular",
+    p_notes: notes || null,
+    p_items: items,
+  })
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 400 })
+  }
+
+  // Upload receipt if provided
   if (receiptFile) {
     const { createAdminClient } = await import("@/lib/supabase/admin")
     const adminClient = createAdminClient()
 
     const ext = receiptFile.name.split(".").pop() || "jpg"
-    const storagePath = `${ids[0]}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const storagePath = `${bookingId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
     const arrayBuffer = await receiptFile.arrayBuffer()
     const { data: uploadData, error: uploadErr } = await adminClient.storage
@@ -421,11 +413,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadErr) {
-      // Roll back — delete all reservations created in this request
-      await adminClient
-        .from("reservations")
-        .delete()
-        .in("id", ids)
+      await adminClient.from("bookings").delete().eq("id", bookingId)
       return Response.json({ error: "Receipt upload failed. Please try again." }, { status: 500 })
     }
 
@@ -433,42 +421,60 @@ export async function POST(request: NextRequest) {
       .from("receipts")
       .getPublicUrl(uploadData.path)
 
-    // Save receipt record linked to the first reservation
-    await adminClient
+    const { error: receiptDbErr } = await adminClient
       .from("payment_receipts")
       .insert({
-        reservation_id: ids[0],
+        booking_id: bookingId,
         image_url: urlData.publicUrl,
         storage_path: uploadData.path,
       })
+
+    if (receiptDbErr) {
+      console.error("Failed to save payment receipt record:", receiptDbErr.message)
+    }
   }
 
-  // Send ONE admin notification email with all slots (non-blocking)
-  const [{ data: court }, { data: firstReservation }] = await Promise.all([
-    supabase.from("courts").select("name, court_type").eq("id", court_id).single(),
-    supabase.from("reservations").select("reservation_code").eq("id", ids[0]).single(),
-  ])
+  // Fetch the created booking for the email
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("booking_code, booking_items(court_id, start_time, end_time, courts(name, court_type))")
+    .eq("id", bookingId)
+    .single()
+
+  type PostItem = { court_id: string; start_time: string; end_time: string; courts: { name: string; court_type: string } | null }
+  const rawPostItems = (booking?.booking_items ?? []) as unknown as { court_id: string; start_time: string; end_time: string; courts: { name: string; court_type: string }[] | { name: string; court_type: string } | null }[]
+  const bookingItems: PostItem[] = rawPostItems.map((bi) => ({
+    ...bi,
+    courts: Array.isArray(bi.courts) ? bi.courts[0] ?? null : bi.courts,
+  }))
+
+  // Group booking items by court for the email
+  const courtGroupMap = new Map<string, { courtName: string; courtType: string; slots: { startTime: string; endTime: string }[] }>()
+  for (const bi of bookingItems) {
+    const name = bi.courts?.name ?? "Unknown"
+    const type = bi.courts?.court_type ?? ""
+    if (!courtGroupMap.has(bi.court_id)) {
+      courtGroupMap.set(bi.court_id, { courtName: name, courtType: type, slots: [] })
+    }
+    courtGroupMap.get(bi.court_id)!.slots.push({ startTime: bi.start_time, endTime: bi.end_time })
+  }
+  const notifCourts = Array.from(courtGroupMap.values())
 
   sendBookingNotification({
-    reservationCode: firstReservation?.reservation_code ?? ids[0],
+    reservationCode: booking?.booking_code ?? bookingId,
     customerName: customer_name,
     customerEmail: customer_email,
     customerPhone: customer_phone,
-    courtName: court?.name ?? "Unknown Court",
-    courtType: court?.court_type ?? "",
     date,
-    startTime: blocks[0].start_time,
-    endTime: blocks[0].end_time,
     reservationType: reservation_type || "regular",
     notes,
-    slots: blocks.map((b) => ({ startTime: b.start_time, endTime: b.end_time })),
+    courts: notifCourts,
   }).catch(console.error)
 
-  // Return first id for backward compatibility, plus all ids and group id
-  return Response.json({ id: ids[0], ids, booking_group_id: bookingGroupId }, { status: 201 })
+  return Response.json({ id: bookingId, booking_code: booking?.booking_code }, { status: 201 })
 }
 
-// PATCH /api/reservations — update reservation status (admin only)
+// PATCH /api/reservations — update booking status (admin only)
 export async function PATCH(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
@@ -478,7 +484,8 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: "Staff access required" }, { status: 403 })
   }
 
-  const supabase = await createClient()
+  const { createAdminClient } = await import("@/lib/supabase/admin")
+  const supabase = createAdminClient()
 
   const body = await request.json()
   const { id, status, payment_status, notes } = body as {
@@ -503,7 +510,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from("reservations")
+    .from("bookings")
     .update(updates)
     .eq("id", id)
     .select()
@@ -513,59 +520,46 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  // Send receipt to customer when admin confirms the booking
-  // For grouped bookings, only send once (from the first sibling) with all slot details
+  // Send receipt email when admin confirms
   if (status === "confirmed") {
-    const { data: reservation } = await supabase
-      .from("reservations_view")
-      .select("*")
+    const { data: booking } = await supabase
+      .from("bookings")
+      .select("*, booking_items(start_time, end_time, total_amount, court_id, courts(name, court_type))")
       .eq("id", id)
       .single()
 
-    if (reservation) {
-      // Check if this is part of a group
-      let siblings: typeof reservation[] = []
-      if (reservation.booking_group_id) {
-        const { data: groupRows } = await supabase
-          .from("reservations_view")
-          .select("*")
-          .eq("booking_group_id", reservation.booking_group_id)
-          .order("start_time", { ascending: true })
+    if (booking) {
+      type EmailItem = { start_time: string; end_time: string; total_amount: number; court_id: string; courts: { name: string; court_type: string } | null }
+      const rawItems = booking.booking_items as unknown as { start_time: string; end_time: string; total_amount: number; court_id: string; courts: { name: string; court_type: string }[] | { name: string; court_type: string } | null }[]
+      const items: EmailItem[] = (rawItems ?? []).map((bi) => ({
+        ...bi,
+        courts: Array.isArray(bi.courts) ? bi.courts[0] ?? null : bi.courts,
+      }))
 
-        siblings = groupRows ?? []
-
-        // Only send the email once — skip if this isn't the first sibling
-        if (siblings.length > 0 && siblings[0].id !== id) {
-          return Response.json(data)
+      const receiptCourtMap = new Map<string, { courtName: string; courtType: string; slots: { startTime: string; endTime: string; amount: number }[] }>()
+      for (const item of items) {
+        const name = item.courts?.name ?? "Unknown"
+        const type = item.courts?.court_type ?? ""
+        if (!receiptCourtMap.has(item.court_id)) {
+          receiptCourtMap.set(item.court_id, { courtName: name, courtType: type, slots: [] })
         }
+        receiptCourtMap.get(item.court_id)!.slots.push({
+          startTime: item.start_time,
+          endTime: item.end_time,
+          amount: Number(item.total_amount),
+        })
       }
-
-      const isGrouped = siblings.length > 1
-      // Use the earliest slot as the primary (matches admin table and booking notification)
-      const primary = isGrouped ? siblings[0] : reservation
-      const groupTotal = isGrouped
-        ? siblings.reduce((sum: number, r: typeof reservation) => sum + Number(r.total_amount), 0)
-        : reservation.total_amount
+      const receiptCourts = Array.from(receiptCourtMap.values())
 
       sendReceiptEmail({
-        customerName: primary.customer_name,
-        customerEmail: primary.customer_email,
-        courtName: primary.court_name,
-        courtType: primary.court_type,
-        date: primary.reservation_date,
-        startTime: primary.start_time,
-        endTime: primary.end_time,
-        reservationType: primary.reservation_type,
-        reservationCode: primary.reservation_code,
-        totalAmount: groupTotal,
-        notes: primary.notes,
-        slots: isGrouped
-          ? siblings.map((r: typeof reservation) => ({
-              startTime: r.start_time,
-              endTime: r.end_time,
-              amount: Number(r.total_amount),
-            }))
-          : undefined,
+        customerName: booking.customer_name,
+        customerEmail: booking.customer_email,
+        date: booking.booking_date,
+        reservationType: booking.reservation_type,
+        reservationCode: booking.booking_code,
+        totalAmount: booking.total_amount,
+        notes: booking.notes,
+        courts: receiptCourts,
       }).catch(console.error)
     }
   }

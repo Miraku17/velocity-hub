@@ -30,23 +30,23 @@ export async function GET() {
   ] = await Promise.all([
     // Total bookings (all time, non-cancelled)
     supabase
-      .from("reservations")
+      .from("bookings")
       .select("id", { count: "exact", head: true })
       .neq("status", "cancelled"),
 
     // Today's bookings
     supabase
-      .from("reservations")
+      .from("bookings")
       .select("id", { count: "exact", head: true })
-      .eq("reservation_date", today)
+      .eq("booking_date", today)
       .neq("status", "cancelled"),
 
     // Revenue this month (paid, excluding cancelled)
     supabase
-      .from("reservations")
+      .from("bookings")
       .select("total_amount")
-      .gte("reservation_date", monthStart)
-      .lte("reservation_date", monthEnd)
+      .gte("booking_date", monthStart)
+      .lte("booking_date", monthEnd)
       .neq("status", "cancelled")
       .in("payment_status", ["paid"]),
 
@@ -71,12 +71,12 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(10),
 
-    // All non-cancelled reservations this month (for analytics)
+    // All non-cancelled booking items this month (for analytics)
     supabase
-      .from("reservations")
-      .select("reservation_date, start_time, end_time, duration_hours")
-      .gte("reservation_date", monthStart)
-      .lte("reservation_date", monthEnd)
+      .from("booking_items_view")
+      .select("booking_date, start_time, end_time, duration_hours, status")
+      .gte("booking_date", monthStart)
+      .lte("booking_date", monthEnd)
       .neq("status", "cancelled"),
 
     // Court schedules (for calculating total available hours)
@@ -125,7 +125,7 @@ export async function GET() {
   const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
   const byDayOfWeek = dayLabels.map((label, i) => {
     const dayRes = monthReservations.filter((r) => {
-      const d = new Date(r.reservation_date + "T00:00:00")
+      const d = new Date(r.booking_date + "T00:00:00")
       return d.getDay() === i
     })
     return {

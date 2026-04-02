@@ -5,6 +5,7 @@ import {
   useReservations,
   type PaymentStatus,
   type Reservation,
+  type BookingItem,
 } from "@/lib/hooks/useReservations"
 import { LoadingPage } from "@/components/ui/loading"
 import { Portal } from "@/components/ui/portal"
@@ -98,12 +99,25 @@ function buildPrintHTML(
   const byCourtType = new Map<string, { bookings: number; revenue: number; paid: number }>()
 
   for (const s of sales) {
-    // court
-    const court = byCourt.get(s.court_name) ?? { bookings: 0, hours: 0, revenue: 0, paid: 0 }
-    court.bookings++
-    court.hours += s.duration_hours
-    if (s.payment_status === "paid") { court.revenue += s.total_amount; court.paid += s.total_amount }
-    byCourt.set(s.court_name, court)
+    const items = s.booking_items ?? []
+    const totalHrs = items.reduce((sum, i) => sum + i.duration_hours, 0)
+
+    // court (aggregate per court from items)
+    for (const item of items) {
+      const courtName = item.courts?.name ?? "Unknown"
+      const court = byCourt.get(courtName) ?? { bookings: 0, hours: 0, revenue: 0, paid: 0 }
+      court.bookings++
+      court.hours += item.duration_hours
+      if (s.payment_status === "paid") { court.revenue += item.total_amount; court.paid += item.total_amount }
+      byCourt.set(courtName, court)
+
+      // court type
+      const courtType = item.courts?.court_type ?? "unknown"
+      const ct = byCourtType.get(courtType) ?? { bookings: 0, revenue: 0, paid: 0 }
+      ct.bookings++
+      if (s.payment_status === "paid") { ct.revenue += item.total_amount; ct.paid += item.total_amount }
+      byCourtType.set(courtType, ct)
+    }
 
     // status
     const st = byStatus.get(s.status) ?? { bookings: 0, revenue: 0 }
@@ -116,19 +130,13 @@ function buildPrintHTML(
     tp.bookings++
     if (s.payment_status === "paid") tp.revenue += s.total_amount
     byType.set(s.reservation_type, tp)
-
-    // court type
-    const ct = byCourtType.get(s.court_type) ?? { bookings: 0, revenue: 0, paid: 0 }
-    ct.bookings++
-    if (s.payment_status === "paid") { ct.revenue += s.total_amount; ct.paid += s.total_amount }
-    byCourtType.set(s.court_type, ct)
   }
 
   const fmt = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
   const pct = (n: number, total: number) => total > 0 ? `${((n / total) * 100).toFixed(1)}%` : "0%"
 
   const totalBookings = sales.length
-  const totalHours = sales.reduce((a, s) => a + s.duration_hours, 0)
+  const totalHours = sales.reduce((a, s) => a + (s.booking_items ?? []).reduce((sum, i) => sum + i.duration_hours, 0), 0)
 
   const courtRows = [...byCourt.entries()]
     .sort((a, b) => b[1].paid - a[1].paid)
@@ -328,25 +336,32 @@ function exportCSV(sales: Reservation[], filters: { date: string; week: string; 
       : s
   }
 
-  const rows = sales.map((s) => [
-    s.reservation_code,
-    s.reservation_date,
-    s.customer_name,
-    s.customer_email,
-    s.customer_phone,
-    s.court_name,
-    s.court_type,
-    s.start_time,
-    s.end_time,
-    s.duration_hours,
-    s.reservation_type,
-    s.status,
-    s.payment_status,
-    (s.duration_hours > 0 ? s.total_amount / s.duration_hours : s.price_per_hour).toFixed(2),
-    s.total_amount.toFixed(2),
-    s.notes ?? "",
-    new Date(s.created_at).toISOString(),
-  ].map(escape).join(","))
+  const rows = sales.map((s) => {
+    const items = s.booking_items ?? []
+    const courtNames = items.map((i) => i.courts?.name ?? "—").join("; ")
+    const courtTypes = items.map((i) => i.courts?.court_type ?? "—").join("; ")
+    const times = items.map((i) => `${i.start_time}-${i.end_time}`).join("; ")
+    const totalHrs = items.reduce((sum, i) => sum + i.duration_hours, 0)
+    return [
+      s.booking_code,
+      s.booking_date,
+      s.customer_name,
+      s.customer_email,
+      s.customer_phone,
+      courtNames,
+      courtTypes,
+      times,
+      "",
+      totalHrs,
+      s.reservation_type,
+      s.status,
+      s.payment_status,
+      (totalHrs > 0 ? s.total_amount / totalHrs : 0).toFixed(2),
+      s.total_amount.toFixed(2),
+      s.notes ?? "",
+      new Date(s.created_at).toISOString(),
+    ].map(escape).join(",")
+  })
 
   const csv = [headers.join(","), ...rows].join("\n")
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
@@ -397,7 +412,7 @@ function SaleDetailModal({
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-outline-variant/15 bg-surface-container-lowest px-6 py-5">
             <div>
               <h3 className="font-headline text-lg font-bold text-on-surface">Sale Details</h3>
-              <p className="mt-0.5 font-mono text-xs text-on-surface-variant">#{res.reservation_code}</p>
+              <p className="mt-0.5 font-mono text-xs text-on-surface-variant">#{res.booking_code}</p>
             </div>
             <button
               onClick={onClose}
@@ -457,26 +472,12 @@ function SaleDetailModal({
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <span className="font-body text-[10px] text-on-surface-variant">Court</span>
-                  <p className="font-body text-sm font-semibold text-on-surface">
-                    {res.court_name} <span className="font-normal text-xs text-on-surface-variant capitalize">({res.court_type})</span>
-                  </p>
-                </div>
-                <div>
                   <span className="font-body text-[10px] text-on-surface-variant">Type</span>
                   <p className="font-body text-sm font-semibold capitalize text-on-surface">{res.reservation_type}</p>
                 </div>
                 <div>
                   <span className="font-body text-[10px] text-on-surface-variant">Date</span>
-                  <p className="font-body text-sm font-semibold text-on-surface">{formatDate(res.reservation_date)}</p>
-                </div>
-                <div>
-                  <span className="font-body text-[10px] text-on-surface-variant">Time</span>
-                  <p className="font-body text-sm font-semibold text-on-surface">{formatTime(res.start_time)} – {formatTime(res.end_time)}</p>
-                </div>
-                <div>
-                  <span className="font-body text-[10px] text-on-surface-variant">Duration</span>
-                  <p className="font-body text-sm font-semibold text-on-surface">{res.duration_hours}h</p>
+                  <p className="font-body text-sm font-semibold text-on-surface">{formatDate(res.booking_date)}</p>
                 </div>
                 <div>
                   <span className="font-body text-[10px] text-on-surface-variant">Booked</span>
@@ -486,6 +487,23 @@ function SaleDetailModal({
                   </p>
                 </div>
               </div>
+              {res.booking_items && res.booking_items.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {res.booking_items.map((item: BookingItem) => (
+                    <div key={item.id} className="flex items-center justify-between rounded bg-surface-container px-3 py-2">
+                      <div>
+                        <p className="font-body text-sm font-semibold text-on-surface">
+                          {item.courts?.name} <span className="font-normal text-xs text-on-surface-variant capitalize">({item.courts?.court_type})</span>
+                        </p>
+                        <p className="font-body text-xs text-on-surface-variant">
+                          {formatTime(item.start_time)} – {formatTime(item.end_time)} · {item.duration_hours}h
+                        </p>
+                      </div>
+                      <span className="font-headline text-sm font-bold text-on-surface">₱{item.total_amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {res.notes && (
                 <div className="mt-3 border-t border-outline-variant/15 pt-3">
                   <span className="font-body text-[10px] text-on-surface-variant">Notes</span>
@@ -501,20 +519,15 @@ function SaleDetailModal({
                   <p className="font-headline text-xs font-bold text-on-surface">Velocity Pickleball Hub</p>
                   <p className="font-body text-[9px] text-on-surface-variant">Official Receipt</p>
                 </div>
-                <p className="font-mono text-[9px] text-on-surface-variant">#{res.reservation_code}</p>
+                <p className="font-mono text-[9px] text-on-surface-variant">#{res.booking_code}</p>
               </div>
               <div className="border-t border-dashed border-outline-variant/30 pt-2.5 space-y-1.5">
-                <div className="flex justify-between font-body text-[11px]">
-                  <span className="text-on-surface-variant">{res.court_name}</span>
-                </div>
-                <div className="flex justify-between font-body text-[11px]">
-                  <span className="text-on-surface-variant">Rate</span>
-                  <span className="text-on-surface">₱{(res.duration_hours > 0 ? res.total_amount / res.duration_hours : res.price_per_hour).toFixed(2)}/hr</span>
-                </div>
-                <div className="flex justify-between font-body text-[11px]">
-                  <span className="text-on-surface-variant">Duration</span>
-                  <span className="text-on-surface">{res.duration_hours} hour{res.duration_hours !== 1 ? "s" : ""}</span>
-                </div>
+                {(res.booking_items ?? []).map((item: BookingItem) => (
+                  <div key={item.id} className="flex justify-between font-body text-[11px]">
+                    <span className="text-on-surface-variant">{item.courts?.name} ({item.duration_hours}h)</span>
+                    <span className="text-on-surface">₱{item.total_amount.toFixed(2)}</span>
+                  </div>
+                ))}
               </div>
               <div className="border-t border-outline-variant/30 mt-2.5 pt-2.5 flex justify-between items-center">
                 <span className="font-headline text-xs font-bold text-on-surface">Total</span>
@@ -563,6 +576,8 @@ export default function SalesPage() {
   const summary = useMemo(() => {
     const s = { total: 0, paid: 0, pending: 0, refunded: 0, declined: 0 }
     for (const r of allSales) {
+      // Exclude cancelled reservations from revenue summary
+      if (r.status === "cancelled") continue
       if (r.payment_status === "paid") {
         s.paid += r.total_amount
         s.total += r.total_amount
@@ -783,12 +798,12 @@ export default function SalesPage() {
                     >
                       <td className="px-6 py-5">
                         <span className="font-mono text-xs font-semibold text-on-surface">
-                          {s.reservation_code}
+                          {s.booking_code}
                         </span>
                       </td>
                       <td className="px-6 py-5">
                         <span className="font-body text-sm text-on-surface">
-                          {formatDate(s.reservation_date)}
+                          {formatDate(s.booking_date)}
                         </span>
                       </td>
                       <td className="px-6 py-5">
@@ -796,16 +811,24 @@ export default function SalesPage() {
                         <p className="mt-0.5 font-body text-[11px] text-on-surface-variant">{s.customer_email}</p>
                       </td>
                       <td className="px-6 py-5">
-                        <p className="font-body text-sm text-on-surface">{s.court_name}</p>
-                        <p className="mt-0.5 font-body text-[10px] capitalize text-on-surface-variant">{s.court_type}</p>
+                        {(s.booking_items ?? []).map((item: BookingItem) => (
+                          <div key={item.id}>
+                            <p className="font-body text-sm text-on-surface">{item.courts?.name}</p>
+                            <p className="font-body text-[10px] capitalize text-on-surface-variant">{item.courts?.court_type}</p>
+                          </div>
+                        ))}
                       </td>
                       <td className="px-6 py-5">
-                        <span className="font-body text-sm text-on-surface">
-                          {formatTime(s.start_time)} – {formatTime(s.end_time)}
-                        </span>
-                        <p className="mt-0.5 font-body text-[10px] text-on-surface-variant">
-                          {s.duration_hours}h
-                        </p>
+                        {(s.booking_items ?? []).map((item: BookingItem) => (
+                          <div key={item.id}>
+                            <span className="font-body text-sm text-on-surface">
+                              {formatTime(item.start_time)} – {formatTime(item.end_time)}
+                            </span>
+                            <p className="font-body text-[10px] text-on-surface-variant">
+                              {item.duration_hours}h
+                            </p>
+                          </div>
+                        ))}
                       </td>
                       <td className="px-6 py-5">
                         <span className={`rounded px-1.5 py-0.5 font-label text-[9px] font-extrabold uppercase tracking-widest ${sb.bg} ${sb.text}`}>

@@ -30,41 +30,38 @@ const formatDate = (date: string) =>
     day: "numeric",
   })
 
-export interface TimeSlot {
-  startTime: string
-  endTime: string
+export interface CourtGroup {
+  courtName: string
+  courtType: string
+  slots: { startTime: string; endTime: string }[]
+}
+
+export interface CourtGroupWithAmount {
+  courtName: string
+  courtType: string
+  slots: { startTime: string; endTime: string; amount: number }[]
 }
 
 export interface BookingEmailData {
   customerName: string
   customerEmail: string
   customerPhone: string
-  courtName: string
-  courtType: string
   date: string
-  startTime: string
-  endTime: string
   reservationType: string
   notes?: string | null
   reservationCode: string
-  /** Additional time slots for grouped bookings */
-  slots?: TimeSlot[]
+  courts: CourtGroup[]
 }
 
 export interface ReceiptEmailData {
   customerName: string
   customerEmail: string
-  courtName: string
-  courtType: string
   date: string
-  startTime: string
-  endTime: string
   reservationType: string
   reservationCode: string
   totalAmount: number
   notes?: string | null
-  /** Per-slot breakdown for grouped bookings */
-  slots?: (TimeSlot & { amount: number })[]
+  courts: CourtGroupWithAmount[]
 }
 
 export async function sendBookingNotification(data: BookingEmailData) {
@@ -73,33 +70,36 @@ export async function sendBookingNotification(data: BookingEmailData) {
 
   if (!ADMIN_EMAIL) return
 
-  const {
-    customerName,
-    customerEmail,
-    customerPhone,
-    courtName,
-    courtType,
-    date,
-    startTime,
-    endTime,
-    reservationType,
-    notes,
-    reservationCode,
-    slots,
-  } = data
+  const { customerName, customerEmail, customerPhone, date, reservationType, notes, reservationCode, courts } = data
 
   const formattedDate = formatDate(date)
-  const allSlots: TimeSlot[] = slots && slots.length > 1 ? slots : [{ startTime: startTime, endTime: endTime }]
-  const isGrouped = allSlots.length > 1
+  const totalSlots = courts.reduce((sum, c) => sum + c.slots.length, 0)
 
-  const slotsTimeHtml = isGrouped
-    ? allSlots.map((s, i) => `<span style="display:block;font-size:14px;font-weight:700;color:#065f46;">${i + 1}. ${formatTime(s.startTime)} – ${formatTime(s.endTime)}</span>`).join("")
-    : `${formatTime(startTime)} – ${formatTime(endTime)}`
+  const courtsHtml = courts.map((court) => `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;border:1px solid #d1fae5;border-radius:8px;overflow:hidden;">
+      <tr>
+        <td style="background:#d1fae5;padding:8px 12px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:13px;font-weight:700;color:#065f46;">${escapeHtml(court.courtName)}</td>
+              <td align="right" style="font-size:11px;font-weight:600;color:#047857;text-transform:capitalize;">${escapeHtml(court.courtType)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      ${court.slots.map((s, i) => `
+      <tr>
+        <td style="padding:7px 12px;background:#f0fdf4;border-top:1px solid #d1fae5;">
+          <span style="font-size:12px;font-weight:600;color:#065f46;">${i + 1}. ${formatTime(s.startTime)} &ndash; ${formatTime(s.endTime)}</span>
+        </td>
+      </tr>`).join("")}
+    </table>
+  `).join("")
 
   await resend.emails.send({
     from: `Velocity Pickleball Hub <${FROM_EMAIL}>`,
     to: ADMIN_EMAIL,
-    subject: `New Booking — ${escapeHtml(customerName)} · ${formattedDate}${isGrouped ? ` (${allSlots.length} slots)` : ""}`,
+    subject: `New Booking — ${escapeHtml(customerName)} · ${formattedDate} (${totalSlots} slot${totalSlots > 1 ? "s" : ""}, ${courts.length} court${courts.length > 1 ? "s" : ""})`,
     html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -117,7 +117,7 @@ export async function sendBookingNotification(data: BookingEmailData) {
                 <td>
                   <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.5);">Velocity Pickleball Hub</p>
                   <h1 style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;">New Court Booking</h1>
-                  <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.6);">A new reservation has been ${isGrouped ? `submitted with ${allSlots.length} time slots.` : "confirmed."}</p>
+                  <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.6);">${courts.length > 1 ? `${courts.length} courts · ${totalSlots} time slots` : `${totalSlots} time slot${totalSlots > 1 ? "s" : ""}`}</p>
                 </td>
                 <td align="right" valign="top">
                   <img src="${LOGO_URL}" alt="Velocity Pickleball Hub" width="48" height="48" style="border-radius:10px;display:block;" />
@@ -127,17 +127,13 @@ export async function sendBookingNotification(data: BookingEmailData) {
           </td>
         </tr>
 
-        <!-- Booking highlight bar -->
+        <!-- Date highlight bar -->
         <tr>
-          <td style="background:#d1fae5;padding:16px 36px;border-left:4px solid #059669;">
+          <td style="background:#d1fae5;padding:14px 36px;border-left:4px solid #059669;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="font-size:15px;font-weight:700;color:#065f46;">${formattedDate}</td>
-                <td align="right" style="font-size:15px;font-weight:700;color:#065f46;">${slotsTimeHtml}</td>
-              </tr>
-              <tr>
-                <td style="font-size:13px;color:#047857;padding-top:2px;">${courtName} <span style="color:#6ee7b7;">&nbsp;·&nbsp;</span> <span style="text-transform:capitalize;">${courtType}</span></td>
-                <td align="right" style="font-size:13px;color:#047857;padding-top:2px;text-transform:capitalize;">${reservationType}</td>
+                <td align="right" style="font-size:13px;font-weight:600;color:#047857;text-transform:capitalize;">${escapeHtml(reservationType)}</td>
               </tr>
             </table>
           </td>
@@ -174,10 +170,14 @@ export async function sendBookingNotification(data: BookingEmailData) {
               </tr>
             </table>
 
+            <!-- Courts & slots -->
+            <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af;">Courts &amp; Time Slots</p>
+            ${courtsHtml}
+
             ${notes ? `
             <!-- Notes -->
-            <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af;">Notes</p>
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:28px;">
+            <p style="margin:16px 0 10px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af;">Notes</p>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;">
               <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">${escapeHtml(notes)}</p>
             </div>` : ""}
 
@@ -206,27 +206,55 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
   const { resend, FROM_EMAIL, SITE_URL } = getEnv()
   const LOGO_URL = `${SITE_URL}/logo.png`
 
-  const {
-    customerName,
-    customerEmail,
-    courtName,
-    courtType,
-    date,
-    startTime,
-    endTime,
-    reservationType,
-    reservationCode,
-    totalAmount,
-    notes,
-    slots: receiptSlots,
-  } = data
+  const { customerName, customerEmail, date, reservationType, reservationCode, totalAmount, notes, courts } = data
 
   const formattedDate = formatDate(date)
-  const formattedAmount = new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-  }).format(totalAmount)
-  const isGroupedReceipt = receiptSlots && receiptSlots.length > 1
+  const formattedAmount = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(totalAmount)
+
+  const courtsHtml = courts.map((court) => {
+    const courtSubtotal = court.slots.reduce((sum, s) => sum + s.amount, 0)
+    const formattedSubtotal = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(courtSubtotal)
+    return `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+      <tr>
+        <td style="background:#f0fdf4;padding:8px 14px;border-bottom:1px solid #d1fae5;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:13px;font-weight:700;color:#14532d;">${escapeHtml(court.courtName)}</td>
+              <td align="right">
+                <span style="display:inline-block;background:#d1fae5;border:1px solid #bbf7d0;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;color:#15803d;text-transform:capitalize;">${escapeHtml(court.courtType)}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      ${court.slots.map((s) => {
+        const amt = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(s.amount)
+        return `
+      <tr>
+        <td style="padding:8px 14px;border-bottom:1px solid #f3f4f6;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:13px;font-weight:600;color:#111827;">${formatTime(s.startTime)} &ndash; ${formatTime(s.endTime)}</td>
+              <td align="right" style="font-size:13px;font-weight:600;color:#6b7280;">${amt}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>`
+      }).join("")}
+      ${courts.length > 1 ? `
+      <tr>
+        <td style="padding:7px 14px;background:#f9fafb;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Subtotal</td>
+              <td align="right" style="font-size:13px;font-weight:700;color:#111827;">${formattedSubtotal}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>` : ""}
+    </table>`
+  }).join("")
 
   await resend.emails.send({
     from: `Velocity Pickleball Hub <${FROM_EMAIL}>`,
@@ -280,25 +308,12 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
         <!-- Receipt body -->
         <tr>
           <td style="background:#ffffff;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
-
-            <!-- Line items -->
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="padding:20px 32px 0;">
                   <table width="100%" cellpadding="0" cellspacing="0">
 
-                    <!-- Row: Court -->
-                    <tr>
-                      <td style="padding:11px 0;border-bottom:1px dashed #e5e7eb;">
-                        <p style="margin:0;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Court</p>
-                        <p style="margin:3px 0 0;font-size:14px;font-weight:600;color:#111827;">${courtName}</p>
-                      </td>
-                      <td align="right" style="padding:11px 0;border-bottom:1px dashed #e5e7eb;vertical-align:bottom;">
-                        <span style="display:inline-block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:#15803d;text-transform:capitalize;">${courtType}</span>
-                      </td>
-                    </tr>
-
-                    <!-- Row: Date -->
+                    <!-- Date & session type -->
                     <tr>
                       <td style="padding:11px 0;border-bottom:1px dashed #e5e7eb;">
                         <p style="margin:0;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Date</p>
@@ -306,63 +321,37 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
                       </td>
                       <td align="right" style="padding:11px 0;border-bottom:1px dashed #e5e7eb;vertical-align:bottom;">
                         <p style="margin:0;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Session Type</p>
-                        <p style="margin:3px 0 0;font-size:14px;font-weight:600;color:#111827;text-transform:capitalize;">${reservationType}</p>
+                        <p style="margin:3px 0 0;font-size:14px;font-weight:600;color:#111827;text-transform:capitalize;">${escapeHtml(reservationType)}</p>
                       </td>
                     </tr>
-
-                    <!-- Row: Time -->
-                    ${isGroupedReceipt ? `
-                    <tr>
-                      <td colspan="2" style="padding:11px 0;border-bottom:1px dashed #e5e7eb;">
-                        <p style="margin:0;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Time Slots (${receiptSlots.length})</p>
-                        ${receiptSlots.map((s, i) => {
-                          const amt = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(s.amount)
-                          return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;">
-                            <tr>
-                              <td style="font-size:14px;font-weight:600;color:#111827;">
-                                <span style="display:inline-block;width:18px;height:18px;background:#d1fae5;border-radius:50%;text-align:center;line-height:18px;font-size:10px;font-weight:700;color:#059669;margin-right:6px;">${i + 1}</span>
-                                ${formatTime(s.startTime)} &ndash; ${formatTime(s.endTime)}
-                              </td>
-                              <td align="right" style="font-size:13px;font-weight:600;color:#6b7280;">${amt}</td>
-                            </tr>
-                          </table>`
-                        }).join("")}
-                      </td>
-                    </tr>
-                    ` : `
-                    <tr>
-                      <td colspan="2" style="padding:11px 0;border-bottom:1px dashed #e5e7eb;">
-                        <p style="margin:0;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Time Slot</p>
-                        <p style="margin:3px 0 0;font-size:14px;font-weight:600;color:#111827;">${formatTime(startTime)} &ndash; ${formatTime(endTime)}</p>
-                      </td>
-                    </tr>
-                    `}
 
                   </table>
                 </td>
               </tr>
 
+              <!-- Courts & slots -->
+              <tr>
+                <td style="padding:16px 32px 0;">
+                  <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af;">Courts &amp; Time Slots</p>
+                  ${courtsHtml}
+                </td>
+              </tr>
+
               <!-- Total row -->
               <tr>
-                <td style="padding:0 32px;">
-                  <table width="100%" cellpadding="0" cellspacing="0">
+                <td style="padding:0 32px 4px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;padding:14px 16px;border:1px solid #e5e7eb;">
                     <tr>
-                      <td style="padding:16px 0 0;">
-                        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;padding:14px 16px;border:1px solid #e5e7eb;">
-                          <tr>
-                            <td style="font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;">Total Amount Due</td>
-                            <td align="right" style="font-size:22px;font-weight:800;color:#1b4332;">${formattedAmount}</td>
-                          </tr>
-                        </table>
-                      </td>
+                      <td style="font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;">Total Amount Due</td>
+                      <td align="right" style="font-size:22px;font-weight:800;color:#1b4332;">${formattedAmount}</td>
                     </tr>
                   </table>
                 </td>
               </tr>
             </table>
 
-            <!-- Divider with holes (receipt tear effect) -->
-            <div style="margin:24px 0 0;border-top:2px dashed #e5e7eb;position:relative;"></div>
+            <!-- Divider -->
+            <div style="margin:24px 0 0;border-top:2px dashed #e5e7eb;"></div>
 
             <!-- Before you arrive -->
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -414,7 +403,7 @@ export async function sendReceiptEmail(data: ReceiptEmailData) {
           </td>
         </tr>
 
-        <!-- Footer tear strip -->
+        <!-- Footer -->
         <tr>
           <td style="background:#1b4332;padding:20px 32px;border-radius:0 0 12px 12px;">
             <table width="100%" cellpadding="0" cellspacing="0">
