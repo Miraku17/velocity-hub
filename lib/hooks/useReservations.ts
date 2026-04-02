@@ -56,18 +56,21 @@ export interface PaginatedResponse {
 }
 
 export interface ReservationInput {
-  court_id: string
   customer_name: string
   customer_email: string
   customer_phone: string
   date: string
-  start_time: string
-  end_time: string
+  turnstile_token?: string
   reservation_type?: ReservationType
   notes?: string
-  turnstile_token?: string
-  time_blocks?: { start_time: string; end_time: string }[]
   receipt?: File
+  // Legacy single-court fields
+  court_id?: string
+  start_time?: string
+  end_time?: string
+  time_blocks?: { start_time: string; end_time: string }[]
+  // Multi-court booking
+  bookings?: { court_id: string; time_blocks: { start_time: string; end_time: string }[] }[]
 }
 
 export interface ReservationUpdate {

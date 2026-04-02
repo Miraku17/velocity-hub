@@ -208,8 +208,9 @@ export async function POST(request: NextRequest) {
     notes,
     turnstile_token,
     time_blocks,
+    bookings,
   } = body as {
-    court_id: string
+    court_id?: string
     customer_name: string
     customer_email: string
     customer_phone: string
@@ -220,6 +221,7 @@ export async function POST(request: NextRequest) {
     notes?: string
     turnstile_token?: string
     time_blocks?: { start_time: string; end_time: string }[]
+    bookings?: { court_id: string; time_blocks: { start_time: string; end_time: string }[] }[]
   }
 
   // Verify Cloudflare Turnstile token
@@ -265,17 +267,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Build the list of time blocks to create
-  const blocks = time_blocks && time_blocks.length > 0
+  // Determine if this is a multi-court booking or legacy single-court booking
+  const isMultiCourt = Array.isArray(bookings) && bookings.length > 0
+
+  // Build the list of time blocks to create (legacy single-court path)
+  const legacyBlocks = time_blocks && time_blocks.length > 0
     ? time_blocks
     : start_time && end_time
       ? [{ start_time, end_time }]
       : []
 
   // Validate required fields
-  if (!court_id || !customer_name || !customer_email || !customer_phone || !date || blocks.length === 0) {
+  if (!customer_name || !customer_email || !customer_phone || !date) {
     return Response.json(
-      { error: "court_id, customer_name, customer_email, customer_phone, date, and time block(s) are required" },
+      { error: "customer_name, customer_email, customer_phone, and date are required" },
+      { status: 400 }
+    )
+  }
+
+  if (!isMultiCourt && (!court_id || legacyBlocks.length === 0)) {
+    return Response.json(
+      { error: "court_id and time block(s) are required" },
       { status: 400 }
     )
   }
@@ -286,9 +298,6 @@ export async function POST(request: NextRequest) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
-  if (!UUID_RE.test(court_id)) {
-    return Response.json({ error: "Invalid court ID" }, { status: 400 })
-  }
   if (customer_name.trim().length < 1 || customer_name.length > 100) {
     return Response.json({ error: "Name must be between 1 and 100 characters" }, { status: 400 })
   }
@@ -309,99 +318,140 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Cannot book dates in the past" }, { status: 400 })
   }
 
-  // Validate each time block
-  const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/
-  for (const block of blocks) {
-    if (!block.start_time || !block.end_time) {
-      return Response.json({ error: "Each time block must have start_time and end_time" }, { status: 400 })
-    }
-    if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
-      return Response.json({ error: "Invalid time format" }, { status: 400 })
-    }
-    if (block.start_time >= block.end_time) {
-      return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
-    }
-  }
-
   // Validate reservation type
   const VALID_RESERVATION_TYPES = ["regular", "walk-in", "priority"]
   if (reservation_type && !VALID_RESERVATION_TYPES.includes(reservation_type)) {
     return Response.json({ error: "Invalid reservation type" }, { status: 400 })
   }
 
-  // Fetch the court's schedule to determine the correct hourly rate per time slot
-  const bookingDayOfWeek = new Date(date + "T00:00:00").getDay()
-  const { data: courtData } = await supabase
-    .from("courts")
-    .select("price_per_hour, court_schedules(*)")
-    .eq("id", court_id)
-    .single()
+  const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/
 
-  const basePrice: number = courtData?.price_per_hour ?? 0
-  const schedule = (courtData?.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
-    ?.find((s) => s.day_of_week === bookingDayOfWeek)
-  const hourlyRates = schedule?.hourly_rates ?? null
+  // Normalize into a unified list: { court_id, blocks }[]
+  const courtBookings: { court_id: string; blocks: { start_time: string; end_time: string }[] }[] = []
 
-  /** Return the correct rate for a given start hour */
-  function getHourRate(startHour: number): number {
-    if (!hourlyRates) return basePrice
-    return hourlyRates[String(startHour)] ?? basePrice
+  if (isMultiCourt) {
+    for (const b of bookings!) {
+      if (!UUID_RE.test(b.court_id)) {
+        return Response.json({ error: "Invalid court ID in bookings" }, { status: 400 })
+      }
+      if (!b.time_blocks || b.time_blocks.length === 0) {
+        return Response.json({ error: "Each booking must have at least one time block" }, { status: 400 })
+      }
+      for (const block of b.time_blocks) {
+        if (!block.start_time || !block.end_time) {
+          return Response.json({ error: "Each time block must have start_time and end_time" }, { status: 400 })
+        }
+        if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
+          return Response.json({ error: "Invalid time format" }, { status: 400 })
+        }
+        if (block.start_time >= block.end_time) {
+          return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
+        }
+      }
+      courtBookings.push({ court_id: b.court_id, blocks: b.time_blocks })
+    }
+  } else {
+    if (!UUID_RE.test(court_id!)) {
+      return Response.json({ error: "Invalid court ID" }, { status: 400 })
+    }
+    for (const block of legacyBlocks) {
+      if (!block.start_time || !block.end_time) {
+        return Response.json({ error: "Each time block must have start_time and end_time" }, { status: 400 })
+      }
+      if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
+        return Response.json({ error: "Invalid time format" }, { status: 400 })
+      }
+      if (block.start_time >= block.end_time) {
+        return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
+      }
+    }
+    courtBookings.push({ court_id: court_id!, blocks: legacyBlocks })
   }
 
-  // Generate a shared group ID when booking multiple non-contiguous blocks
-  const bookingGroupId = blocks.length > 1
+  // Count total blocks to determine if we need a group ID
+  const totalBlocks = courtBookings.reduce((sum, cb) => sum + cb.blocks.length, 0)
+  const bookingGroupId = totalBlocks > 1 || courtBookings.length > 1
     ? crypto.randomUUID()
     : null
 
-  // Create a reservation for each time block
-  const ids: string[] = []
-  for (const block of blocks) {
-    const { data, error } = await supabase.rpc("create_reservation", {
-      p_court_id: court_id,
-      p_customer_name: customer_name,
-      p_customer_email: customer_email,
-      p_customer_phone: customer_phone,
-      p_date: date,
-      p_start_time: block.start_time,
-      p_end_time: block.end_time,
-      p_reservation_type: reservation_type || "regular",
-      p_notes: notes || null,
+  const bookingDayOfWeek = new Date(date + "T00:00:00").getDay()
+
+  // Fetch all involved courts' schedules in one query
+  const courtIds = [...new Set(courtBookings.map((cb) => cb.court_id))]
+  const { data: courtsData } = await supabase
+    .from("courts")
+    .select("id, name, court_type, price_per_hour, court_schedules(*)")
+    .in("id", courtIds)
+
+  const courtMap = new Map<string, { name: string; court_type: string; price_per_hour: number; hourlyRates: Record<string, number> | null }>()
+  for (const c of courtsData || []) {
+    const schedule = (c.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
+      ?.find((s) => s.day_of_week === bookingDayOfWeek)
+    courtMap.set(c.id, {
+      name: c.name,
+      court_type: c.court_type,
+      price_per_hour: c.price_per_hour,
+      hourlyRates: schedule?.hourly_rates ?? null,
     })
+  }
 
-    if (error) {
-      // Rollback previously created reservations in this group
-      if (ids.length > 0) {
-        await supabase
-          .from("reservations")
-          .update({ status: "cancelled" })
-          .in("id", ids)
-      }
-      return Response.json({ error: error.message }, { status: 400 })
-    }
+  function getHourRateForCourt(courtId: string, startHour: number): number {
+    const info = courtMap.get(courtId)
+    if (!info) return 0
+    if (!info.hourlyRates) return info.price_per_hour
+    return info.hourlyRates[String(startHour)] ?? info.price_per_hour
+  }
 
-    const reservationId = data as string
-    ids.push(reservationId)
-
-    // Compute the correct price_per_hour and total_amount using hourly rates
-    const startHour = parseInt(block.start_time.split(":")[0], 10)
-    const endHour = parseInt(block.end_time.split(":")[0], 10)
-    const durationHours = endHour > startHour ? endHour - startHour : 24 - startHour + endHour
-    let correctTotal = 0
-    for (let h = startHour; h < startHour + durationHours; h++) {
-      correctTotal += getHourRate(h % 24)
-    }
-    // For price_per_hour, use the average rate across the block's hours
-    const correctRate = durationHours > 0 ? correctTotal / durationHours : basePrice
-
-    // Update with correct rate, total, and optional group ID
-    await supabase
-      .from("reservations")
-      .update({
-        price_per_hour: correctRate,
-        total_amount: correctTotal,
-        ...(bookingGroupId ? { booking_group_id: bookingGroupId } : {}),
+  // Create reservations for all court bookings
+  const ids: string[] = []
+  for (const cb of courtBookings) {
+    for (const block of cb.blocks) {
+      const { data, error } = await supabase.rpc("create_reservation", {
+        p_court_id: cb.court_id,
+        p_customer_name: customer_name,
+        p_customer_email: customer_email,
+        p_customer_phone: customer_phone,
+        p_date: date,
+        p_start_time: block.start_time,
+        p_end_time: block.end_time,
+        p_reservation_type: reservation_type || "regular",
+        p_notes: notes || null,
       })
-      .eq("id", reservationId)
+
+      if (error) {
+        // Rollback all previously created reservations in this group
+        if (ids.length > 0) {
+          await supabase
+            .from("reservations")
+            .update({ status: "cancelled" })
+            .in("id", ids)
+        }
+        return Response.json({ error: error.message }, { status: 400 })
+      }
+
+      const reservationId = data as string
+      ids.push(reservationId)
+
+      // Compute the correct price_per_hour and total_amount using hourly rates
+      const startHour = parseInt(block.start_time.split(":")[0], 10)
+      const endHour = parseInt(block.end_time.split(":")[0], 10)
+      const durationHours = endHour > startHour ? endHour - startHour : 24 - startHour + endHour
+      let correctTotal = 0
+      for (let h = startHour; h < startHour + durationHours; h++) {
+        correctTotal += getHourRateForCourt(cb.court_id, h % 24)
+      }
+      const correctRate = durationHours > 0 ? correctTotal / durationHours : (courtMap.get(cb.court_id)?.price_per_hour ?? 0)
+
+      // Update with correct rate, total, and optional group ID
+      await supabase
+        .from("reservations")
+        .update({
+          price_per_hour: correctRate,
+          total_amount: correctTotal,
+          ...(bookingGroupId ? { booking_group_id: bookingGroupId } : {}),
+        })
+        .eq("id", reservationId)
+    }
   }
 
   // Upload receipt if provided — if this fails, roll back all reservations
@@ -443,25 +493,39 @@ export async function POST(request: NextRequest) {
       })
   }
 
-  // Send ONE admin notification email with all slots (non-blocking)
-  const [{ data: court }, { data: firstReservation }] = await Promise.all([
-    supabase.from("courts").select("name, court_type").eq("id", court_id).single(),
-    supabase.from("reservations").select("reservation_code").eq("id", ids[0]).single(),
-  ])
+  // Send ONE admin notification email (non-blocking)
+  // For multi-court bookings, list all courts and their slots
+  const firstCourtBooking = courtBookings[0]
+  const firstCourtInfo = courtMap.get(firstCourtBooking.court_id)
+  const { data: firstReservation } = await supabase
+    .from("reservations")
+    .select("reservation_code")
+    .eq("id", ids[0])
+    .single()
+
+  // Build all slots across all courts for the email
+  const allSlots = courtBookings.flatMap((cb) =>
+    cb.blocks.map((b) => ({ startTime: b.start_time, endTime: b.end_time }))
+  )
+
+  // For multi-court, note all courts in the email
+  const courtNames = courtBookings
+    .map((cb) => courtMap.get(cb.court_id)?.name ?? "Unknown")
+    .filter((name, i, arr) => arr.indexOf(name) === i)
 
   sendBookingNotification({
     reservationCode: firstReservation?.reservation_code ?? ids[0],
     customerName: customer_name,
     customerEmail: customer_email,
     customerPhone: customer_phone,
-    courtName: court?.name ?? "Unknown Court",
-    courtType: court?.court_type ?? "",
+    courtName: courtNames.join(", "),
+    courtType: firstCourtInfo?.court_type ?? "",
     date,
-    startTime: blocks[0].start_time,
-    endTime: blocks[0].end_time,
+    startTime: firstCourtBooking.blocks[0].start_time,
+    endTime: firstCourtBooking.blocks[0].end_time,
     reservationType: reservation_type || "regular",
     notes,
-    slots: blocks.map((b) => ({ startTime: b.start_time, endTime: b.end_time })),
+    slots: allSlots,
   }).catch(console.error)
 
   // Return first id for backward compatibility, plus all ids and group id
