@@ -339,6 +339,11 @@ export async function POST(request: NextRequest) {
 
   const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/
 
+  function timeToMinutes(t: string) {
+    const [h, m] = t.split(":").map(Number)
+    return h * 60 + m
+  }
+
   // Build items array for the RPC
   const items: { court_id: string; start_time: string; end_time: string }[] = []
 
@@ -357,7 +362,7 @@ export async function POST(request: NextRequest) {
         if (!TIME_RE.test(block.start_time) || !TIME_RE.test(block.end_time)) {
           return Response.json({ error: "Invalid time format" }, { status: 400 })
         }
-        if (block.start_time >= block.end_time) {
+        if (timeToMinutes(block.start_time) >= timeToMinutes(block.end_time)) {
           return Response.json({ error: "start_time must be before end_time" }, { status: 400 })
         }
         items.push({ court_id: b.court_id, start_time: block.start_time, end_time: block.end_time })

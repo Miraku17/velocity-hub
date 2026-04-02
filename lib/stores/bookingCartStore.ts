@@ -167,7 +167,7 @@ export function buildBookingPayload(items: CartItem[]) {
     court_id: g.court_id,
     time_blocks: g.ranges.map((r) => ({
       start_time: r.start_time + ":00",
-      end_time: r.end_time + ":00",
+      end_time: r.end_time === "00:00" ? "24:00:00" : r.end_time + ":00",
     })),
   }))
 }
