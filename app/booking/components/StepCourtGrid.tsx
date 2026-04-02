@@ -26,7 +26,14 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
     return d;
   }, [today]);
 
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const cartDate = items[0]?.date;
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    if (cartDate) {
+      const d = new Date(cartDate + "T00:00:00");
+      if (!isNaN(d.getTime())) return d;
+    }
+    return today;
+  });
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);

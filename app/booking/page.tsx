@@ -24,15 +24,23 @@ export default function BookingPageWrapper() {
 
 function BookingPage() {
   const { isLoading } = useCourts({ status: "available" });
-  const { step, setStep: setCartStep } = useBookingCart();
+  const { step, setStep: setCartStep, items, customer } = useBookingCart();
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Sync step from URL on mount
+  // Sync step from URL on mount, clamped to what the user has actually earned
   useEffect(() => {
+    const customerFilled = !!(customer.name.trim() && customer.email.trim() && customer.phone.trim());
+    const cartHasItems = items.length > 0;
+
+    const maxValidStep = customerFilled && cartHasItems ? 3 : customerFilled ? 2 : 1;
+
     const urlStep = Number(searchParams.get("step"));
-    if (urlStep >= 1 && urlStep <= 3 && urlStep !== step) {
-      setCartStep(urlStep);
+    const target = urlStep >= 1 && urlStep <= 3 ? urlStep : step;
+    const clamped = Math.min(target, maxValidStep);
+
+    if (clamped !== step) {
+      setCartStep(clamped);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

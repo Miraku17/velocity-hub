@@ -202,6 +202,170 @@ export async function sendBookingNotification(data: BookingEmailData) {
   })
 }
 
+export interface CancellationEmailData {
+  customerName: string
+  customerEmail: string
+  date: string
+  reservationCode: string
+  courts: CourtGroup[]
+}
+
+export async function sendCancellationEmail(data: CancellationEmailData) {
+  const { resend, FROM_EMAIL, ADMIN_EMAIL, SITE_URL } = getEnv()
+  const LOGO_URL = `${SITE_URL}/logo.png`
+
+  const { customerName, customerEmail, date, reservationCode, courts } = data
+  const formattedDate = formatDate(date)
+  const totalSlots = courts.reduce((sum, c) => sum + c.slots.length, 0)
+
+  const courtsHtml = courts.map((court) => `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;border:1px solid #fecaca;border-radius:8px;overflow:hidden;">
+      <tr>
+        <td style="background:#fef2f2;padding:8px 12px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:13px;font-weight:700;color:#991b1b;">${escapeHtml(court.courtName)}</td>
+              <td align="right" style="font-size:11px;font-weight:600;color:#b91c1c;text-transform:capitalize;">${escapeHtml(court.courtType)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      ${court.slots.map((s, i) => `
+      <tr>
+        <td style="padding:7px 12px;background:#fff5f5;border-top:1px solid #fecaca;">
+          <span style="font-size:12px;font-weight:600;color:#991b1b;text-decoration:line-through;">${i + 1}. ${formatTime(s.startTime)} &ndash; ${formatTime(s.endTime)}</span>
+        </td>
+      </tr>`).join("")}
+    </table>
+  `).join("")
+
+  // Send to customer
+  await resend.emails.send({
+    from: `Velocity Pickleball Hub <${FROM_EMAIL}>`,
+    to: customerEmail,
+    subject: `Booking Cancelled — ${reservationCode}`,
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(150deg,#7f1d1d 0%,#991b1b 100%);border-radius:12px 12px 0 0;padding:28px 32px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td valign="middle">
+                  <img src="${LOGO_URL}" alt="Velocity Pickleball Hub" width="40" height="40" style="border-radius:8px;display:block;" />
+                </td>
+                <td valign="middle" style="padding-left:12px;">
+                  <p style="margin:0;font-size:13px;font-weight:700;color:#ffffff;letter-spacing:0.01em;">Velocity Pickleball Hub</p>
+                  <p style="margin:1px 0 0;font-size:11px;color:rgba(255,255,255,0.45);letter-spacing:0.08em;text-transform:uppercase;">Cebu</p>
+                </td>
+                <td align="right" valign="middle">
+                  <span style="display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:#ffffff;letter-spacing:0.08em;text-transform:uppercase;">Cancelled</span>
+                </td>
+              </tr>
+            </table>
+            <div style="margin-top:24px;">
+              <h1 style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;">Booking Cancelled</h1>
+              <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.55);">Hi ${escapeHtml(customerName.split(" ")[0])}, your booking has been cancelled.</p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Reservation code band -->
+        <tr>
+          <td style="background:#111827;padding:12px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.4);">Reservation Code</td>
+                <td align="right" style="font-family:monospace;font-size:15px;font-weight:700;color:#fca5a5;letter-spacing:0.08em;text-decoration:line-through;">${reservationCode}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="background:#ffffff;padding:24px 32px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+            <p style="margin:0 0 6px;font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Date</p>
+            <p style="margin:0 0 20px;font-size:14px;font-weight:600;color:#111827;">${formattedDate}</p>
+
+            <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af;">Cancelled Slots</p>
+            ${courtsHtml}
+
+            <div style="margin-top:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 16px;">
+              <p style="margin:0;font-size:13px;color:#991b1b;line-height:1.5;">This booking has been cancelled. The time slots are now available for others to book.</p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#1b4332;padding:20px 32px;border-radius:0 0 12px 12px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center">
+                  <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.6);">Want to rebook? Visit our website anytime.</p>
+                  <p style="margin:10px 0 0;font-size:11px;color:rgba(255,255,255,0.35);">
+                    Velocity Pickleball Hub &mdash; Cebu &nbsp;&middot;&nbsp;
+                    <a href="${SITE_URL}" style="color:rgba(255,255,255,0.35);text-decoration:none;">${SITE_URL.replace("https://", "")}</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+    `,
+  })
+
+  // Notify admin
+  if (ADMIN_EMAIL) {
+    resend.emails.send({
+      from: `Velocity Pickleball Hub <${FROM_EMAIL}>`,
+      to: ADMIN_EMAIL,
+      subject: `Booking Cancelled — ${escapeHtml(customerName)} · ${formattedDate} (${totalSlots} slot${totalSlots > 1 ? "s" : ""})`,
+      html: `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+        <tr>
+          <td style="background:#7f1d1d;border-radius:12px 12px 0 0;padding:24px 36px;">
+            <h1 style="margin:0;font-size:20px;font-weight:800;color:#ffffff;">Booking Cancelled by Customer</h1>
+            <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.6);">${escapeHtml(customerName)} &middot; ${formattedDate}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;padding:24px 36px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
+            <p style="margin:0 0 4px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">Reservation Code</p>
+            <p style="margin:0 0 16px;font-size:15px;font-weight:700;color:#991b1b;font-family:monospace;">${reservationCode}</p>
+            ${courtsHtml}
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+      `,
+    }).catch(console.error)
+  }
+}
+
 export async function sendReceiptEmail(data: ReceiptEmailData) {
   const { resend, FROM_EMAIL, SITE_URL } = getEnv()
   const LOGO_URL = `${SITE_URL}/logo.png`

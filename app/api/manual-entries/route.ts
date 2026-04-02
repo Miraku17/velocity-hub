@@ -101,59 +101,57 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  // Also create a reservation when court and time info are provided
+  // Also create a booking when court and time info are provided
   let reservationId: string | null = null
   if (court_id && start_time && end_time) {
     const adminClient = createAdminClient()
-    const { data: resData, error: resError } = await adminClient.rpc(
-      "create_reservation",
-      {
-        p_court_id: court_id,
-        p_customer_name: description,
-        p_customer_email: "Manual Input",
-        p_customer_phone: "Manual Input",
-        p_date: entry_date,
-        p_start_time: start_time,
-        p_end_time: end_time,
-        p_reservation_type: "walk-in",
-        p_notes: description + (notes ? ` — ${notes}` : ""),
-      }
-    )
 
-    if (!resError && resData) {
-      reservationId = resData as string
+    // Compute the correct hourly rate from the court's schedule
+    const dayOfWeek = new Date(entry_date + "T00:00:00").getDay()
+    const { data: courtInfo } = await adminClient
+      .from("courts")
+      .select("price_per_hour, court_schedules(*)")
+      .eq("id", court_id)
+      .single()
 
-      // Compute the correct hourly rate from the court's schedule
-      const dayOfWeek = new Date(entry_date + "T00:00:00").getDay()
-      const { data: courtInfo } = await adminClient
-        .from("courts")
-        .select("price_per_hour, court_schedules(*)")
-        .eq("id", court_id)
-        .single()
+    const courtBasePrice: number = courtInfo?.price_per_hour ?? 0
+    const daySchedule = (courtInfo?.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
+      ?.find((s) => s.day_of_week === dayOfWeek)
+    const rates = daySchedule?.hourly_rates ?? null
 
-      const courtBasePrice: number = courtInfo?.price_per_hour ?? 0
-      const daySchedule = (courtInfo?.court_schedules as { day_of_week: number; hourly_rates?: Record<string, number> | null }[] | null)
-        ?.find((s) => s.day_of_week === dayOfWeek)
-      const rates = daySchedule?.hourly_rates ?? null
+    const sh = parseInt(start_time.split(":")[0], 10)
+    const eh = parseInt(end_time.split(":")[0], 10)
+    const hrs = eh > sh ? eh - sh : 24 - sh + eh
+    let correctTotal = 0
+    for (let h = sh; h < sh + hrs; h++) {
+      correctTotal += rates?.[String(h % 24)] ?? courtBasePrice
+    }
+    const correctRate = hrs > 0 ? correctTotal / hrs : courtBasePrice
+    const finalTotal = amount != null ? amount : correctTotal
 
-      const sh = parseInt(start_time.split(":")[0], 10)
-      const eh = parseInt(end_time.split(":")[0], 10)
-      const hrs = eh > sh ? eh - sh : 24 - sh + eh
-      let correctTotal = 0
-      for (let h = sh; h < sh + hrs; h++) {
-        correctTotal += rates?.[String(h % 24)] ?? courtBasePrice
-      }
-      const correctRate = hrs > 0 ? correctTotal / hrs : courtBasePrice
+    const { data: bookingId, error: bookingError } = await adminClient.rpc("create_booking", {
+      p_customer_name: description,
+      p_customer_email: "Manual Input",
+      p_customer_phone: "Manual Input",
+      p_date: entry_date,
+      p_reservation_type: "walk-in",
+      p_notes: description + (notes ? ` — ${notes}` : ""),
+      p_items: [{ court_id, start_time, end_time }],
+    })
 
-      // Auto-confirm and set correct rate; override total_amount if admin provided one
+    if (!bookingError && bookingId) {
+      reservationId = bookingId as string
+
+      // Auto-confirm with correct rate and total
       await adminClient
-        .from("reservations")
-        .update({
-          status: "confirmed",
-          price_per_hour: correctRate,
-          ...(amount != null ? { total_amount: amount } : { total_amount: correctTotal }),
-        })
-        .eq("id", reservationId)
+        .from("bookings")
+        .update({ status: "confirmed", payment_status: "paid", total_amount: finalTotal })
+        .eq("id", bookingId)
+
+      await adminClient
+        .from("booking_items")
+        .update({ price_per_hour: correctRate, total_amount: finalTotal })
+        .eq("booking_id", bookingId)
     }
   }
 
@@ -208,17 +206,24 @@ export async function DELETE(request: NextRequest) {
     .eq("id", id)
     .single()
 
-  // Cancel the matching reservation if one exists
+  // Cancel the matching booking if one exists
   if (entry?.court_id && entry?.start_time && entry?.end_time) {
     const adminClient = createAdminClient()
-    await adminClient
-      .from("reservations")
-      .delete()
+    const { data: matchingItems } = await adminClient
+      .from("booking_items")
+      .select("booking_id")
       .eq("court_id", entry.court_id)
-      .eq("reservation_date", entry.entry_date)
+      .eq("booking_date", entry.entry_date)
       .eq("start_time", entry.start_time)
       .eq("end_time", entry.end_time)
-      .eq("customer_email", "Manual Input")
+    if (matchingItems && matchingItems.length > 0) {
+      const bookingIds = matchingItems.map((i: { booking_id: string }) => i.booking_id)
+      await adminClient
+        .from("bookings")
+        .delete()
+        .in("id", bookingIds)
+        .eq("customer_email", "Manual Input")
+    }
   }
 
   const { error } = await supabase
