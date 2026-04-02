@@ -32,19 +32,24 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  // Return signed URLs instead of public URLs
+  // Return signed URLs for private bucket
   const receiptsWithSignedUrls = await Promise.all(
     (data ?? []).map(async (receipt) => {
-      if (!receipt.storage_path) return receipt
+      if (!receipt.storage_path) {
+        console.error("payment_receipts: missing storage_path for id", receipt.id)
+        return { ...receipt, image_url: null }
+      }
 
-      const { data: signedData } = await supabase.storage
+      const { data: signedData, error: signErr } = await supabase.storage
         .from("receipts")
         .createSignedUrl(receipt.storage_path, 60 * 60) // 1 hour expiry
 
-      return {
-        ...receipt,
-        image_url: signedData?.signedUrl ?? receipt.image_url,
+      if (signErr || !signedData?.signedUrl) {
+        console.error("payment_receipts: failed to sign url for", receipt.storage_path, signErr?.message)
+        return { ...receipt, image_url: null }
       }
+
+      return { ...receipt, image_url: signedData.signedUrl }
     })
   )
 

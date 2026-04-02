@@ -127,6 +127,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
       return;
     }
 
+    // Snapshot cart data now, before any async work or clearCart()
+    setConfirmedGroups(groups);
+    setConfirmedTotal(total);
+    setConfirmedDate(formattedDate);
+
     const bookingsPayload = buildBookingPayload(items);
 
     createReservation.mutate(
@@ -141,9 +146,6 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
       },
       {
         onSuccess: (data) => {
-          setConfirmedGroups(groups);
-          setConfirmedTotal(total);
-          setConfirmedDate(formattedDate);
           setShowConfirmModal(false);
           setReservationId(data.id);
           setBookingConfirmed(true);
