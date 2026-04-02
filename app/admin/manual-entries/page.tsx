@@ -128,7 +128,7 @@ function EntryFormModal({
     return generateTimeSlots(courtSchedule.open_time, courtSchedule.close_time)
   }, [courtSchedule])
 
-  // Fetch existing reservations for selected court + date
+  // Fetch existing bookings for selected court + date
   const { data: existingReservations = [] } = useQuery<
     { start_time: string; end_time: string; status: string }[]
   >({
@@ -136,13 +136,24 @@ function EntryFormModal({
     queryFn: async () => {
       if (!courtId) return []
       const res = await fetch(
-        `/api/reservations?court_id=${courtId}&date=${date}&fields=start_time,end_time,status`
+        `/api/reservations?court_id=${courtId}&date=${date}`
       )
       if (!res.ok) return []
       const json = await res.json()
-      return (json.data || []).filter(
-        (r: { status: string }) => r && r.status !== "cancelled"
-      )
+      const bookings = json.data || []
+      // Extract booking_items for this court and flatten into slot entries
+      const slots: { start_time: string; end_time: string; status: string }[] = []
+      for (const b of bookings) {
+        if (!b || b.status === "cancelled") continue
+        const items = b.booking_items || []
+        for (const item of items) {
+          if (!item || item.court_id !== courtId) continue
+          if (item.start_time && item.end_time) {
+            slots.push({ start_time: item.start_time, end_time: item.end_time, status: b.status })
+          }
+        }
+      }
+      return slots
     },
     enabled: !!courtId,
     staleTime: 0,

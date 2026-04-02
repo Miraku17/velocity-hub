@@ -67,17 +67,17 @@ export async function POST(request: NextRequest) {
   }
 
   // Check for confirmed/pending bookings that would conflict with this block
-  let conflictQuery = supabase
-    .from("reservations")
-    .select("id, customer_name, start_time, end_time, status")
-    .eq("reservation_date", blocked_date)
-    .in("status", ["pending", "confirmed"])
+  let itemQuery = supabase
+    .from("booking_items")
+    .select("id, court_id, start_time, end_time, booking_id, bookings!inner(id, customer_name, status)")
+    .eq("booking_date", blocked_date)
+    .in("bookings.status", ["pending", "confirmed"])
 
   if (court_id) {
-    conflictQuery = conflictQuery.eq("court_id", court_id)
+    itemQuery = itemQuery.eq("court_id", court_id)
   }
 
-  const { data: allReservations } = await conflictQuery
+  const { data: allItems } = await itemQuery
 
   // Check overlap in JS — handles midnight (00:00:00) correctly by treating it as 1440 min (end of day)
   const toMinutes = (t: string) => {
@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
     return mins === 0 ? 1440 : mins
   }
 
-  let conflicts = allReservations || []
+  type ConflictItem = { id: string; start_time: string; end_time: string; bookings: { id: string; customer_name: string; status: string }[] }
+  let conflicts = (allItems || []) as unknown as ConflictItem[]
   if (start_time && end_time) {
     const blockStart = toMinutes(start_time)
     const blockEnd = toMinutes(end_time)
@@ -102,7 +103,13 @@ export async function POST(request: NextRequest) {
     return Response.json(
       {
         error: `Cannot block: ${count} existing booking${count > 1 ? "s" : ""} conflict with this time slot. Please review existing bookings first.`,
-        conflicts,
+        conflicts: conflicts.map((c) => ({
+          id: c.bookings[0]?.id,
+          customer_name: c.bookings[0]?.customer_name,
+          start_time: c.start_time,
+          end_time: c.end_time,
+          status: c.bookings[0]?.status,
+        })),
       },
       { status: 409 }
     )

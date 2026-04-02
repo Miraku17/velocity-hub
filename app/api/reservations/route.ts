@@ -245,47 +245,47 @@ export async function POST(request: NextRequest) {
     bookings?: { court_id: string; time_blocks: { start_time: string; end_time: string }[] }[]
   }
 
-  // Verify Cloudflare Turnstile token
-  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
-  if (turnstileSecret) {
-    if (!turnstile_token) {
-      return Response.json(
-        { error: "Human verification is required. Please complete the CAPTCHA." },
-        { status: 400 }
-      )
-    }
+  // // Verify Cloudflare Turnstile token (temporarily disabled)
+  // const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
+  // if (turnstileSecret) {
+  //   if (!turnstile_token) {
+  //     return Response.json(
+  //       { error: "Human verification is required. Please complete the CAPTCHA." },
+  //       { status: 400 }
+  //     )
+  //   }
 
-    let turnstileSuccess = false
-    try {
-      const verifyRes = await fetch(
-        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            secret: turnstileSecret,
-            response: turnstile_token,
-            remoteip: ip,
-          }),
-        }
-      )
+  //   let turnstileSuccess = false
+  //   try {
+  //     const verifyRes = await fetch(
+  //       "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+  //       {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  //         body: new URLSearchParams({
+  //           secret: turnstileSecret,
+  //           response: turnstile_token,
+  //           remoteip: ip,
+  //         }),
+  //       }
+  //     )
 
-      const verification = (await verifyRes.json()) as { success: boolean }
-      turnstileSuccess = verification.success
-    } catch {
-      return Response.json(
-        { error: "Unable to verify human check. Please try again." },
-        { status: 503 }
-      )
-    }
+  //     const verification = (await verifyRes.json()) as { success: boolean }
+  //     turnstileSuccess = verification.success
+  //   } catch {
+  //     return Response.json(
+  //       { error: "Unable to verify human check. Please try again." },
+  //       { status: 503 }
+  //     )
+  //   }
 
-    if (!turnstileSuccess) {
-      return Response.json(
-        { error: "Human verification failed. Please try again." },
-        { status: 403 }
-      )
-    }
-  }
+  //   if (!turnstileSuccess) {
+  //     return Response.json(
+  //       { error: "Human verification failed. Please try again." },
+  //       { status: 403 }
+  //     )
+  //   }
+  // }
 
   const isMultiCourt = Array.isArray(bookings) && bookings.length > 0
   const legacyBlocks = time_blocks && time_blocks.length > 0
