@@ -140,7 +140,7 @@ export function CourtAvailabilityGrid({ data, date, isLoading }: CourtAvailabili
                 const slotStatus = data.slots[court.id]?.[String(hour)];
                 const isClosed = !slotStatus;
                 const startTime = `${String(hour).padStart(2, "0")}:00`;
-                const endTime = `${String((hour + 1) % 24).padStart(2, "0")}:00`;
+                const endTime = hour === 23 ? "24:00" : `${String(hour + 1).padStart(2, "0")}:00`;
                 const isSelected = selectedSet.has(`${court.id}:${startTime}`);
                 const price = getHourRate(
                   hour,
