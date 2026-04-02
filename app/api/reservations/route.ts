@@ -448,23 +448,27 @@ export async function POST(request: NextRequest) {
     courts: Array.isArray(bi.courts) ? bi.courts[0] ?? null : bi.courts,
   }))
 
-  const allSlots = bookingItems.map((bi) => ({ startTime: bi.start_time, endTime: bi.end_time }))
-  const courtNames = [...new Set(bookingItems.map((bi) => bi.courts?.name ?? "Unknown"))]
-  const firstItem = bookingItems[0]
+  // Group booking items by court for the email
+  const courtGroupMap = new Map<string, { courtName: string; courtType: string; slots: { startTime: string; endTime: string }[] }>()
+  for (const bi of bookingItems) {
+    const name = bi.courts?.name ?? "Unknown"
+    const type = bi.courts?.court_type ?? ""
+    if (!courtGroupMap.has(bi.court_id)) {
+      courtGroupMap.set(bi.court_id, { courtName: name, courtType: type, slots: [] })
+    }
+    courtGroupMap.get(bi.court_id)!.slots.push({ startTime: bi.start_time, endTime: bi.end_time })
+  }
+  const notifCourts = Array.from(courtGroupMap.values())
 
   sendBookingNotification({
     reservationCode: booking?.booking_code ?? bookingId,
     customerName: customer_name,
     customerEmail: customer_email,
     customerPhone: customer_phone,
-    courtName: courtNames.join(", "),
-    courtType: firstItem?.courts?.court_type ?? "",
     date,
-    startTime: firstItem?.start_time ?? "",
-    endTime: firstItem?.end_time ?? "",
     reservationType: reservation_type || "regular",
     notes,
-    slots: allSlots,
+    courts: notifCourts,
   }).catch(console.error)
 
   return Response.json({ id: bookingId, booking_code: booking?.booking_code }, { status: 201 })
@@ -480,7 +484,8 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: "Staff access required" }, { status: 403 })
   }
 
-  const supabase = await createClient()
+  const { createAdminClient } = await import("@/lib/supabase/admin")
+  const supabase = createAdminClient()
 
   const body = await request.json()
   const { id, status, payment_status, notes } = body as {
@@ -531,28 +536,30 @@ export async function PATCH(request: NextRequest) {
         courts: Array.isArray(bi.courts) ? bi.courts[0] ?? null : bi.courts,
       }))
 
-      const firstItem = items[0]
-      const courtNames = [...new Set(items.map((i) => i.courts?.name ?? "Unknown"))]
+      const receiptCourtMap = new Map<string, { courtName: string; courtType: string; slots: { startTime: string; endTime: string; amount: number }[] }>()
+      for (const item of items) {
+        const name = item.courts?.name ?? "Unknown"
+        const type = item.courts?.court_type ?? ""
+        if (!receiptCourtMap.has(item.court_id)) {
+          receiptCourtMap.set(item.court_id, { courtName: name, courtType: type, slots: [] })
+        }
+        receiptCourtMap.get(item.court_id)!.slots.push({
+          startTime: item.start_time,
+          endTime: item.end_time,
+          amount: Number(item.total_amount),
+        })
+      }
+      const receiptCourts = Array.from(receiptCourtMap.values())
 
       sendReceiptEmail({
         customerName: booking.customer_name,
         customerEmail: booking.customer_email,
-        courtName: courtNames.join(", "),
-        courtType: firstItem?.courts?.court_type ?? "",
         date: booking.booking_date,
-        startTime: firstItem?.start_time ?? "",
-        endTime: firstItem?.end_time ?? "",
         reservationType: booking.reservation_type,
         reservationCode: booking.booking_code,
         totalAmount: booking.total_amount,
         notes: booking.notes,
-        slots: items.length > 1
-          ? items.map((i) => ({
-              startTime: i.start_time,
-              endTime: i.end_time,
-              amount: Number(i.total_amount),
-            }))
-          : undefined,
+        courts: receiptCourts,
       }).catch(console.error)
     }
   }
