@@ -149,7 +149,6 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
           setBookingConfirmed(true);
           sessionStorage.removeItem(STORAGE_KEY);
           clearCart();
-          setStep(1);
           queryClient.invalidateQueries({ queryKey: ["calendar-availability"] });
           queryClient.invalidateQueries({ queryKey: ["grid-availability"] });
         },
@@ -599,16 +598,18 @@ function BookingConfirmation({
   setShowSlots: (v: boolean) => void;
 }) {
   const router = useRouter();
+  const { setStep } = useBookingCart();
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     if (countdown <= 0) {
+      setStep(1);
       router.push("/");
       return;
     }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [countdown, router]);
+  }, [countdown, router, setStep]);
 
   const totalSlots = groups.reduce((sum, g) => sum + g.ranges.reduce((s, r) => {
     const startH = parseInt(r.start_time.split(":")[0], 10);
@@ -743,14 +744,14 @@ function BookingConfirmation({
       </div>
 
       <div className="text-center mt-6 space-y-2">
-        <Link
-          href="/"
+        <button
+          onClick={() => { setStep(1); router.push("/"); }}
           className="inline-flex items-center gap-2 rounded-xl px-8 py-3.5 font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] shadow-sm"
           style={{ backgroundColor: colors.bg, color: colors.accent }}
         >
           <span className="material-symbols-outlined text-[16px]">home</span>
           Back to Home
-        </Link>
+        </button>
         <p className="font-[Poppins] text-[11px]" style={{ color: `${colors.bg}50` }}>
           Redirecting in {countdown}s…
         </p>
