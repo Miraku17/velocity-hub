@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   getAuthenticatedUser,
-  checkIsAdmin,
+  checkIsStaff,
   unauthorizedResponse,
 } from "@/lib/supabase/auth"
 import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
@@ -59,13 +59,13 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const params = request.nextUrl.searchParams
   const user = await getAuthenticatedUser()
-  const isAdmin = user ? await checkIsAdmin() : false
+  const isStaff = user ? await checkIsStaff() : false
 
   const date = params.get("date")
   const courtId = params.get("court_id")
 
   // Public (unauthenticated) access: only slot availability lookups
-  if (!isAdmin) {
+  if (!isStaff) {
     if (!courtId || !date) {
       return Response.json(
         { error: "court_id and date are required" },
@@ -537,18 +537,12 @@ export async function PATCH(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return unauthorizedResponse()
 
-  const supabase = await createClient()
-
-  // Check if admin
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (profile?.role !== "admin") {
-    return Response.json({ error: "Admin access required" }, { status: 403 })
+  const isStaff = await checkIsStaff()
+  if (!isStaff) {
+    return Response.json({ error: "Staff access required" }, { status: 403 })
   }
+
+  const supabase = await createClient()
 
   const body = await request.json()
   const { id, status, payment_status, notes } = body as {
