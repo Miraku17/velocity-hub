@@ -1,10 +1,19 @@
 import { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  getAuthenticatedUser,
+  checkIsStaff,
+  unauthorizedResponse,
+  forbiddenResponse,
+} from "@/lib/supabase/auth"
+import { rateLimit } from "@/lib/rate-limit"
 
-// GET /api/payment-receipts?reservation_id=xxx — fetch receipts for a reservation
-// Supports comma-separated IDs for grouped reservations:
-//   ?reservation_id=id1,id2,id3
+// GET /api/payment-receipts?reservation_id=xxx — fetch receipts (staff only)
 export async function GET(request: NextRequest) {
+  const user = await getAuthenticatedUser()
+  if (!user) return unauthorizedResponse()
+  if (!(await checkIsStaff())) return forbiddenResponse()
+
   const param = request.nextUrl.searchParams.get("reservation_id")
 
   if (!param) {
@@ -25,11 +34,44 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  return Response.json(data)
+  // Return signed URLs instead of public URLs
+  const receiptsWithSignedUrls = await Promise.all(
+    (data ?? []).map(async (receipt) => {
+      if (!receipt.storage_path) return receipt
+
+      const { data: signedData } = await supabase.storage
+        .from("receipts")
+        .createSignedUrl(receipt.storage_path, 60 * 60) // 1 hour expiry
+
+      return {
+        ...receipt,
+        image_url: signedData?.signedUrl ?? receipt.image_url,
+      }
+    })
+  )
+
+  return Response.json(receiptsWithSignedUrls)
 }
 
 // POST /api/payment-receipts — public, upload receipt image + save record
 export async function POST(request: NextRequest) {
+  // Rate limit by IP
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? request.headers.get("x-real-ip")
+    ?? "unknown"
+
+  const { limited, retryAfter } = rateLimit(ip, "POST:/api/payment-receipts", {
+    maxRequests: 10,
+    windowMs: 15 * 60 * 1000,
+  })
+
+  if (limited) {
+    return Response.json(
+      { error: "Too many upload attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    )
+  }
+
   const formData = await request.formData()
   const file = formData.get("file") as File | null
   const reservationId = formData.get("reservation_id") as string | null
@@ -40,6 +82,12 @@ export async function POST(request: NextRequest) {
 
   if (!reservationId) {
     return Response.json({ error: "reservation_id is required" }, { status: 400 })
+  }
+
+  // Validate UUID format
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!UUID_RE.test(reservationId)) {
+    return Response.json({ error: "Invalid reservation_id" }, { status: 400 })
   }
 
   // Validate file type
@@ -82,7 +130,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: uploadErr.message }, { status: 500 })
   }
 
-  // Get public URL
+  // Store the storage path (not a public URL)
   const { data: urlData } = supabase.storage
     .from("receipts")
     .getPublicUrl(uploadData.path)
