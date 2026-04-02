@@ -27,6 +27,22 @@ export async function checkIsAdmin(): Promise<boolean> {
   return profile?.role === "admin"
 }
 
+export async function checkIsStaff(): Promise<boolean> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return false
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  return profile?.role === "admin" || profile?.role === "employee"
+}
+
 export async function checkPermission(permissionName: string): Promise<boolean> {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("has_permission", {
