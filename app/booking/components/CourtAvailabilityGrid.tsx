@@ -82,7 +82,7 @@ export function CourtAvailabilityGrid({ data, date, isLoading }: CourtAvailabili
         <div
           className="grid gap-px min-w-max"
           style={{
-            gridTemplateColumns: `64px repeat(${openCourts.length}, minmax(68px, 1fr))`,
+            gridTemplateColumns: `auto repeat(${openCourts.length}, minmax(68px, 1fr))`,
           }}
         >
           {/* Header row */}

@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatLocalDate, colors } from "../utils";
 import { CourtAvailabilityGrid } from "./CourtAvailabilityGrid";
-import { BookingCart, MobileCartBar } from "./BookingCart";
+import { BookingCart } from "./BookingCart";
 
 interface StepCourtGridProps {
   onNext: () => void;
@@ -67,7 +67,6 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
-    // Clear cart when date changes since we're single-date
     clearCart();
   };
 
@@ -84,7 +83,6 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
     setCheckingAvailability(true);
 
     try {
-      // Refetch grid data to check for conflicts
       const freshData = await queryClient.fetchQuery({
         queryKey: ["grid-availability", dateStr],
         staleTime: 0,
@@ -96,7 +94,6 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
         return;
       }
 
-      // Check each selected item against fresh data
       const conflicts: string[] = [];
       for (const item of items) {
         const hour = parseInt(item.start_time.split(":")[0], 10);
@@ -118,122 +115,142 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
       onNext();
     } catch {
       setCheckingAvailability(false);
-      onNext(); // Let the RPC guard handle it
+      onNext();
     }
   }, [items, checkingAvailability, dateStr, queryClient, gridData, onNext]);
 
+  const { bg } = colors;
+
+  const formattedDateShort = selectedDate.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-      {/* Left: Date picker + Grid */}
-      <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-        {/* Date picker card */}
-        <div
-          className="bg-white rounded-2xl p-5 sm:p-8 shadow-sm"
-          style={{ border: `1px solid ${colors.bg}08` }}
-        >
-          <label
-            className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-3 block"
-            style={{ color: `${colors.bg}80` }}
-          >
-            <span
-              className="material-symbols-outlined text-sm align-middle mr-1"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              calendar_today
-            </span>
-            Select Date
-          </label>
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        {/* Left: Date picker + Grid */}
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+
+          {/* Date picker card */}
           <div
-            className="rounded-xl overflow-hidden inline-block max-w-full"
-            style={{ border: `1px solid ${colors.bg}0d` }}
+            className="bg-white rounded-2xl p-5 sm:p-8 shadow-sm"
+            style={{ border: `1px solid ${bg}08` }}
           >
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => date && handleDateChange(date)}
-              disabled={{ before: today, after: maxDate }}
-              modifiers={calendarModifiers}
-              className="bg-white"
-            />
-          </div>
-          <div className="flex items-center gap-4 mt-3">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="font-[Poppins] text-[10px]" style={{ color: `${colors.bg}50` }}>
-                Available
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
-              <span className="font-[Poppins] text-[10px]" style={{ color: `${colors.bg}50` }}>
-                Fully Booked
-              </span>
-            </div>
-          </div>
-          <p
-            className="font-[Poppins] text-[10px] sm:text-[11px] mt-2"
-            style={{ color: `${colors.bg}40` }}
-          >
-            Selected:{" "}
-            <span className="font-semibold" style={{ color: `${colors.bg}99` }}>
-              {formattedDate}
-            </span>
-          </p>
-        </div>
-
-        {/* Availability Grid card */}
-        <div
-          className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm"
-          style={{ border: `1px solid ${colors.bg}08` }}
-        >
-          <label
-            className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-4 block"
-            style={{ color: `${colors.bg}80` }}
-          >
-            <span
-              className="material-symbols-outlined text-sm align-middle mr-1"
-              style={{ fontVariationSettings: "'FILL' 1" }}
+            <label
+              className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-3 block"
+              style={{ color: `${bg}80` }}
             >
-              grid_view
-            </span>
-            Court Availability — {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-          </label>
-
-          {gridData ? (
-            <CourtAvailabilityGrid
-              data={gridData}
-              date={dateStr}
-              isLoading={isFetching}
-            />
-          ) : isLoading ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
               <span
-                className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"
-                style={{ borderColor: `${colors.bg}20`, borderTopColor: colors.bg }}
-              />
-              <p className="font-[Poppins] text-xs font-medium" style={{ color: `${colors.bg}50` }}>
-                Loading availability...
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center py-12">
-              <span
-                className="material-symbols-outlined text-3xl mb-2"
-                style={{ color: `${colors.bg}15`, fontVariationSettings: "'FILL' 0, 'wght' 300" }}
+                className="material-symbols-outlined text-sm align-middle mr-1"
+                style={{ fontVariationSettings: "'FILL' 1" }}
               >
-                error_outline
+                calendar_today
               </span>
-              <p className="font-[Poppins] text-sm" style={{ color: `${colors.bg}40` }}>
-                Unable to load availability
-              </p>
+              Select Date
+            </label>
+            <div
+              className="rounded-xl overflow-hidden inline-block max-w-full"
+              style={{ border: `1px solid ${bg}0d` }}
+            >
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && handleDateChange(date)}
+                disabled={{ before: today, after: maxDate }}
+                modifiers={calendarModifiers}
+                className="bg-white"
+              />
             </div>
-          )}
-        </div>
-      </div>
+            <div className="flex items-center gap-4 mt-3">
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                <span className="font-[Poppins] text-[10px]" style={{ color: `${bg}50` }}>
+                  Available
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
+                <span className="font-[Poppins] text-[10px]" style={{ color: `${bg}50` }}>
+                  Fully Booked
+                </span>
+              </div>
+            </div>
+            <p
+              className="font-[Poppins] text-[10px] sm:text-[11px] mt-2"
+              style={{ color: `${bg}40` }}
+            >
+              Selected:{" "}
+              <span className="font-semibold" style={{ color: `${bg}99` }}>
+                {formattedDate}
+              </span>
+            </p>
+          </div>
 
-      {/* Right: Cart sidebar (desktop) */}
-      <div className="hidden lg:block">
-        <div className="sticky top-24">
+          {/* Availability Grid card */}
+          <div
+            className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm"
+            style={{ border: `1px solid ${bg}08` }}
+          >
+            <label
+              className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-4 block"
+              style={{ color: `${bg}80` }}
+            >
+              <span
+                className="material-symbols-outlined text-sm align-middle mr-1"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                grid_view
+              </span>
+              Tap to select slots — {formattedDateShort}
+            </label>
+
+            {gridData ? (
+              <CourtAvailabilityGrid
+                data={gridData}
+                date={dateStr}
+                isLoading={isFetching}
+              />
+            ) : isLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <span
+                  className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"
+                  style={{ borderColor: `${bg}20`, borderTopColor: bg }}
+                />
+                <p className="font-[Poppins] text-xs font-medium" style={{ color: `${bg}50` }}>
+                  Loading availability...
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-12">
+                <span
+                  className="material-symbols-outlined text-3xl mb-2"
+                  style={{ color: `${bg}15`, fontVariationSettings: "'FILL' 0, 'wght' 300" }}
+                >
+                  error_outline
+                </span>
+                <p className="font-[Poppins] text-sm" style={{ color: `${bg}40` }}>
+                  Unable to load availability
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Cart sidebar (desktop) */}
+        <div className="hidden lg:block">
+          <div className="sticky top-24">
+            <BookingCart
+              onProceed={handleProceed}
+              onBack={onBack}
+              isCheckingAvailability={checkingAvailability}
+            />
+          </div>
+        </div>
+
+        {/* Mobile: Full cart (shown below grid) */}
+        <div className="lg:hidden pb-20">
           <BookingCart
             onProceed={handleProceed}
             onBack={onBack}
@@ -242,13 +259,70 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
         </div>
       </div>
 
-      {/* Mobile: Cart at bottom + floating bar */}
-      <div className="lg:hidden">
-        <BookingCart
-          onProceed={handleProceed}
-          onBack={onBack}
-          isCheckingAvailability={checkingAvailability}
-        />
+      {/* Mobile floating cart bar */}
+      <MobileFloatingBar
+        onProceed={handleProceed}
+        onBack={onBack}
+        isCheckingAvailability={checkingAvailability}
+      />
+    </>
+  );
+}
+
+/** Mobile floating bar — visible when items are selected */
+function MobileFloatingBar({
+  onProceed,
+  onBack,
+  isCheckingAvailability,
+}: {
+  onProceed: () => void;
+  onBack: () => void;
+  isCheckingAvailability?: boolean;
+}) {
+  const { items } = useBookingCart();
+  const total = useMemo(() => {
+    return items.reduce((sum, item) => sum + item.price, 0);
+  }, [items]);
+
+  if (items.length === 0) return null;
+
+  const { bg, accent } = colors;
+
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden"
+      style={{ backgroundColor: bg }}
+    >
+      <div className="absolute inset-0 grain-overlay opacity-15 pointer-events-none" />
+      <div className="relative z-10 max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p
+            className="font-[Poppins] text-[10px] uppercase tracking-wider font-semibold"
+            style={{ color: `${colors.accentDim}80` }}
+          >
+            {items.length} slot{items.length > 1 ? "s" : ""} selected
+          </p>
+          <p className="font-['Clash_Display'] text-lg font-bold text-white">
+            ₱{total.toLocaleString("en-PH")}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="px-3 py-2.5 rounded-xl font-[Poppins] font-bold text-[10px] uppercase tracking-wider transition-all active:scale-[0.98]"
+            style={{ border: `1px solid ${accent}30`, color: accent }}
+          >
+            Back
+          </button>
+          <button
+            onClick={onProceed}
+            disabled={isCheckingAvailability}
+            className="px-5 py-2.5 rounded-xl font-[Poppins] font-bold text-[10px] uppercase tracking-wider transition-all active:scale-[0.98]"
+            style={{ backgroundColor: accent, color: bg }}
+          >
+            {isCheckingAvailability ? "Checking..." : "Review"}
+          </button>
+        </div>
       </div>
     </div>
   );

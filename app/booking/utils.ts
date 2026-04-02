@@ -69,12 +69,21 @@ export function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Convert 24h hour to "7:00 AM" format */
+/** Convert 24h hour to "7:00 - 8:00 AM" range format */
 export function hour24ToLabel(hour: number): string {
-  const displayHour = hour % 24;
-  const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
-  const ampm = displayHour < 12 ? "AM" : "PM";
-  return `${hour12}:00 ${ampm}`;
+  const startH = hour % 24;
+  const endH = (hour + 1) % 24;
+
+  const to12 = (h: number) => (h === 0 ? 12 : h > 12 ? h - 12 : h);
+  const period = (h: number) => (h < 12 ? "AM" : "PM");
+
+  const startPeriod = period(startH);
+  const endPeriod = period(endH);
+
+  if (startPeriod === endPeriod) {
+    return `${to12(startH)}:00 - ${to12(endH)}:00 ${endPeriod}`;
+  }
+  return `${to12(startH)}:00 ${startPeriod} - ${to12(endH)}:00 ${endPeriod}`;
 }
 
 export const STORAGE_KEY = "velocity-booking-form";
