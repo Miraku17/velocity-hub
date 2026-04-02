@@ -141,7 +141,7 @@ function EntryFormModal({
       if (!res.ok) return []
       const json = await res.json()
       return (json.data || []).filter(
-        (r: { status: string }) => r.status !== "cancelled"
+        (r: { status: string }) => r && r.status !== "cancelled"
       )
     },
     enabled: !!courtId,
@@ -185,6 +185,7 @@ function EntryFormModal({
       }
     }
     for (const r of existingReservations) {
+      if (!r.start_time || !r.end_time) continue
       const startH = parseInt(r.start_time.split(":")[0], 10)
       let endH = parseInt(r.end_time.split(":")[0], 10)
       if (endH <= startH) endH += 24
