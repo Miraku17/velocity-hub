@@ -122,10 +122,10 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
   async function handleConfirmBooking() {
     if (items.length === 0) return;
 
-    if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      toast.error("Please complete the human verification before confirming.");
-      return;
-    }
+    // if (TURNSTILE_SITE_KEY && !turnstileToken) {
+    //   toast.error("Please complete the human verification before confirming.");
+    //   return;
+    // }
 
     // Snapshot cart data now, before any async work or clearCart()
     setConfirmedGroups(groups);
@@ -534,11 +534,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                   </div>
                 )}
 
-                {TURNSTILE_SITE_KEY && (
+                {/* {TURNSTILE_SITE_KEY && (
                   <div className="flex justify-center mb-4">
                     <div ref={turnstileContainerRef} />
                   </div>
-                )}
+                )} */}
 
                 <div className="flex gap-3">
                   {createReservation.isPending ? (
@@ -563,7 +563,7 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                       </button>
                       <button
                         onClick={handleConfirmBooking}
-                        disabled={!!TURNSTILE_SITE_KEY && !turnstileToken}
+                        disabled={false}
                         className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60"
                         style={{ backgroundColor: colors.bg, color: "white" }}
                       >
