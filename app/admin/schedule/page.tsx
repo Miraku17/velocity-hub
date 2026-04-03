@@ -163,13 +163,11 @@ export default function SchedulePage() {
   const { data: reservations = [], isLoading: reservationsLoading, isFetching } = useQuery({
     queryKey: ["schedule-reservations", dateStr],
     queryFn: () => fetchReservations(dateStr),
-    refetchInterval: 30000,
   })
 
   const { data: blockedSlots = [] } = useQuery({
     queryKey: ["schedule-blocked", dateStr],
     queryFn: () => fetchBlockedSlots(dateStr),
-    refetchInterval: 30000,
   })
 
   const activeCourts = courts.filter((c) => c.status !== "maintenance")

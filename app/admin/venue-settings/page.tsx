@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Portal } from "@/components/ui/portal"
 import { Input } from "@/components/ui/input"
@@ -563,15 +564,12 @@ export default function VenueSettingsPage() {
                       key={url}
                       className="group relative aspect-video overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-low"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={url}
                         alt="Venue photo"
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = ""
-                          ;(e.target as HTMLImageElement).alt = "Failed to load"
-                        }}
+                        fill
+                        sizes="(max-width: 640px) 50vw, 33vw"
+                        className="object-cover"
                       />
                       <button
                         onClick={() => removePhoto(url)}
@@ -623,11 +621,12 @@ export default function VenueSettingsPage() {
                     {/* QR Image area */}
                     <div className="relative flex aspect-square items-center justify-center bg-white p-6">
                       {qr.image_url ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
+                        <Image
                           src={qr.image_url}
                           alt={qr.name}
-                          className="h-full w-full object-contain"
+                          fill
+                          sizes="200px"
+                          className="object-contain"
                         />
                       ) : (
                         <span
@@ -754,8 +753,7 @@ export default function VenueSettingsPage() {
                   {qrForm.image_url ? (
                     <div className="relative mx-auto w-fit">
                       <div className="flex items-center justify-center rounded-2xl border border-outline-variant/15 bg-white p-5 shadow-sm">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={qrForm.image_url} alt="QR Preview" className="h-48 w-48 object-contain" />
+                        <Image src={qrForm.image_url} alt="QR Preview" width={192} height={192} className="h-48 w-48 object-contain" />
                       </div>
                       <button
                         type="button"

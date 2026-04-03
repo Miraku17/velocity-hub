@@ -156,8 +156,7 @@ function EntryFormModal({
       return slots
     },
     enabled: !!courtId,
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 60_000,
   })
 
   // Fetch blocked slots for selected court + date
@@ -172,8 +171,7 @@ function EntryFormModal({
       return res.json()
     },
     enabled: !!courtId,
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 60_000,
   })
 
   const isDayBlocked = useMemo(() => {

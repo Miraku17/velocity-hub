@@ -132,7 +132,6 @@ export default function AdminOverview() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
-    refetchInterval: 30000,
   })
 
   if (isLoading || !data) {

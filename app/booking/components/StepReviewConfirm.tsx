@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -218,10 +219,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                 className="w-full flex justify-center rounded-xl bg-white p-4 border cursor-zoom-in transition-shadow hover:shadow-md"
                 style={{ borderColor: `${colors.bg}10` }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={paymentQrCodes[selectedQrIndex]?.image_url}
                   alt={paymentQrCodes[selectedQrIndex]?.name}
+                  width={288}
+                  height={288}
                   className="h-64 w-64 sm:h-72 sm:w-72 object-contain"
                 />
               </button>
@@ -239,10 +241,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
               onClick={() => setQrLightbox(false)}
             >
               <div className="flex flex-col items-center p-4" onClick={(e) => e.stopPropagation()}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={paymentQrCodes[selectedQrIndex].image_url}
                   alt={paymentQrCodes[selectedQrIndex].name}
+                  width={600}
+                  height={600}
                   className="max-h-[80vh] max-w-[90vw] rounded-xl object-contain bg-white p-4"
                 />
                 <button
@@ -279,8 +282,7 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
             {receiptUrl ? (
               <div className="space-y-3">
                 <div className="relative rounded-xl overflow-hidden border" style={{ borderColor: `${colors.bg}15` }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={receiptUrl} alt="Receipt" className="w-full max-h-48 object-contain bg-white" />
+                  <Image src={receiptUrl} alt="Receipt" width={400} height={192} className="w-full max-h-48 object-contain bg-white" />
                   <div className="absolute top-2 right-2 flex h-7 items-center gap-1 rounded-full px-2.5" style={{ backgroundColor: `${colors.accent}e0` }}>
                     <span className="material-symbols-outlined text-[14px]" style={{ color: colors.bg, fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                     <span className="font-[Poppins] text-[10px] font-bold" style={{ color: colors.bg }}>Uploaded</span>
@@ -713,8 +715,7 @@ function BookingConfirmation({
                 </div>
               </div>
               <div className="rounded-lg overflow-hidden border" style={{ borderColor: `${colors.bg}10` }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={receiptUrl} alt="Receipt" className="w-full max-h-36 object-contain bg-white" />
+                <Image src={receiptUrl} alt="Receipt" width={400} height={144} className="w-full max-h-36 object-contain bg-white" />
               </div>
             </div>
           )}

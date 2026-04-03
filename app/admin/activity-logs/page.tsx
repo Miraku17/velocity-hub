@@ -91,7 +91,6 @@ export default function AuditLogsPage() {
       if (!res.ok) throw new Error("Failed to fetch audit logs")
       return res.json()
     },
-    refetchInterval: 30000,
   })
 
   const totalToday = logs.filter((l) => {

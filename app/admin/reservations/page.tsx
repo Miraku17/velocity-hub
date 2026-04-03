@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Image from "next/image"
 import { useQuery } from "@tanstack/react-query"
 import {
   useReservations,
@@ -753,10 +754,12 @@ function ReservationDetailModal({
                       onClick={() => setLightboxUrl(receipt.image_url)}
                       className="group relative aspect-square overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container-lowest transition-all hover:border-primary/30 hover:shadow-md"
                     >
-                      <img
+                      <Image
                         src={receipt.image_url}
                         alt="Payment proof"
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        fill
+                        sizes="120px"
+                        className="object-cover transition-transform group-hover:scale-105"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/20">
                         <svg
@@ -805,9 +808,11 @@ function ReservationDetailModal({
               />
               <div className="fixed inset-0 z-[80] flex items-center justify-center p-8" onClick={() => setLightboxUrl(null)}>
                 <div className="relative max-h-[85vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
-                  <img
+                  <Image
                     src={lightboxUrl}
                     alt="Payment proof"
+                    width={800}
+                    height={800}
                     className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
                   />
                   <button

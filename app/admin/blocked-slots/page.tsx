@@ -139,7 +139,7 @@ function BlockFormModal({
       return (json.data || []).filter((r: { status: string }) => r.status !== "cancelled")
     },
     enabled: !!courtId && !!date && blockType === "slots",
-    staleTime: 0,
+    staleTime: 60_000,
   })
 
   // Fetch existing blocked slots for the selected date (court-specific + all-courts blocks)
