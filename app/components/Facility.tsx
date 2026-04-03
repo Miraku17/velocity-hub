@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import { motion, useInView } from "motion/react";
 import { ScrollVelocity } from "@/components/ScrollVelocity";
 
@@ -74,10 +75,12 @@ export default function Facility() {
             transition={{ duration: 1, ease }}
             className="col-span-2 row-span-2 relative rounded-3xl overflow-hidden group cursor-default"
           >
-            <img
+            <Image
               src={IMG_1}
               alt="Velocity Courts Overview"
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-[2000ms]"
+              fill
+              sizes="(max-width: 768px) 100vw, 66vw"
+              className="object-cover group-hover:scale-[1.03] transition-transform duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-primary/10 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
@@ -98,10 +101,12 @@ export default function Facility() {
             transition={{ duration: 0.7, delay: 0.1, ease }}
             className="relative rounded-3xl overflow-hidden group cursor-default"
           >
-            <img
+            <Image
               src={IMG_2}
               alt="Court Surface Detail"
-              className="absolute inset-0 w-full h-full object-cover object-right-bottom group-hover:scale-[1.05] transition-transform duration-[2000ms]"
+              fill
+              sizes="(max-width: 768px) 50vw, 33vw"
+              className="object-cover object-right-bottom group-hover:scale-[1.05] transition-transform duration-[2000ms]"
             />
             <div className="absolute inset-0 bg-primary/30" />
             <div className="absolute bottom-4 left-4">
