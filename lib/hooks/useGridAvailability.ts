@@ -14,7 +14,7 @@ export function useGridAvailability(date: string) {
   return useQuery({
     queryKey: ["grid-availability", date],
     queryFn: () => fetchGridAvailability(date),
-    staleTime: 30_000,
+    staleTime: 60_000,
     enabled: !!date,
   })
 }

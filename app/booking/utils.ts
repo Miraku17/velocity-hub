@@ -15,7 +15,7 @@ export function generateTimeSlots(openTime: string, closeTime: string): string[]
 
 /** Convert "HH:MM" or "HH:MM:SS" to "7:00 AM" format */
 export function formatTime12(time: string): string {
-  const hour = parseInt(time.split(":")[0], 10);
+  const hour = parseInt(time.split(":")[0], 10) % 24;
   const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
   const ampm = hour < 12 ? "AM" : "PM";
   return `${hour12}:00 ${ampm}`;
