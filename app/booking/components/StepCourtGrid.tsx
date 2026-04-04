@@ -43,6 +43,12 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
   // Fetch grid availability for the selected date
   const { data: gridData, isLoading, isFetching } = useGridAvailability(dateStr);
 
+  // Refetch availability data on mount to pick up any bookings made in prior steps
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["grid-availability"] });
+    queryClient.invalidateQueries({ queryKey: ["calendar-availability"] });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Calendar availability for dot indicators
   const todayStr = useMemo(() => formatLocalDate(today), [today]);
   const maxDateStr = useMemo(() => formatLocalDate(maxDate), [maxDate]);
