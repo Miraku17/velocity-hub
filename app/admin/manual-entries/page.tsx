@@ -11,6 +11,7 @@ import {
 } from "@/lib/hooks/useManualEntries"
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
+import { toast } from "sonner"
 import { Portal } from "@/components/ui/portal"
 /* ── Helpers ── */
 
@@ -609,8 +610,12 @@ export default function ManualEntriesPage() {
         },
         {
           onSuccess: () => {
+            toast.success("Entry updated successfully")
             setEditEntry(null)
             setShowForm(false)
+          },
+          onError: (err) => {
+            toast.error(err.message || "Failed to update entry")
           },
         }
       )
@@ -633,7 +638,13 @@ export default function ManualEntriesPage() {
           {
             onSuccess: () => {
               completed++
-              if (completed === blocks.length) setShowForm(false)
+              if (completed === blocks.length) {
+                toast.success("Entry added successfully")
+                setShowForm(false)
+              }
+            },
+            onError: (err) => {
+              toast.error(err.message || "Failed to add entry")
             },
           }
         )
@@ -652,7 +663,11 @@ export default function ManualEntriesPage() {
         },
         {
           onSuccess: () => {
+            toast.success("Entry added successfully")
             setShowForm(false)
+          },
+          onError: (err) => {
+            toast.error(err.message || "Failed to add entry")
           },
         }
       )
@@ -662,7 +677,13 @@ export default function ManualEntriesPage() {
   function handleDelete() {
     if (!deleteEntry) return
     deleteMutation.mutate(deleteEntry.id, {
-      onSuccess: () => setDeleteEntry(null),
+      onSuccess: () => {
+        toast.success("Entry deleted successfully")
+        setDeleteEntry(null)
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to delete entry")
+      },
     })
   }
 
