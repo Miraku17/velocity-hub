@@ -86,47 +86,51 @@ export function BookingCart({ onProceed, onBack, isCheckingAvailability }: Booki
                   </span>
                 </div>
 
-                {group.ranges.map((range, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between py-1.5"
-                    style={{ borderTop: i > 0 ? `1px solid ${colors.bg}08` : undefined }}
-                  >
-                    <span
-                      className="font-[Poppins] text-[11px] font-medium"
-                      style={{ color: `${colors.bg}80` }}
-                    >
-                      {formatTime12(range.start_time)} – {formatTime12(range.end_time)}
-                    </span>
-                    <span
-                      className="font-[Poppins] text-[11px] font-bold"
-                      style={{ color: colors.bg }}
-                    >
-                      {formatCurrency(range.total)}
-                    </span>
-                  </div>
-                ))}
+                {group.ranges.map((range, i) => {
+                  // Find items belonging to this range
+                  const rangeStartH = parseInt(range.start_time.split(":")[0], 10)
+                  const rangeEndH = parseInt(range.end_time.split(":")[0], 10)
+                  const rangeItems = items.filter((item) => {
+                    if (item.court_id !== group.court_id) return false
+                    const h = parseInt(item.start_time.split(":")[0], 10)
+                    return h >= rangeStartH && h < (rangeEndH || 24)
+                  })
 
-                {/* Per-slot remove buttons */}
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {group.ranges.flatMap((range) => {
-                    // Find individual items in this range to show remove buttons
-                    const rangeItems = items.filter(
-                      (item) => item.court_id === group.court_id
-                    );
-                    return rangeItems.map((item) => (
-                      <button
-                        key={`${item.court_id}-${item.start_time}`}
-                        onClick={() => removeItem(item.court_id, item.start_time)}
-                        className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[9px] font-[Poppins] font-semibold transition-colors hover:bg-red-50"
-                        style={{ backgroundColor: `${colors.accent}50`, color: colors.bg }}
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-1.5 gap-2"
+                      style={{ borderTop: i > 0 ? `1px solid ${colors.bg}08` : undefined }}
+                    >
+                      <span
+                        className="font-[Poppins] text-[11px] font-medium"
+                        style={{ color: `${colors.bg}80` }}
                       >
-                        {formatTime12(item.start_time)}
-                        <span className="material-symbols-outlined text-[10px]">close</span>
-                      </button>
-                    ));
-                  })}
-                </div>
+                        {formatTime12(range.start_time)} – {formatTime12(range.end_time)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="font-[Poppins] text-[11px] font-bold"
+                          style={{ color: colors.bg }}
+                        >
+                          {formatCurrency(range.total)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            for (const item of rangeItems) {
+                              removeItem(item.court_id, item.start_time)
+                            }
+                          }}
+                          className="flex items-center justify-center h-6 w-6 rounded-md transition-colors hover:bg-red-50 active:scale-95"
+                          style={{ color: `${colors.bg}50` }}
+                        >
+                          <span className="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             ))}
           </div>
