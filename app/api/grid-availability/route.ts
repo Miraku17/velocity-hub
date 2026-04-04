@@ -36,38 +36,38 @@ export async function GET(request: NextRequest) {
 
   const dayOfWeek = new Date(date + "T12:00:00").getDay()
 
-  // Fetch all available courts with schedules
-  const { data: courts, error: courtsError } = await supabase
-    .from("courts")
-    .select("id, name, court_type, price_per_hour, court_schedules(day_of_week, open_time, close_time, is_closed, hourly_rates)")
-    .eq("status", "available")
-    .eq("archived", false)
-    .order("name")
+  // Fetch courts, reservations, and blocked slots in parallel
+  const [courtsResult, resResult, blockedResult] = await Promise.all([
+    supabase
+      .from("courts")
+      .select("id, name, court_type, price_per_hour, court_schedules(day_of_week, open_time, close_time, is_closed, hourly_rates)")
+      .eq("status", "available")
+      .eq("archived", false)
+      .order("name"),
+    supabase
+      .from("reservations_view")
+      .select("court_id, start_time, end_time, status")
+      .eq("reservation_date", date)
+      .neq("status", "cancelled"),
+    supabase
+      .from("blocked_slots")
+      .select("court_id, start_time, end_time")
+      .eq("blocked_date", date),
+  ])
 
-  if (courtsError) {
-    return Response.json({ error: courtsError.message }, { status: 500 })
+  if (courtsResult.error) {
+    return Response.json({ error: courtsResult.error.message }, { status: 500 })
+  }
+  if (resResult.error) {
+    return Response.json({ error: resResult.error.message }, { status: 500 })
+  }
+  if (blockedResult.error) {
+    return Response.json({ error: blockedResult.error.message }, { status: 500 })
   }
 
-  // Fetch reservations for this date (non-cancelled)
-  const { data: reservations, error: resError } = await supabase
-    .from("reservations_view")
-    .select("court_id, start_time, end_time, status")
-    .eq("reservation_date", date)
-    .neq("status", "cancelled")
-
-  if (resError) {
-    return Response.json({ error: resError.message }, { status: 500 })
-  }
-
-  // Fetch blocked slots for this date
-  const { data: blockedSlots, error: blockedError } = await supabase
-    .from("blocked_slots")
-    .select("court_id, start_time, end_time")
-    .eq("blocked_date", date)
-
-  if (blockedError) {
-    return Response.json({ error: blockedError.message }, { status: 500 })
-  }
+  const courts = courtsResult.data
+  const reservations = resResult.data
+  const blockedSlots = blockedResult.data
 
   // Build response
   let earliestOpen = 24
@@ -175,5 +175,7 @@ export async function GET(request: NextRequest) {
     slots,
   }
 
-  return Response.json(response)
+  return Response.json(response, {
+    headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=45" },
+  })
 }
