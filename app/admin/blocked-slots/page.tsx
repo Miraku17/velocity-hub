@@ -42,6 +42,14 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** Format a 24h hour number to 12h string */
+function hourTo12(h: number): string {
+  const displayHour = h % 24
+  const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour
+  const ampm = displayHour < 12 ? "AM" : "PM"
+  return `${hour12}:00 ${ampm}`
+}
+
 /** Generate hourly time slots between open_time and close_time (supports overnight) */
 function generateTimeSlots(openTime: string, closeTime: string): string[] {
   const openHour = parseInt(openTime.split(":")[0], 10)
@@ -49,17 +57,15 @@ function generateTimeSlots(openTime: string, closeTime: string): string[] {
   if (closeHour <= openHour) closeHour += 24
   const slots: string[] = []
   for (let h = openHour; h < closeHour; h++) {
-    const displayHour = h % 24
-    const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour
-    const ampm = displayHour < 12 ? "AM" : "PM"
-    slots.push(`${hour12}:00 ${ampm}`)
+    slots.push(`${hourTo12(h)} – ${hourTo12(h + 1)}`)
   }
   return slots
 }
 
-/** Convert "7:00 AM" to 24h hour number */
+/** Convert "7:00 AM – 8:00 AM" to start 24h hour number */
 function parse12Hour(slot: string): number {
-  const [timePart, ampm] = slot.split(" ")
+  const startPart = slot.split(" – ")[0]
+  const [timePart, ampm] = startPart.split(" ")
   let hour = parseInt(timePart.split(":")[0], 10)
   if (ampm === "AM" && hour === 12) hour = 0
   else if (ampm === "PM" && hour !== 12) hour += 12
@@ -136,7 +142,21 @@ function BlockFormModal({
       const res = await fetch(`/api/reservations?court_id=${courtId}&date=${date}&fields=start_time,end_time,status&limit=100`)
       if (!res.ok) return []
       const json = await res.json()
-      return (json.data || []).filter((r: { status: string }) => r.status !== "cancelled")
+      // Admin response returns booking objects with nested booking_items; flatten them
+      const rows: { start_time?: string; end_time?: string; status?: string; booking_items?: { start_time: string; end_time: string }[] }[] = json.data || []
+      const flat: { start_time: string; end_time: string; status: string }[] = []
+      for (const r of rows) {
+        if (Array.isArray(r.booking_items)) {
+          for (const item of r.booking_items) {
+            if (item.start_time && item.end_time) {
+              flat.push({ start_time: item.start_time, end_time: item.end_time, status: r.status ?? "confirmed" })
+            }
+          }
+        } else if (r.start_time && r.end_time) {
+          flat.push({ start_time: r.start_time, end_time: r.end_time, status: r.status ?? "confirmed" })
+        }
+      }
+      return flat.filter(r => r.status !== "cancelled")
     },
     enabled: !!courtId && !!date && blockType === "slots",
     staleTime: 60_000,
@@ -169,10 +189,7 @@ function BlockFormModal({
       let endH = parseInt(b.end_time.split(":")[0], 10)
       if (endH <= startH) endH += 24
       for (let h = startH; h < endH; h++) {
-        const displayHour = h % 24
-        const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour
-        const ampm = displayHour < 12 ? "AM" : "PM"
-        blocked.add(`${hour12}:00 ${ampm}`)
+        blocked.add(`${hourTo12(h)} – ${hourTo12(h + 1)}`)
       }
     }
     return blocked
@@ -181,19 +198,17 @@ function BlockFormModal({
   // Map booked hours from existing reservations
   const bookedSlots = useMemo(() => {
     const booked = new Set<string>()
-    const toMinutes = (t: string) => {
+    const toHour = (t: string) => {
       const [h] = t.split(":").map(Number)
       return h === 0 ? 24 : h
     }
     for (const r of existingReservations) {
+      if (!r.start_time || !r.end_time) continue
       const startH = parseInt(r.start_time.split(":")[0], 10)
-      let endH = toMinutes(r.end_time)
+      let endH = toHour(r.end_time)
       if (endH <= startH) endH += 24
       for (let h = startH; h < endH; h++) {
-        const displayHour = h % 24
-        const hour12 = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour
-        const ampm = displayHour < 12 ? "AM" : "PM"
-        booked.add(`${hour12}:00 ${ampm}`)
+        booked.add(`${hourTo12(h)} – ${hourTo12(h + 1)}`)
       }
     }
     return booked
@@ -230,7 +245,6 @@ function BlockFormModal({
         reason: reason.trim(),
       }])
     } else {
-      // Group consecutive slots into time ranges
       if (selectedSlots.length === 0) return
       const sorted = [...selectedSlots].sort((a, b) => parse12Hour(a) - parse12Hour(b))
       const ranges: { start: number; end: number }[] = []
@@ -249,7 +263,6 @@ function BlockFormModal({
       }
       ranges.push({ start: currentStart, end: currentEnd })
 
-      // Create one block per contiguous range
       onSave(
         ranges.map((r) => ({
           court_id: courtId || null,
@@ -453,7 +466,7 @@ function BlockFormModal({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {timeSlots.map((slot) => {
                       const isSelected = selectedSlots.includes(slot)
                       const isBooked = bookedSlots.has(slot)
@@ -475,7 +488,7 @@ function BlockFormModal({
                               : "border-outline-variant/20 text-on-surface-variant hover:border-error/40 hover:bg-error/5"
                           }`}
                         >
-                          <span className="block font-body text-xs font-bold" style={{ textDecoration: isBooked || isAlreadyBlocked ? "line-through" : "none" }}>{slot}</span>
+                          <span className="block font-body text-[11px] font-bold" style={{ textDecoration: isBooked || isAlreadyBlocked ? "line-through" : "none" }}>{slot}</span>
                           <span className={`block font-label text-[8px] font-extrabold uppercase tracking-widest mt-0.5 ${
                             isAlreadyBlocked ? "text-error" : ""
                           }`}>

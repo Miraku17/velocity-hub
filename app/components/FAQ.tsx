@@ -20,17 +20,17 @@ const FAQS = [
   {
     question: "What are your operating hours?",
     answer:
-      "We're open daily from 6:00 AM to 11:00 PM, including weekends and most holidays. Check our booking page for real-time availability.",
+      "We're open daily from 7:00 AM to 12:00 AM, including weekends and most holidays. Check our booking page for real-time availability.",
   },
   {
     question: "How much does it cost to rent a court?",
     answer:
-      "Court rental starts at ₱300 per hour during off-peak hours and ₱500 per hour during peak hours (5 PM–9 PM weekdays, all day weekends). We also offer monthly membership packages with discounted rates.",
+      "Court rental ranges from ₱500–₱600 per hour depending on the time slot and day. We also offer monthly membership packages with discounted rates.",
   },
   {
     question: "Is there parking available?",
     answer:
-      "Yes, we have free parking for up to 50 vehicles right next to the facility. Motorcycle parking is also available.",
+      "Yes, parking is available on a first come, first served basis.",
   },
 ];
 
