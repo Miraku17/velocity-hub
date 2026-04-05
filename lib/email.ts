@@ -9,8 +9,9 @@ const getEnv = () => ({
 
 const formatTime = (t: string) => {
   const [h, m] = t.split(":").map(Number)
-  const period = h >= 12 ? "PM" : "AM"
-  const hour = h % 12 || 12
+  const normalizedH = h % 24
+  const period = normalizedH >= 12 ? "PM" : "AM"
+  const hour = normalizedH % 12 || 12
   return `${hour}:${m.toString().padStart(2, "0")} ${period}`
 }
 
