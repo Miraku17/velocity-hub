@@ -135,7 +135,7 @@ function BlockFormModal({
     : []
 
   // Fetch existing reservations for selected court + date (to show as unavailable)
-  const { data: existingReservations = [] } = useQuery<{ start_time: string; end_time: string }[]>({
+  const { data: existingReservations = [], isLoading: loadingReservations } = useQuery<{ start_time: string; end_time: string }[]>({
     queryKey: ["admin-block-reservations", courtId, date],
     queryFn: async () => {
       if (!courtId || !date) return []
@@ -163,9 +163,11 @@ function BlockFormModal({
   })
 
   // Fetch existing blocked slots for the selected date (court-specific + all-courts blocks)
-  const { data: existingBlocks = [] } = useBlockedSlots(
+  const { data: existingBlocks = [], isLoading: loadingBlocks } = useBlockedSlots(
     date ? { date } : undefined
   )
+
+  const slotsLoading = (loadingReservations && !!courtId && !!date && blockType === "slots") || loadingBlocks
 
   // Check if there's a full-day block for this date (matching court or all-courts)
   const fullDayBlock = useMemo(() => {
@@ -453,7 +455,17 @@ function BlockFormModal({
                   </div>
                 )}
 
-                {!courtSchedule ? (
+                {slotsLoading ? (
+                  <div className="flex flex-col items-center rounded-lg bg-surface-container-low py-8">
+                    <svg className="animate-spin text-outline/40 mb-2" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                    <p className="font-body text-xs text-on-surface-variant">
+                      Loading slots...
+                    </p>
+                  </div>
+                ) : !courtSchedule ? (
                   <div className="flex flex-col items-center rounded-lg bg-surface-container-low py-8">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-outline/40 mb-2">
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
