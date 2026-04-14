@@ -326,6 +326,19 @@ function UserActions({
     },
   })
 
+  const resetPassword = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/users/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to send reset email")
+      return data
+    },
+  })
+
   const deleteUser = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/users?user_id=${user.id}`, {
@@ -364,6 +377,18 @@ function UserActions({
                 <polyline points="22,6 12,13 2,6" />
               </svg>
               {resendInvite.isPending ? "Sending..." : resendInvite.isSuccess ? "Invite Sent!" : "Resend Invite"}
+            </DropdownMenuItem>
+          )}
+          {user.last_sign_in && (
+            <DropdownMenuItem
+              disabled={resetPassword.isPending}
+              onClick={() => resetPassword.mutate()}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              {resetPassword.isPending ? "Sending..." : resetPassword.isSuccess ? "Email Sent!" : "Send Password Reset"}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
