@@ -1,12 +1,19 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Input } from "@/components/ui/input"
 import { Portal } from "@/components/ui/portal"
 import { Label } from "@/components/ui/label"
 import { LoadingPage } from "@/components/ui/loading"
 import { useMe } from "@/lib/hooks/useTimeClock"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 
 /* ── Types ── */
 
@@ -212,6 +219,189 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       </div>
     </div>
     </Portal>
+  )
+}
+
+/* ── Delete Confirm Modal ── */
+
+function DeleteConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  userName,
+  loading,
+}: {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  userName: string
+  loading: boolean
+}) {
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !loading) onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open, loading, onClose])
+
+  if (!open) return null
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !loading && onClose()} />
+        <div className="relative z-10 w-full max-w-sm rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl">
+          <div className="px-6 py-5">
+            <h3 className="font-headline text-base font-semibold text-on-surface">Delete User</h3>
+            <p className="mt-2 font-body text-sm text-on-surface-variant">
+              Are you sure you want to delete <span className="font-semibold text-on-surface">{userName}</span>? This action cannot be undone.
+            </p>
+          </div>
+          <div className="flex gap-3 border-t border-outline-variant/15 px-6 py-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="flex-1 rounded-lg border border-outline-variant/30 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 rounded-lg bg-error py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-error transition-colors hover:bg-error/90 disabled:opacity-50"
+            >
+              {loading ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
+}
+
+/* ── User Actions Dropdown ── */
+
+function UserActions({
+  user,
+  currentUserId,
+}: {
+  user: UserProfile
+  currentUserId: string | undefined
+}) {
+  const queryClient = useQueryClient()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  const isSelf = currentUserId === user.id
+
+  const changeRole = useMutation({
+    mutationFn: async (newRole: UserRole) => {
+      const res = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id, role: newRole }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to update role")
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] })
+    },
+  })
+
+  const resendInvite = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/users/resend-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to resend invite")
+      return data
+    },
+  })
+
+  const deleteUser = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/users?user_id=${user.id}`, {
+        method: "DELETE",
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to delete user")
+      return data
+    },
+    onSuccess: () => {
+      setDeleteOpen(false)
+      queryClient.invalidateQueries({ queryKey: ["users"] })
+    },
+  })
+
+  const targetRole: UserRole = user.role === "admin" ? "employee" : "admin"
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="12" cy="19" r="1" />
+          </svg>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
+          {!user.last_sign_in && (
+            <DropdownMenuItem
+              disabled={resendInvite.isPending}
+              onClick={() => resendInvite.mutate()}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              {resendInvite.isPending ? "Sending..." : resendInvite.isSuccess ? "Invite Sent!" : "Resend Invite"}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            disabled={isSelf || changeRole.isPending}
+            onClick={() => changeRole.mutate(targetRole)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 12h-6" />
+            </svg>
+            {changeRole.isPending ? "Updating..." : `Make ${roleLabel[targetRole]}`}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={isSelf}
+            onClick={() => setDeleteOpen(true)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" /><path d="M14 11v6" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+            Delete User
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DeleteConfirmModal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => deleteUser.mutate()}
+        userName={user.full_name}
+        loading={deleteUser.isPending}
+      />
+    </>
   )
 }
 
@@ -422,13 +612,7 @@ export default function AdminUsers() {
                       </td>
 
                       <td className="px-5 py-4 text-right">
-                        <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="5" r="1" />
-                            <circle cx="12" cy="12" r="1" />
-                            <circle cx="12" cy="19" r="1" />
-                          </svg>
-                        </button>
+                        <UserActions user={user} currentUserId={me?.id} />
                       </td>
                     </tr>
                   ))}
