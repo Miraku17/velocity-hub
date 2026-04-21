@@ -118,6 +118,7 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
     const url = URL.createObjectURL(file);
     setReceiptUrl(url);
     if (receiptInputRef.current) receiptInputRef.current.value = "";
+    setShowConfirmModal(true);
   }
 
   async function handleConfirmBooking() {
