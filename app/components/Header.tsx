@@ -8,6 +8,7 @@ const LOGO_URL = "/logo.png";
 
 const NAV_LINKS = [
   { href: "/booking", label: "Book Now" },
+  { href: "/schedules", label: "Schedules" },
   { href: "#facility", label: "Facility" },
 ];
 
