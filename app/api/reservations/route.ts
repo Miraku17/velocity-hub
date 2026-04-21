@@ -425,16 +425,29 @@ export async function POST(request: NextRequest) {
       .from("receipts")
       .getPublicUrl(uploadData.path)
 
-    const { error: receiptDbErr } = await adminClient
-      .from("payment_receipts")
-      .insert({
-        booking_id: bookingId,
-        image_url: urlData.publicUrl,
-        storage_path: uploadData.path,
-      })
+    // Retry the DB insert up to 2 times — if it still fails, clean up and error out
+    let receiptDbErr: { message: string } | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error: insertErr } = await adminClient
+        .from("payment_receipts")
+        .insert({
+          booking_id: bookingId,
+          image_url: urlData.publicUrl,
+          storage_path: uploadData.path,
+        })
+      if (!insertErr) {
+        receiptDbErr = null
+        break
+      }
+      receiptDbErr = insertErr
+    }
 
     if (receiptDbErr) {
-      console.error("Failed to save payment receipt record:", receiptDbErr.message)
+      // Clean up: remove the uploaded file and the booking
+      await adminClient.storage.from("receipts").remove([uploadData.path])
+      await adminClient.from("bookings").delete().eq("id", bookingId)
+      console.error("Failed to save payment receipt record after retries:", receiptDbErr.message)
+      return Response.json({ error: "Failed to save receipt. Please try again." }, { status: 500 })
     }
   }
 
