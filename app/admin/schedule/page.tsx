@@ -174,14 +174,27 @@ export default function SchedulePage() {
   const activeReservations = useMemo(() => reservations.filter((r) => r.status !== "cancelled"), [reservations])
 
   const allHours = useMemo(() => {
-    const hourSet = new Set<number>()
+    // Collect raw (unwrapped) hour ranges to determine the correct display order
+    let earliest = 24
+    let latest = 0
     for (const court of activeCourts) {
-      for (const h of getHoursForCourt(court, dayOfWeek)) hourSet.add(h)
+      const sched = court.court_schedules?.find((s) => s.day_of_week === dayOfWeek)
+      if (!sched || sched.is_closed) continue
+      const openH = parseInt(sched.open_time.split(":")[0], 10)
+      let closeH = parseInt(sched.close_time.split(":")[0], 10)
+      if (closeH <= openH) closeH += 24
+      if (openH < earliest) earliest = openH
+      if (closeH > latest) latest = closeH
     }
-    if (hourSet.size === 0) {
-      for (let h = 6; h <= 21; h++) hourSet.add(h)
+    if (earliest >= latest) {
+      // No open courts — fallback
+      const hours: number[] = []
+      for (let h = 6; h <= 21; h++) hours.push(h)
+      return hours
     }
-    return Array.from(hourSet).sort((a, b) => a - b)
+    const hours: number[] = []
+    for (let h = earliest; h < latest; h++) hours.push(h % 24)
+    return hours
   }, [activeCourts, dayOfWeek])
 
   const bookingMap = useMemo(() => {
