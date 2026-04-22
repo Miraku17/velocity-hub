@@ -287,7 +287,7 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
             {/* Grid content */}
             <div className="p-4 sm:p-6">
               <label
-                className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-4 block"
+                className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-2 block"
                 style={{ color: `${bg}80` }}
               >
                 <span
@@ -298,6 +298,20 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
                 </span>
                 Tap to select slots — {formattedDateShort}
               </label>
+              <p
+                className="font-[Poppins] text-[11px] sm:text-xs font-semibold mb-4 flex items-start gap-1.5"
+                style={{ color: "#c2410c" }}
+              >
+                <span
+                  className="material-symbols-outlined text-sm shrink-0"
+                  style={{ fontSize: "14px", color: "#c2410c", fontVariationSettings: "'FILL' 1" }}
+                >
+                  info
+                </span>
+                <span>
+                  Slots from <strong style={{ color: "#9a3412" }}>12:00 AM onwards</strong> are on the following day.
+                </span>
+              </p>
 
               {gridData ? (
                 <CourtAvailabilityGrid

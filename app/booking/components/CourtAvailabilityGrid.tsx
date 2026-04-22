@@ -18,9 +18,9 @@ export function CourtAvailabilityGrid({ data, date, isLoading }: CourtAvailabili
 
   // Generate the time rows from earliest open to latest close
   const timeRows = useMemo(() => {
-    const rows: number[] = [];
+    const rows: { hour: number; isNextDay: boolean }[] = [];
     for (let h = data.time_range.earliest_open; h < data.time_range.latest_close; h++) {
-      rows.push(h % 24);
+      rows.push({ hour: h % 24, isNextDay: h >= 24 });
     }
     return rows;
   }, [data.time_range]);
@@ -119,12 +119,12 @@ export function CourtAvailabilityGrid({ data, date, isLoading }: CourtAvailabili
           ))}
 
           {/* Time rows */}
-          {timeRows.map((hour) => (
+          {timeRows.map(({ hour, isNextDay }) => (
             <>
               {/* Time label — sticky left */}
               <div
                 key={`time-${hour}`}
-                className="sticky left-0 z-10 bg-white flex items-center justify-center px-1 py-0.5"
+                className="sticky left-0 z-10 bg-white flex flex-col items-center justify-center px-1 py-0.5"
                 style={{ borderBottom: `1px solid ${colors.bg}06` }}
               >
                 <span
@@ -133,6 +133,18 @@ export function CourtAvailabilityGrid({ data, date, isLoading }: CourtAvailabili
                 >
                   {hour24ToLabel(hour)}
                 </span>
+                {isNextDay && (
+                  <span
+                    className="font-[Poppins] text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none mt-0.5 px-1 py-0.5 rounded"
+                    style={{
+                      color: "#9a3412",
+                      backgroundColor: "#fff7ed",
+                      border: "1px solid #fed7aa",
+                    }}
+                  >
+                    Next day
+                  </span>
+                )}
               </div>
 
               {/* Court cells */}
