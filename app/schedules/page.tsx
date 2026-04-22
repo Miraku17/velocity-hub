@@ -268,7 +268,7 @@ export default function SchedulesPage() {
           {/* Grid content */}
           <div className="p-4 sm:p-6">
             <label
-              className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-4 block"
+              className="font-[Poppins] text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-2 block"
               style={{ color: `${bg}80` }}
             >
               <span
@@ -279,6 +279,20 @@ export default function SchedulesPage() {
               </span>
               Court availability — {formattedDateShort}
             </label>
+            <p
+              className="font-[Poppins] text-[11px] sm:text-xs font-semibold mb-4 flex items-start gap-1.5"
+              style={{ color: "#c2410c" }}
+            >
+              <span
+                className="material-symbols-outlined text-sm shrink-0"
+                style={{ fontSize: "14px", color: "#c2410c", fontVariationSettings: "'FILL' 1" }}
+              >
+                info
+              </span>
+              <span>
+                Slots from <strong style={{ color: "#9a3412" }}>12:00 AM onwards</strong> are on the following day.
+              </span>
+            </p>
 
             {gridData ? (
               <ReadOnlyGrid data={gridData} isLoading={isFetching} />
@@ -327,9 +341,9 @@ export default function SchedulesPage() {
 /** Read-only grid — no selection, just shows availability status */
 function ReadOnlyGrid({ data, isLoading }: { data: GridAvailabilityResponse; isLoading?: boolean }) {
   const timeRows = useMemo(() => {
-    const rows: number[] = [];
+    const rows: { hour: number; isNextDay: boolean }[] = [];
     for (let h = data.time_range.earliest_open; h < data.time_range.latest_close; h++) {
-      rows.push(h % 24);
+      rows.push({ hour: h % 24, isNextDay: h >= 24 });
     }
     return rows;
   }, [data.time_range]);
@@ -432,8 +446,14 @@ function ReadOnlyGrid({ data, isLoading }: { data: GridAvailabilityResponse; isL
           ))}
 
           {/* Time rows */}
-          {timeRows.map((hour) => (
-            <ReadOnlyRow key={hour} hour={hour} openCourts={openCourts} data={data} />
+          {timeRows.map(({ hour, isNextDay }) => (
+            <ReadOnlyRow
+              key={`${hour}-${isNextDay ? "next" : "same"}`}
+              hour={hour}
+              isNextDay={isNextDay}
+              openCourts={openCourts}
+              data={data}
+            />
           ))}
         </div>
       </div>
@@ -444,17 +464,19 @@ function ReadOnlyGrid({ data, isLoading }: { data: GridAvailabilityResponse; isL
 /** Single time row in the read-only grid */
 function ReadOnlyRow({
   hour,
+  isNextDay,
   openCourts,
   data,
 }: {
   hour: number;
+  isNextDay: boolean;
   openCourts: GridAvailabilityResponse["courts"];
   data: GridAvailabilityResponse;
 }) {
   return (
     <>
       <div
-        className="sticky left-0 z-10 bg-white flex items-center justify-center px-1 py-0.5"
+        className="sticky left-0 z-10 bg-white flex flex-col items-center justify-center px-1 py-0.5"
         style={{ borderBottom: `1px solid ${bg}06` }}
       >
         <span
@@ -463,6 +485,18 @@ function ReadOnlyRow({
         >
           {hour24ToLabel(hour)}
         </span>
+        {isNextDay && (
+          <span
+            className="font-[Poppins] text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none mt-0.5 px-1 py-0.5 rounded"
+            style={{
+              color: "#9a3412",
+              backgroundColor: "#fff7ed",
+              border: "1px solid #fed7aa",
+            }}
+          >
+            Next day
+          </span>
+        )}
       </div>
 
       {openCourts.map((court) => {
