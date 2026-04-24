@@ -9,6 +9,39 @@ import { sendBookingNotification, sendReceiptEmail } from "@/lib/email"
 import { rateLimit } from "@/lib/rate-limit"
 
 /**
+ * Shift a "YYYY-MM-DD" date string by N days.
+ */
+function shiftDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00")
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+// Overnight-slot cutoff: items with start_time before 06:00 are treated as next-day
+const NEXT_DAY_CUTOFF = "06:00:00"
+
+/**
+ * Given a target display date, return booking IDs whose items actually fall on
+ * that date because of overnight (next-day) slots stored under the previous
+ * calendar date.
+ */
+async function getOvernightBookingIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  targetDate: string
+): Promise<string[]> {
+  const prevDate = shiftDate(targetDate, -1)
+  const { data } = await supabase
+    .from("booking_items")
+    .select("booking_id")
+    .eq("booking_date", prevDate)
+    .lt("start_time", NEXT_DAY_CUTOFF)
+  return [...new Set((data ?? []).map((r: { booking_id: string }) => r.booking_id))]
+}
+
+/**
  * Try to parse a search string as a date and return "YYYY-MM-DD" or null.
  */
 function tryParseDate(input: string): string | null {
@@ -120,7 +153,15 @@ export async function GET(request: NextRequest) {
     .select("*, booking_items(id, court_id, booking_date, start_time, end_time, duration_hours, price_per_hour, total_amount, courts(name, court_type))", { count: "exact" })
     .order("created_at", { ascending: false })
 
-  if (date) query = query.eq("booking_date", date)
+  if (date) {
+    // Include bookings stored on (date - 1) whose overnight items actually fall on `date`
+    const overnightIds = await getOvernightBookingIds(supabase, date)
+    if (overnightIds.length > 0) {
+      query = query.or(`booking_date.eq.${date},id.in.(${overnightIds.join(",")})`)
+    } else {
+      query = query.eq("booking_date", date)
+    }
+  }
   if (dateFrom) query = query.gte("booking_date", dateFrom)
   if (dateTo) query = query.lte("booking_date", dateTo)
   if (status) query = query.eq("status", status)
