@@ -57,24 +57,17 @@ async function fetchReservations(date: string): Promise<Reservation[]> {
   const res = await fetch(`/api/reservations?date=${date}&limit=100`)
   if (!res.ok) throw new Error("Failed to fetch reservations")
   const json = await res.json()
-  // Flatten bookings with booking_items into per-item entries for the schedule grid.
-  // An item's actual date is booking_date + 1 when it is an overnight slot
-  // (start_time before 6 AM). Only include items whose actual date matches `date`.
+  // The schedule grid is operating-day based (e.g. 6 AM -> 2 AM next morning is one
+  // "day"). Items are stored under the booking_date that owns them, so only include
+  // items whose booking_date matches the selected date. Overnight rollovers the API
+  // adds from the previous calendar day are intentionally ignored here.
   const bookings = json.data ?? []
   const flat: Reservation[] = []
   for (const b of bookings) {
+    if (b.booking_date !== date) continue
     if (!b.booking_items || b.booking_items.length === 0) continue
     for (const item of b.booking_items) {
-      const startHour = parseInt(item.start_time.split(":")[0], 10)
-      const isNextDay = startHour < 6
-      const actualDate = isNextDay
-        ? (() => {
-            const d = new Date(b.booking_date + "T00:00:00")
-            d.setDate(d.getDate() + 1)
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-          })()
-        : b.booking_date
-      if (actualDate !== date) continue
+      if (item.booking_date !== date) continue
       flat.push({
         id: item.id,
         court_id: item.court_id,
@@ -185,7 +178,6 @@ export default function SchedulePage() {
   const activeReservations = useMemo(() => reservations.filter((r) => r.status !== "cancelled"), [reservations])
 
   const allHours = useMemo(() => {
-    // Collect raw (unwrapped) hour ranges to determine the correct display order
     let earliest = 24
     let latest = 0
     for (const court of activeCourts) {
@@ -198,13 +190,12 @@ export default function SchedulePage() {
       if (closeH > latest) latest = closeH
     }
     if (earliest >= latest) {
-      // No open courts — fallback
-      const hours: { hour: number; isNextDay: boolean }[] = []
-      for (let h = 6; h <= 21; h++) hours.push({ hour: h, isNextDay: false })
+      const hours: number[] = []
+      for (let h = 6; h <= 21; h++) hours.push(h)
       return hours
     }
-    const hours: { hour: number; isNextDay: boolean }[] = []
-    for (let h = earliest; h < latest; h++) hours.push({ hour: h % 24, isNextDay: h >= 24 })
+    const hours: number[] = []
+    for (let h = earliest; h < latest; h++) hours.push(h % 24)
     return hours
   }, [activeCourts, dayOfWeek])
 
@@ -451,11 +442,11 @@ export default function SchedulePage() {
             </tr>
           </thead>
           <tbody>
-            {allHours.map(({ hour, isNextDay }, rowIdx) => {
-              const isCurrentHour = isToday && !isNextDay && hour === currentHour
+            {allHours.map((hour, rowIdx) => {
+              const isCurrentHour = isToday && hour === currentHour
               return (
                 <tr
-                  key={`${hour}-${isNextDay ? "next" : "same"}`}
+                  key={hour}
                   className={`transition-colors ${
                     isCurrentHour
                       ? "bg-primary/[0.04]"
@@ -469,11 +460,6 @@ export default function SchedulePage() {
                     <span className={`font-nav text-[11px] font-bold tracking-wide ${isCurrentHour ? "text-primary" : "text-on-surface-variant"}`}>
                       {formatHourRange(hour)}
                     </span>
-                    {isNextDay && (
-                      <span className="mt-0.5 block rounded px-1 py-0.5 font-label text-[8px] font-bold uppercase tracking-wider bg-[#fff7ed] text-[#9a3412] border border-[#fed7aa]">
-                        Next day
-                      </span>
-                    )}
                     {isCurrentHour && (
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                     )}
