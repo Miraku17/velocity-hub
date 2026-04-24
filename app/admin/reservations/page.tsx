@@ -47,6 +47,32 @@ function formatDate(date: string) {
   })
 }
 
+function addDays(dateStr: string, days: number) {
+  const d = new Date(dateStr + "T00:00:00")
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+// Slots starting before 6 AM are overnight (next-day) slots
+function isNextDaySlot(startTime: string) {
+  return parseInt(startTime.split(":")[0], 10) < 6
+}
+
+function getSlotActualDate(bookingDate: string, startTime: string) {
+  return isNextDaySlot(startTime) ? addDays(bookingDate, 1) : bookingDate
+}
+
+function hasNextDayItem(items?: BookingItem[]) {
+  return (items ?? []).some((i) => isNextDaySlot(i.start_time))
+}
+
+function hasSameDayItem(items?: BookingItem[]) {
+  return (items ?? []).some((i) => !isNextDaySlot(i.start_time))
+}
+
 function formatTime(time: string) {
   const [h, m] = time.split(":")
   const hour = parseInt(h, 10) % 24
@@ -593,25 +619,43 @@ function ReservationDetailModal({
                 </div>
                 <div>
                   <span className="font-body text-[10px] text-on-surface-variant">Date</span>
-                  <p className="font-nav text-sm font-semibold text-on-surface">{formatDate(res.booking_date)}</p>
+                  <p className="font-nav text-sm font-semibold text-on-surface">
+                    {hasNextDayItem(res.booking_items) && hasSameDayItem(res.booking_items)
+                      ? `${formatDate(res.booking_date)} – ${formatDate(addDays(res.booking_date, 1))}`
+                      : hasNextDayItem(res.booking_items)
+                        ? formatDate(addDays(res.booking_date, 1))
+                        : formatDate(res.booking_date)}
+                  </p>
                 </div>
                 <div>
                   <span className="font-body text-[10px] text-on-surface-variant">Time</span>
                   {(res.booking_items ?? []).length > 1 ? (
                     <div className="mt-0.5 flex flex-col gap-1">
                       {(res.booking_items ?? []).map((item: BookingItem, i: number) => (
-                        <div key={item.id} className="flex items-center gap-1.5">
+                        <div key={item.id} className="flex items-center gap-1.5 flex-wrap">
                           <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 font-label text-[9px] font-bold text-primary">
                             {i + 1}
                           </span>
                           <p className="font-nav text-sm font-semibold text-primary">{formatTimeSlot(item.start_time, item.end_time)}</p>
+                          {isNextDaySlot(item.start_time) && (
+                            <span className="rounded px-1.5 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider bg-[#fff7ed] text-[#9a3412] border border-[#fed7aa]">
+                              Next day · {formatDate(addDays(res.booking_date, 1))}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="font-nav text-sm font-semibold text-primary">
-                      {res.booking_items?.[0] ? formatTimeSlot(res.booking_items[0].start_time, res.booking_items[0].end_time) : "—"}
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-nav text-sm font-semibold text-primary">
+                        {res.booking_items?.[0] ? formatTimeSlot(res.booking_items[0].start_time, res.booking_items[0].end_time) : "—"}
+                      </p>
+                      {res.booking_items?.[0] && isNextDaySlot(res.booking_items[0].start_time) && (
+                        <span className="rounded px-1.5 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider bg-[#fff7ed] text-[#9a3412] border border-[#fed7aa]">
+                          Next day · {formatDate(addDays(res.booking_date, 1))}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div>
@@ -660,7 +704,12 @@ function ReservationDetailModal({
                         <span className="text-on-surface-variant">{courtName}</span>
                       </div>
                       <div className="flex justify-between font-body text-xs">
-                        <span className="text-on-surface-variant">{(res.booking_items?.length ?? 0) > 1 ? `Slot ${i + 1} ` : ""}({formatTimeSlot(item.start_time, item.end_time)})</span>
+                        <span className="text-on-surface-variant">
+                          {(res.booking_items?.length ?? 0) > 1 ? `Slot ${i + 1} ` : ""}({formatTimeSlot(item.start_time, item.end_time)})
+                          {isNextDaySlot(item.start_time) && (
+                            <span className="ml-1 text-[9px] font-bold uppercase text-[#9a3412]">· next day</span>
+                          )}
+                        </span>
                         <span className="text-on-surface">₱{Number(item.total_amount).toFixed(2)}</span>
                       </div>
                     </div>
@@ -1253,19 +1302,29 @@ export default function ReservationsPage() {
                     {/* Schedule */}
                     <td className="border-l border-outline-variant/15 px-6 py-6">
                       <p className="mb-0.5 text-xs font-medium text-on-surface-variant">
-                        {formatDate(res.booking_date)}
+                        {hasNextDayItem(res.booking_items) && hasSameDayItem(res.booking_items)
+                          ? `${formatDate(res.booking_date)} – ${formatDate(addDays(res.booking_date, 1))}`
+                          : hasNextDayItem(res.booking_items)
+                            ? formatDate(addDays(res.booking_date, 1))
+                            : formatDate(res.booking_date)}
                       </p>
                       {res.booking_items && res.booking_items.length > 0 ? (
                         <div className="flex flex-col gap-0.5">
                           {res.booking_items.map((item: BookingItem) => (
-                            <p
-                              key={item.id}
-                              className={`font-headline text-base font-extrabold tracking-tight ${
-                                isCancelled ? "text-outline line-through" : "text-primary"
-                              }`}
-                            >
-                              {formatTimeSlot(item.start_time, item.end_time)}
-                            </p>
+                            <div key={item.id} className="flex items-center gap-1.5 flex-wrap">
+                              <p
+                                className={`font-headline text-base font-extrabold tracking-tight ${
+                                  isCancelled ? "text-outline line-through" : "text-primary"
+                                }`}
+                              >
+                                {formatTimeSlot(item.start_time, item.end_time)}
+                              </p>
+                              {isNextDaySlot(item.start_time) && (
+                                <span className="rounded px-1.5 py-0.5 font-label text-[9px] font-bold uppercase tracking-wider bg-[#fff7ed] text-[#9a3412] border border-[#fed7aa]">
+                                  Next day
+                                </span>
+                              )}
+                            </div>
                           ))}
                         </div>
                       ) : (
