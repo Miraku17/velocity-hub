@@ -12,7 +12,16 @@ import type { GridAvailabilityResponse, SlotStatus } from "@/app/api/grid-availa
 const { bg, accent, accentDim, surface } = colors;
 
 export default function SchedulesPage() {
-  const today = useMemo(() => new Date(), []);
+  // Operating-day "today": before 6 AM, the previous calendar day is still the
+  // current operating day (overnight slots run past midnight), so don't lock it.
+  const today = useMemo(() => {
+    const now = new Date();
+    if (now.getHours() < 6) {
+      now.setDate(now.getDate() - 1);
+    }
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }, []);
   const maxDate = useMemo(() => {
     const d = new Date(today);
     d.setDate(d.getDate() + 30);
