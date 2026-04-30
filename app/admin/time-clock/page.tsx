@@ -199,7 +199,8 @@ export default function TimeClock() {
   const isAdmin = user?.role === "admin" || user?.permissions.time_clock_manage
 
   const allEntries = entries ?? []
-  const todayStr = new Date().toISOString().split("T")[0]
+  const phNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }))
+  const todayStr = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, "0")}-${String(phNow.getDate()).padStart(2, "0")}`
   const todayEntries = allEntries.filter((e) => e.entry_date === todayStr)
   const activeEntries = allEntries.filter((e) => e.is_active)
 
