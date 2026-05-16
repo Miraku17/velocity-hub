@@ -18,11 +18,16 @@ function getInitials(name: string) {
 }
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-US", {
+  // entry_date is a YYYY-MM-DD string already computed in Asia/Manila by the view.
+  // Parse as a local-noon date so toLocaleDateString never shifts to the previous day
+  // regardless of the viewer's browser timezone.
+  const [y, m, d] = date.split("-").map(Number)
+  return new Date(y, m - 1, d, 12).toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "Asia/Manila",
   })
 }
 
@@ -31,6 +36,7 @@ function formatTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
+    timeZone: "Asia/Manila",
   })
 }
 
