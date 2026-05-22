@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
@@ -37,6 +37,73 @@ interface StepReviewConfirmProps {
   onBack: () => void;
 }
 
+const WAIVER_SECTIONS: { title: string; body: string }[] = [
+  {
+    title: "1. Assumption of Risk",
+    body: "I understand that pickleball and related activities involve inherent risks, including but not limited to slips, falls, collisions, physical contact, equipment failure, overexertion, serious injury, permanent disability, or death. I voluntarily choose to participate despite these risks.",
+  },
+  {
+    title: "2. Release of Liability",
+    body: "To the fullest extent permitted under Philippine law, I hereby release, waive, discharge, and hold harmless Velocity Pickleball Hub, its owners, management, employees, staff, coaches, agents, affiliates, and representatives from any and all claims, liabilities, damages, losses, costs, or expenses arising from or related to participation, use of the facilities, equipment, premises, or services, including injuries, accidents, property damage, or losses, whether caused by negligence or otherwise, except in cases of gross negligence or willful misconduct as provided by law.",
+  },
+  {
+    title: "3. Health and Fitness",
+    body: "All participants confirm that they are physically fit and capable of participating in pickleball activities and voluntarily assume all risks associated with participation.",
+  },
+  {
+    title: "4. Responsibility for Personal Belongings",
+    body: "Velocity Pickleball Hub shall not be responsible for lost, stolen, or damaged personal belongings brought onto the premises.",
+  },
+  {
+    title: "5. Facility Rules",
+    body: "All participants agree to follow all facility rules, staff instructions, safety protocols, and court regulations at all times. Velocity Pickleball Hub reserves the right to refuse entry or remove any individual for unsafe, disruptive, abusive, or inappropriate behavior without refund.",
+  },
+  {
+    title: "6. Equipment and Premises",
+    body: "Participants acknowledge that sports equipment and facilities may involve risks despite regular maintenance and inspections. Any unsafe condition, damaged equipment, spills, or hazards should immediately be reported to staff.",
+  },
+  {
+    title: "7. Emergency Medical Treatment",
+    body: "In the event of injury or medical emergency, participants authorize Velocity Pickleball Hub staff to obtain emergency medical assistance if necessary. Any medical costs incurred shall remain the sole responsibility of the participant.",
+  },
+  {
+    title: "8. Group Bookings and Representation",
+    body: "The individual making the booking represents and warrants that they are authorized to make the reservation on behalf of all participants included in the booking. By completing a booking, the booking individual confirms that all participants in the group have been informed of and agree to the terms, conditions, rules, risks, and waiver provisions stated herein. All participants entering or using the facilities of Velocity Pickleball Hub shall be deemed to have accepted these terms and voluntarily assumed all risks associated with participation, regardless of whether they personally completed the booking. Velocity Pickleball Hub reserves the right to require any participant to individually complete and sign a waiver prior to participating in any activity.",
+  },
+  {
+    title: "9. Minors",
+    body: "Participants below eighteen (18) years old must have consent from a parent or legal guardian. The parent or legal guardian accepts these terms on behalf of the minor participant.",
+  },
+  {
+    title: "10. Indemnification",
+    body: "Participants agree to indemnify and hold harmless Velocity Pickleball Hub, its owners, staff, employees, and affiliates from any claims, demands, actions, damages, liabilities, costs, or expenses, including legal fees, arising from the participant’s actions, negligence, misconduct, violation of facility rules, or participation in activities within the premises.",
+  },
+  {
+    title: "11. Weather, Force Majeure, and Uncontrollable Events",
+    body: "Velocity Pickleball Hub shall not be liable for interruptions, cancellations, injuries, damages, or losses caused by weather conditions, natural disasters, power outages, acts of God, emergencies, government actions, or other circumstances beyond reasonable control.",
+  },
+  {
+    title: "12. CCTV and Security Monitoring",
+    body: "Participants acknowledge that portions of the facility may be monitored by CCTV cameras for safety, security, operational, and incident documentation purposes.",
+  },
+  {
+    title: "13. Photo and Video Consent",
+    body: "Participants consent to the use of photographs, videos, or recordings taken within the facility for promotional, marketing, security, or operational purposes unless otherwise requested in writing.",
+  },
+  {
+    title: "14. Limitation of Liability",
+    body: "To the maximum extent permitted by law, Velocity Pickleball Hub’s total liability for any claim related to facility use shall be limited to the amount paid for the applicable booking or service.",
+  },
+  {
+    title: "15. Severability",
+    body: "If any provision of this waiver is found invalid or unenforceable, the remaining provisions shall continue in full force and effect.",
+  },
+  {
+    title: "16. Acknowledgment",
+    body: "By proceeding with a booking, entering the premises, or participating in any activity, all participants acknowledge that they have carefully read, understood, and voluntarily agreed to this Waiver and Release of Liability.",
+  },
+];
+
 export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
   const { items, customer, clearCart, setStep } = useBookingCart();
   const { data: paymentQrCodes = [] } = usePaymentQrCodes();
@@ -66,6 +133,36 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
   const [confirmedGroups, setConfirmedGroups] = useState<ReturnType<typeof groupItemsByCourt>>([]);
   const [confirmedTotal, setConfirmedTotal] = useState(0);
   const [confirmedDate, setConfirmedDate] = useState("");
+
+  // Waiver acknowledgment
+  const [showWaiverModal, setShowWaiverModal] = useState(false);
+  const [hasScrolledWaiver, setHasScrolledWaiver] = useState(false);
+  const [acceptedWaiver, setAcceptedWaiver] = useState(false);
+  const [pendingAcceptance, setPendingAcceptance] = useState(false);
+
+  const waiverScrollRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    if (node.scrollHeight <= node.clientHeight + 4) {
+      setHasScrolledWaiver(true);
+    }
+  }, []);
+
+  function handleWaiverScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 16) {
+      setHasScrolledWaiver(true);
+    }
+  }
+
+  function openWaiverModal() {
+    setPendingAcceptance(acceptedWaiver);
+    setShowWaiverModal(true);
+  }
+
+  function confirmWaiverAcceptance() {
+    setAcceptedWaiver(true);
+    setShowWaiverModal(false);
+  }
 
   // Turnstile
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -118,7 +215,7 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
     const url = URL.createObjectURL(file);
     setReceiptUrl(url);
     if (receiptInputRef.current) receiptInputRef.current.value = "";
-    setShowConfirmModal(true);
+    if (acceptedWaiver) setShowConfirmModal(true);
   }
 
   async function handleConfirmBooking() {
@@ -312,6 +409,59 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
             )}
           </div>
 
+          {/* Waiver summary card */}
+          <div className="rounded-2xl bg-white p-5 sm:p-6 shadow-sm" style={{ border: `1px solid ${colors.bg}08` }}>
+            <h3 className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em] mb-1" style={{ color: `${colors.bg}60` }}>
+              Waiver & Release of Liability
+            </h3>
+            <p className="font-[Poppins] text-[11px] mb-4" style={{ color: `${colors.bg}40` }}>
+              Read the full waiver and confirm you agree before booking.
+            </p>
+
+            {acceptedWaiver ? (
+              <div
+                className="rounded-xl p-4 flex items-start gap-3"
+                style={{ backgroundColor: `${colors.accent}40`, border: `1px solid ${colors.accent}` }}
+              >
+                <span
+                  className="material-symbols-outlined text-[20px] shrink-0 mt-0.5"
+                  style={{ color: colors.bg, fontVariationSettings: "'FILL' 1" }}
+                >
+                  check_circle
+                </span>
+                <div className="flex-1">
+                  <p className="font-[Poppins] text-xs font-bold" style={{ color: colors.bg }}>
+                    Waiver Accepted
+                  </p>
+                  <p className="font-[Poppins] text-[11px] mt-0.5 leading-relaxed" style={{ color: `${colors.bg}80` }}>
+                    You agreed to the Waiver and Release of Liability.
+                  </p>
+                  <button
+                    onClick={openWaiverModal}
+                    className="mt-1 font-[Poppins] text-[11px] font-semibold underline"
+                    style={{ color: colors.bg }}
+                  >
+                    Review again
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={openWaiverModal}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 font-[Poppins] font-semibold text-sm transition-all active:scale-[0.98]"
+                style={{
+                  backgroundColor: colors.bg,
+                  color: colors.accent,
+                }}
+              >
+                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 0, 'wght' 400" }}>
+                  description
+                </span>
+                Read & Accept Waiver
+              </button>
+            )}
+          </div>
+
           {/* Total + confirm */}
           <div className="rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden" style={{ backgroundColor: colors.bg }}>
             <div className="absolute inset-0 grain-overlay opacity-15 pointer-events-none" />
@@ -327,7 +477,7 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
               </p>
               <button
                 onClick={() => setShowConfirmModal(true)}
-                disabled={createReservation.isPending || !receiptFile}
+                disabled={createReservation.isPending || !receiptFile || !acceptedWaiver}
                 className="w-full py-3.5 sm:py-4 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ backgroundColor: colors.accent, color: colors.bg }}
               >
@@ -337,6 +487,12 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                 <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.accentDim}90` }}>
                   <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>upload_file</span>
                   Please upload your payment receipt above to confirm
+                </p>
+              )}
+              {receiptFile && !acceptedWaiver && (
+                <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.accentDim}90` }}>
+                  <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>description</span>
+                  Please read and accept the waiver to continue
                 </p>
               )}
               {createReservation.isError && (
@@ -442,6 +598,168 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
           </div>
         </div>
       </div>
+
+      {/* Waiver Modal */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showWaiverModal && (
+            <>
+              <motion.div
+                key="waiver-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
+                onClick={() => setShowWaiverModal(false)}
+              />
+              <motion.div
+                key="waiver-modal"
+                initial={{ opacity: 0, scale: 0.97, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97, y: 20 }}
+                transition={{ duration: 0.25, ease }}
+                className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 pointer-events-none"
+              >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl bg-white shadow-2xl pointer-events-auto overflow-hidden"
+                style={{ border: `1px solid ${colors.bg}10` }}
+              >
+                {/* Header */}
+                <div
+                  className="px-5 sm:px-8 py-4 sm:py-5 flex items-start justify-between gap-3 shrink-0 bg-white"
+                  style={{ borderBottom: `1px solid ${colors.bg}10` }}
+                >
+                  <div className="min-w-0">
+                    <p
+                      className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em]"
+                      style={{ color: `${colors.bg}60` }}
+                    >
+                      Velocity Pickleball Hub
+                    </p>
+                    <h3
+                      className="font-['Clash_Display'] text-lg sm:text-xl font-bold mt-0.5"
+                      style={{ color: colors.bg }}
+                    >
+                      Waiver & Release of Liability
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setShowWaiverModal(false)}
+                    aria-label="Close waiver"
+                    className="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-black/5"
+                    style={{ border: `1px solid ${colors.bg}10` }}
+                  >
+                    <span
+                      className="material-symbols-outlined text-[18px]"
+                      style={{ color: `${colors.bg}90`, fontVariationSettings: "'wght' 500" }}
+                    >
+                      close
+                    </span>
+                  </button>
+                </div>
+
+                {/* Scrollable body */}
+                <div
+                  ref={waiverScrollRef}
+                  onScroll={handleWaiverScroll}
+                  className="flex-1 overflow-y-auto px-5 sm:px-8 py-5 sm:py-6 space-y-5 bg-white"
+                >
+                  <p
+                    className="font-[Poppins] text-xs sm:text-sm leading-relaxed"
+                    style={{ color: `${colors.bg}b0` }}
+                  >
+                    By booking, entering, or using the facilities of Velocity Pickleball Hub, all players,
+                    guests, spectators, and participants acknowledge and agree to the following terms and
+                    conditions.
+                  </p>
+                  {WAIVER_SECTIONS.map((s) => (
+                    <div key={s.title}>
+                      <p
+                        className="font-[Poppins] text-xs sm:text-sm font-bold uppercase tracking-wider mb-1.5"
+                        style={{ color: colors.bg }}
+                      >
+                        {s.title}
+                      </p>
+                      <p
+                        className="font-[Poppins] text-xs sm:text-sm leading-relaxed whitespace-pre-line"
+                        style={{ color: `${colors.bg}c0` }}
+                      >
+                        {s.body}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div
+                  className="px-5 sm:px-8 py-4 sm:py-5 shrink-0 space-y-3 bg-white"
+                  style={{ borderTop: `1px solid ${colors.bg}10` }}
+                >
+                  {!hasScrolledWaiver && (
+                    <p
+                      className="font-[Poppins] text-[11px] flex items-center justify-center gap-1.5"
+                      style={{ color: `${colors.bg}70` }}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">expand_more</span>
+                      Scroll to the bottom to enable acceptance
+                    </p>
+                  )}
+                  <label
+                    className={`flex items-start gap-2.5 rounded-xl p-3 transition-all ${
+                      hasScrolledWaiver ? "cursor-pointer" : "cursor-not-allowed"
+                    }`}
+                    style={{
+                      backgroundColor: pendingAcceptance ? `${colors.accent}40` : "white",
+                      border: `1px solid ${pendingAcceptance ? colors.accent : `${colors.bg}15`}`,
+                      opacity: hasScrolledWaiver ? 1 : 0.55,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pendingAcceptance}
+                      disabled={!hasScrolledWaiver}
+                      onChange={(e) => setPendingAcceptance(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 cursor-[inherit]"
+                      style={{ accentColor: colors.bg }}
+                    />
+                    <span
+                      className="font-[Poppins] text-[11px] sm:text-xs leading-relaxed"
+                      style={{ color: `${colors.bg}c0` }}
+                    >
+                      I confirm that I have read and agreed to the Waiver and Release of Liability and
+                      Facility Rules of Velocity Pickleball Hub. I further confirm that all participants
+                      included in this booking have been informed of and agree to these terms and voluntarily
+                      assume all risks associated with participation.
+                    </span>
+                  </label>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowWaiverModal(false)}
+                      className="flex-1 py-3 rounded-xl font-[Poppins] font-semibold text-sm transition-all"
+                      style={{ border: `1px solid ${colors.bg}12`, color: `${colors.bg}80` }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmWaiverAcceptance}
+                      disabled={!pendingAcceptance}
+                      className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ backgroundColor: colors.bg, color: colors.accent }}
+                    >
+                      Accept
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Confirmation Modal */}
       <AnimatePresence>
