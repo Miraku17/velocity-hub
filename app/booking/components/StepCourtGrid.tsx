@@ -19,15 +19,19 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
   const queryClient = useQueryClient();
   const { items, clearCart } = useBookingCart();
 
-  // Operating-day "today": before 6 AM, the previous calendar day is still the
-  // current operating day (overnight slots run past midnight), so don't lock it.
+  // Operating-day "today" in Asia/Manila. Computed from PH wallclock so SSR
+  // (runs in UTC on Vercel) doesn't ship the previous day's date during PH
+  // early morning. Before 6 AM PH, the previous calendar day is still the
+  // current operating day (overnight slots run past midnight).
   const today = useMemo(() => {
-    const now = new Date();
-    if (now.getHours() < 6) {
-      now.setDate(now.getDate() - 1);
+    const phNow = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
+    );
+    if (phNow.getHours() < 6) {
+      phNow.setDate(phNow.getDate() - 1);
     }
-    now.setHours(0, 0, 0, 0);
-    return now;
+    phNow.setHours(0, 0, 0, 0);
+    return phNow;
   }, []);
   const maxDate = useMemo(() => {
     const d = new Date(today);
