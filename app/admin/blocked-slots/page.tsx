@@ -257,42 +257,49 @@ function BlockFormModal({
     e.preventDefault()
 
     if (blockType === "day") {
-      onSave([{
-        court_id: courtId || null,
-        blocked_date: date,
-        start_time: null,
-        end_time: null,
-        reason: reason.trim(),
-      }])
-    } else {
-      if (selectedSlots.length === 0) return
-      const sorted = [...selectedSlots].sort((a, b) => parse12Hour(a) - parse12Hour(b))
-      const ranges: { start: number; end: number }[] = []
-      let currentStart = parse12Hour(sorted[0])
-      let currentEnd = currentStart + 1
-
-      for (let i = 1; i < sorted.length; i++) {
-        const hour = parse12Hour(sorted[i])
-        if (hour === currentEnd) {
-          currentEnd = hour + 1
-        } else {
-          ranges.push({ start: currentStart, end: currentEnd })
-          currentStart = hour
-          currentEnd = hour + 1
-        }
-      }
-      ranges.push({ start: currentStart, end: currentEnd })
-
       onSave(
-        ranges.map((r) => ({
+        allDates.map((d) => ({
           court_id: courtId || null,
-          blocked_date: date,
-          start_time: `${String(r.start % 24).padStart(2, "0")}:00:00`,
-          end_time: `${String(r.end % 24).padStart(2, "0")}:00:00`,
+          blocked_date: d,
+          start_time: null,
+          end_time: null,
           reason: reason.trim(),
         }))
       )
+      return
     }
+
+    if (selectedSlots.length === 0) return
+
+    // Existing contiguous-range grouping (unchanged):
+    const sorted = [...selectedSlots].sort((a, b) => parse12Hour(a) - parse12Hour(b))
+    const ranges: { start: number; end: number }[] = []
+    let currentStart = parse12Hour(sorted[0])
+    let currentEnd = currentStart + 1
+
+    for (let i = 1; i < sorted.length; i++) {
+      const hour = parse12Hour(sorted[i])
+      if (hour === currentEnd) {
+        currentEnd = hour + 1
+      } else {
+        ranges.push({ start: currentStart, end: currentEnd })
+        currentStart = hour
+        currentEnd = hour + 1
+      }
+    }
+    ranges.push({ start: currentStart, end: currentEnd })
+
+    const rows = allDates.flatMap((d) =>
+      ranges.map((r) => ({
+        court_id: courtId || null,
+        blocked_date: d,
+        start_time: `${String(r.start % 24).padStart(2, "0")}:00:00`,
+        end_time: `${String(r.end % 24).padStart(2, "0")}:00:00`,
+        reason: reason.trim(),
+      }))
+    )
+
+    onSave(rows)
   }
 
   const canSubmit = blockType === "day" || selectedSlots.length > 0
@@ -646,9 +653,11 @@ function BlockFormModal({
               disabled={saving || !canSubmit}
               className="rounded-lg bg-error px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
             >
-              {saving ? "Blocking..." : blockType === "slots" && selectedSlots.length > 0
-                ? `Block ${selectedSlots.length} Slot${selectedSlots.length > 1 ? "s" : ""}`
-                : "Block"
+              {saving
+                ? "Saving..."
+                : allDates.length > 1
+                  ? `Block ${allDates.length} Dates`
+                  : "Block Slots"
               }
             </button>
           </div>
