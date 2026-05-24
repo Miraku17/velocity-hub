@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useBlockedSlots,
   useCreateBlockedSlot,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ConfirmModal } from "@/components/admin/ConfirmModal"
+import { toast } from "sonner"
 
 /* ── Helpers ── */
 
@@ -670,10 +671,12 @@ function BlockFormModal({
 /* ── Page ── */
 
 export default function BlockedSlotsPage() {
+  const queryClient = useQueryClient()
   const [dateFilter, setDateFilter] = useState("")
   const [monthFilter, setMonthFilter] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [conflictError, setConflictError] = useState<string | null>(null)
+  const [batchSaving, setBatchSaving] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string
     message: string
@@ -699,22 +702,50 @@ export default function BlockedSlotsPage() {
     return map
   }, [courts])
 
-  function handleSave(blocks: {
+  async function handleSave(rows: Array<{
     court_id: string | null
     blocked_date: string
     start_time: string | null
     end_time: string | null
     reason: string
-  }[]) {
-    setConflictError(null)
-    setShowForm(false)
-    for (const block of blocks) {
-      createMutation.mutate(block, {
-        onError: (err) => {
-          setShowForm(true)
-          setConflictError(err.message)
-        },
-      })
+  }>) {
+    setBatchSaving(true)
+    try {
+      const results = await Promise.allSettled(
+        rows.map((r) => createMutation.mutateAsync(r))
+      )
+
+      const failures = results
+        .map((r, i) => ({ r, row: rows[i] }))
+        .filter(({ r }) => r.status === "rejected") as Array<{
+          r: PromiseRejectedResult
+          row: typeof rows[number]
+        }>
+
+      queryClient.invalidateQueries({ queryKey: ["blocked-slots"] })
+
+      const successCount = results.length - failures.length
+      const uniqueDates = new Set(rows.map((r) => r.blocked_date)).size
+
+      if (failures.length === 0) {
+        toast.success(
+          uniqueDates > 1
+            ? `Blocked ${uniqueDates} dates (${successCount} slot${successCount === 1 ? "" : "s"})`
+            : `Blocked ${successCount} slot${successCount === 1 ? "" : "s"}`
+        )
+        setShowForm(false)
+        return
+      }
+
+      const firstErr = (failures[0].r.reason as Error)?.message || "Failed to create block"
+      const failedDates = Array.from(new Set(failures.map((f) => f.row.blocked_date))).join(", ")
+      toast.error(
+        successCount > 0
+          ? `Saved ${successCount}, failed on ${failedDates}: ${firstErr}`
+          : `Failed: ${firstErr}`
+      )
+    } finally {
+      setBatchSaving(false)
     }
   }
 
@@ -739,7 +770,7 @@ export default function BlockedSlotsPage() {
           courts={courts}
           onClose={() => { setShowForm(false); setConflictError(null) }}
           onSave={handleSave}
-          saving={createMutation.isPending}
+          saving={createMutation.isPending || batchSaving}
           conflictError={conflictError}
           onClearError={() => setConflictError(null)}
         />
