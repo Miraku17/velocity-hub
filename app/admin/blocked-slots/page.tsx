@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ConfirmModal } from "@/components/admin/ConfirmModal"
 
 /* ── Helpers ── */
 
@@ -568,78 +569,20 @@ function BlockFormModal({
   )
 }
 
-/* ── Delete Confirmation ── */
-
-function UnblockModal({
-  block,
-  courts,
-  onClose,
-  onConfirm,
-  deleting,
-}: {
-  block: BlockedSlot
-  courts: Court[]
-  onClose: () => void
-  onConfirm: () => void
-  deleting: boolean
-}) {
-  const courtName = block.court_id
-    ? courts.find((c) => c.id === block.court_id)?.name ?? "Unknown"
-    : "All Courts"
-
-  return (
-    <Portal>
-      <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
-        <div
-          className="w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex justify-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#16A34A]/10 text-[#16A34A]">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-4 text-center">
-            <h3 className="font-headline text-lg font-semibold text-on-surface">Unblock</h3>
-            <p className="mt-2 font-body text-sm text-on-surface-variant">
-              Remove this block for <span className="font-semibold text-on-surface">{courtName}</span> on{" "}
-              <span className="font-semibold text-on-surface">{formatDate(block.blocked_date)}</span>?
-            </p>
-          </div>
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={onClose}
-              disabled={deleting}
-              className="flex-1 rounded-lg border border-outline-variant/30 bg-transparent px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={deleting}
-              className="flex-1 rounded-lg bg-[#16A34A] px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:bg-[#16A34A]/90 disabled:opacity-60"
-            >
-              {deleting ? "Unblocking..." : "Unblock"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Portal>
-  )
-}
-
 /* ── Page ── */
 
 export default function BlockedSlotsPage() {
   const [dateFilter, setDateFilter] = useState("")
   const [monthFilter, setMonthFilter] = useState("")
   const [showForm, setShowForm] = useState(false)
-  const [unblockItem, setUnblockItem] = useState<BlockedSlot | null>(null)
   const [conflictError, setConflictError] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    variant: "danger" | "default"
+    onConfirm: () => void
+  } | null>(null)
 
   const filters = {
     date: dateFilter || undefined,
@@ -677,11 +620,17 @@ export default function BlockedSlotsPage() {
     }
   }
 
-  function handleUnblock() {
-    if (!unblockItem) return
-    const id = unblockItem.id
-    setUnblockItem(null)
-    deleteMutation.mutate(id)
+  function handleUnblock(block: BlockedSlot) {
+    const courtName = block.court_id
+      ? (courts.find((c) => c.id === block.court_id)?.name ?? "Unknown")
+      : "All Courts"
+    setConfirmDialog({
+      title: "Delete Block",
+      message: `Remove the block for ${courtName} on ${formatDate(block.blocked_date)}?`,
+      confirmLabel: "Delete",
+      variant: "danger",
+      onConfirm: () => deleteMutation.mutate(block.id),
+    })
   }
 
   return (
@@ -698,14 +647,19 @@ export default function BlockedSlotsPage() {
         />
       )}
 
-      {/* Unblock Modal */}
-      {unblockItem && (
-        <UnblockModal
-          block={unblockItem}
-          courts={courts}
-          onClose={() => setUnblockItem(null)}
-          onConfirm={handleUnblock}
-          deleting={deleteMutation.isPending}
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <ConfirmModal
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={() => {
+            const { onConfirm } = confirmDialog
+            setConfirmDialog(null)
+            onConfirm()
+          }}
         />
       )}
 
@@ -871,7 +825,7 @@ export default function BlockedSlotsPage() {
                     <td className="px-6 py-5">
                       <div className="flex justify-end">
                         <button
-                          onClick={() => setUnblockItem(block)}
+                          onClick={() => handleUnblock(block)}
                           className="flex h-8 items-center gap-1.5 rounded-lg px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-[#16A34A] transition-colors hover:bg-[#16A34A]/10"
                           title="Unblock"
                         >
