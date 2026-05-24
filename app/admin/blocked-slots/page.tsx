@@ -118,17 +118,43 @@ function BlockFormModal({
   )
 
   const [addDateOpen, setAddDateOpen] = useState(false)
+  const addDateTriggerRef = useRef<HTMLButtonElement>(null)
   const addDatePopoverRef = useRef<HTMLDivElement>(null)
+  const [addDatePos, setAddDatePos] = useState<{ top: number; left: number; placement: "below" | "above" } | null>(null)
 
   useEffect(() => {
-    if (!addDateOpen) return
-    function handleClickOutside(e: MouseEvent) {
-      if (addDatePopoverRef.current && !addDatePopoverRef.current.contains(e.target as Node)) {
-        setAddDateOpen(false)
-      }
+    if (!addDateOpen) {
+      setAddDatePos(null)
+      return
     }
+    function recompute() {
+      const el = addDateTriggerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const popoverHeight = 340 // approx Calendar height + padding
+      const spaceBelow = window.innerHeight - rect.bottom
+      const placement = spaceBelow < popoverHeight && rect.top > popoverHeight ? "above" : "below"
+      setAddDatePos({
+        top: placement === "below" ? rect.bottom + 6 : rect.top - 6,
+        left: rect.left,
+        placement,
+      })
+    }
+    recompute()
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node
+      if (addDateTriggerRef.current?.contains(target)) return
+      if (addDatePopoverRef.current?.contains(target)) return
+      setAddDateOpen(false)
+    }
+    window.addEventListener("resize", recompute)
+    window.addEventListener("scroll", recompute, true)
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    return () => {
+      window.removeEventListener("resize", recompute)
+      window.removeEventListener("scroll", recompute, true)
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
   }, [addDateOpen])
 
   function addDate(d: string) {
@@ -497,20 +523,31 @@ function BlockFormModal({
                     </span>
                   )
                 })}
-                <div className="relative" ref={addDatePopoverRef}>
-                  <button
-                    type="button"
-                    onClick={() => setAddDateOpen((o) => !o)}
-                    className={`inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                      addDateOpen
-                        ? "border-primary text-primary"
-                        : "border-outline-variant/40 text-on-surface-variant hover:border-primary hover:text-primary"
-                    }`}
-                  >
-                    + Add Date
-                  </button>
-                  {addDateOpen && (
-                    <div className="absolute left-0 top-9 z-50 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-xl">
+                <button
+                  ref={addDateTriggerRef}
+                  type="button"
+                  onClick={() => setAddDateOpen((o) => !o)}
+                  className={`inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                    addDateOpen
+                      ? "border-primary text-primary"
+                      : "border-outline-variant/40 text-on-surface-variant hover:border-primary hover:text-primary"
+                  }`}
+                >
+                  + Add Date
+                </button>
+                {addDateOpen && addDatePos && (
+                  <Portal>
+                    <div
+                      ref={addDatePopoverRef}
+                      style={{
+                        position: "fixed",
+                        top: addDatePos.placement === "below" ? addDatePos.top : undefined,
+                        bottom: addDatePos.placement === "above" ? window.innerHeight - addDatePos.top : undefined,
+                        left: addDatePos.left,
+                        zIndex: 200,
+                      }}
+                      className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-xl"
+                    >
                       <Calendar
                         mode="single"
                         selected={isoToDate(date)}
@@ -522,8 +559,8 @@ function BlockFormModal({
                         }}
                       />
                     </div>
-                  )}
-                </div>
+                  </Portal>
+                )}
               </div>
             </div>
 
