@@ -19,7 +19,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ConfirmModal } from "@/components/admin/ConfirmModal"
+import { Calendar } from "@/components/ui/calendar"
 import { toast } from "sonner"
+
+function dateToISO(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+function isoToDate(iso: string) {
+  return new Date(iso + "T00:00:00")
+}
 
 /* ── Helpers ── */
 
@@ -108,7 +117,19 @@ function BlockFormModal({
     [dates]
   )
 
-  const addDatePickerRef = useRef<HTMLInputElement>(null)
+  const [addDateOpen, setAddDateOpen] = useState(false)
+  const addDatePopoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!addDateOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (addDatePopoverRef.current && !addDatePopoverRef.current.contains(e.target as Node)) {
+        setAddDateOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [addDateOpen])
 
   function addDate(d: string) {
     if (dates.includes(d)) return
@@ -476,34 +497,32 @@ function BlockFormModal({
                     </span>
                   )
                 })}
-                <div className="relative">
+                <div className="relative" ref={addDatePopoverRef}>
                   <button
                     type="button"
-                    onClick={() => {
-                      const el = addDatePickerRef.current
-                      if (!el) return
-                      if (typeof el.showPicker === "function") {
-                        try { el.showPicker() } catch { el.click() }
-                      } else {
-                        el.click()
-                      }
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-outline-variant/40 px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
+                    onClick={() => setAddDateOpen((o) => !o)}
+                    className={`inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                      addDateOpen
+                        ? "border-primary text-primary"
+                        : "border-outline-variant/40 text-on-surface-variant hover:border-primary hover:text-primary"
+                    }`}
                   >
                     + Add Date
                   </button>
-                  <input
-                    ref={addDatePickerRef}
-                    type="date"
-                    value=""
-                    onChange={(e) => {
-                      const v = e.target.value
-                      if (!v) return
-                      addDate(v)
-                      e.target.value = ""
-                    }}
-                    className="sr-only"
-                  />
+                  {addDateOpen && (
+                    <div className="absolute left-0 top-9 z-50 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-xl">
+                      <Calendar
+                        mode="single"
+                        selected={isoToDate(date)}
+                        disabled={(d) => dates.includes(dateToISO(d))}
+                        onSelect={(d) => {
+                          if (!d) return
+                          addDate(dateToISO(d))
+                          setAddDateOpen(false)
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
