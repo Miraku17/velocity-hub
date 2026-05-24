@@ -14,7 +14,13 @@ import { LoadingPage } from "@/components/ui/loading"
 import { toast } from "sonner"
 import { Portal } from "@/components/ui/portal"
 import { CourtSlotGrid } from "./components/CourtSlotGrid"
-import type { SelectedSlot, GridAvailData } from "./components/types"
+import type { DateBlock, SelectedSlot, GridAvailData } from "./components/types"
+
+function newBlockId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `b_${Math.random().toString(36).slice(2)}`
+}
 /* ── Helpers ── */
 
 function formatDate(dateStr: string) {
@@ -64,24 +70,34 @@ function EntryFormModal({
   onSave: (data: EntryFormData) => void
   saving: boolean
 }) {
-  const [date, setDate] = useState(entry?.entry_date ?? todayISO())
+  const [dateBlocks, setDateBlocks] = useState<DateBlock[]>(() => {
+    if (entry?.entry_date) {
+      const slots: SelectedSlot[] = []
+      if (entry.court_id && entry.start_time && entry.end_time) {
+        const court = courts.find((c) => c.id === entry.court_id)
+        if (court) {
+          const startH = parseInt(entry.start_time.split(":")[0], 10)
+          const endH = parseInt(entry.end_time.split(":")[0], 10)
+          for (let h = startH; h < endH; h++) {
+            slots.push({ court_id: court.id, court_name: court.name, hour: h })
+          }
+        }
+      }
+      return [{ id: newBlockId(), date: entry.entry_date, selectedSlots: slots }]
+    }
+    return [{ id: newBlockId(), date: todayISO(), selectedSlots: [] }]
+  })
+  const [activeBlockId, setActiveBlockId] = useState<string>(() => dateBlocks[0].id)
+
+  const activeBlock = dateBlocks.find((b) => b.id === activeBlockId) ?? dateBlocks[0]
+  const date = activeBlock.date
+  const selectedSlots = activeBlock.selectedSlots
+
   const [amount, setAmount] = useState(entry?.amount?.toString() ?? "")
   const [description, setDescription] = useState(entry?.description ?? "")
   const [notes, setNotes] = useState(entry?.notes ?? "")
-  const [selectedSlots, setSelectedSlots] = useState<SelectedSlot[]>(() => {
-    if (!entry?.court_id || !entry?.start_time || !entry?.end_time) return []
-    const court = courts.find((c) => c.id === entry.court_id)
-    if (!court) return []
-    const startH = parseInt(entry.start_time.split(":")[0], 10)
-    const endH = parseInt(entry.end_time.split(":")[0], 10)
-    const slots: SelectedSlot[] = []
-    for (let h = startH; h < endH; h++) {
-      slots.push({ court_id: court.id, court_name: court.name, hour: h })
-    }
-    return slots
-  })
 
-  // Fetch grid availability for the selected date
+  // Fetch grid availability for the active block's date
   const { data: gridData } = useQuery<GridAvailData>({
     queryKey: ["grid-availability", date],
     queryFn: async () => {
@@ -92,9 +108,6 @@ function EntryFormModal({
     staleTime: 60_000,
     enabled: !!date,
   })
-
-  // Clear selected slots when date changes
-  useEffect(() => { setSelectedSlots([]) }, [date])
 
   // Auto-fill amount based on selected slots
   const computedTotal = useMemo(() => {
@@ -117,12 +130,25 @@ function EntryFormModal({
   }, [computedTotal, selectedSlots.length])
 
   function toggleSlot(courtId: string, courtName: string, hour: number) {
-    const key = `${courtId}:${hour}`
-    setSelectedSlots((prev) => {
-      const exists = prev.some((s) => `${s.court_id}:${s.hour}` === key)
-      if (exists) return prev.filter((s) => `${s.court_id}:${s.hour}` !== key)
-      return [...prev, { court_id: courtId, court_name: courtName, hour }]
-    })
+    setDateBlocks((blocks) =>
+      blocks.map((b) => {
+        if (b.id !== activeBlockId) return b
+        const key = `${courtId}:${hour}`
+        const exists = b.selectedSlots.some((s) => `${s.court_id}:${s.hour}` === key)
+        if (exists) {
+          return { ...b, selectedSlots: b.selectedSlots.filter((s) => `${s.court_id}:${s.hour}` !== key) }
+        }
+        return { ...b, selectedSlots: [...b.selectedSlots, { court_id: courtId, court_name: courtName, hour }] }
+      })
+    )
+  }
+
+  function setActiveDate(newDate: string) {
+    setDateBlocks((blocks) =>
+      blocks.map((b) =>
+        b.id === activeBlockId ? { ...b, date: newDate, selectedSlots: [] } : b
+      )
+    )
   }
 
   const stableOnClose = useCallback(onClose, [onClose])
@@ -138,62 +164,72 @@ function EntryFormModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    // Group selected slots by court_id, then merge contiguous hours into blocks
-    const byCourt = new Map<string, number[]>()
-    for (const s of selectedSlots) {
-      if (!byCourt.has(s.court_id)) byCourt.set(s.court_id, [])
-      byCourt.get(s.court_id)!.push(s.hour)
-    }
-
-    // For manual entries, we create one entry per court
-    // If only one court is selected, use the simple path
     const allEntries: EntryFormData[] = []
-    for (const [cId, hours] of byCourt) {
-      hours.sort((a, b) => a - b)
-      const blocks: { startH: number; endH: number }[] = []
-      let blockStart = hours[0]
-      let prev = hours[0]
-      for (let i = 1; i < hours.length; i++) {
-        if (hours[i] !== prev + 1) {
-          blocks.push({ startH: blockStart, endH: prev + 1 })
-          blockStart = hours[i]
-        }
-        prev = hours[i]
-      }
-      blocks.push({ startH: blockStart, endH: prev + 1 })
 
-      const startTime = `${String(blocks[0].startH).padStart(2, "0")}:00:00`
-      const endTime = `${String(blocks[blocks.length - 1].endH).padStart(2, "0")}:00:00`
-
-      // Calculate amount for this court's slots from hourly rates
-      let courtAmount: number | null = null
-      if (gridData) {
-        const court = gridData.courts.find((c) => c.id === cId)
-        if (court) {
-          courtAmount = hours.reduce((sum, h) => {
-            return sum + (court.schedule?.hourly_rates?.[String(h)] ?? court.price_per_hour)
-          }, 0)
-        }
+    for (const block of dateBlocks) {
+      if (block.selectedSlots.length === 0) {
+        // Empty block — skip in submission (validation in a later task will block this case).
+        continue
       }
 
-      allEntries.push({
-        id: entry?.id,
-        entry_date: date,
-        amount: courtAmount,
-        description: description.trim(),
-        notes: notes.trim() || null,
-        court_id: cId,
-        start_time: startTime,
-        end_time: endTime,
-        time_blocks: blocks.length > 1 ? blocks.map((b) => ({
-          start_time: `${String(b.startH).padStart(2, "0")}:00:00`,
-          end_time: `${String(b.endH).padStart(2, "0")}:00:00`,
-        })) : undefined,
-      })
+      const byCourt = new Map<string, number[]>()
+      for (const s of block.selectedSlots) {
+        if (!byCourt.has(s.court_id)) byCourt.set(s.court_id, [])
+        byCourt.get(s.court_id)!.push(s.hour)
+      }
+
+      for (const [cId, hours] of byCourt) {
+        hours.sort((a, b) => a - b)
+        const blocks: { startH: number; endH: number }[] = []
+        let blockStart = hours[0]
+        let prev = hours[0]
+        for (let i = 1; i < hours.length; i++) {
+          if (hours[i] !== prev + 1) {
+            blocks.push({ startH: blockStart, endH: prev + 1 })
+            blockStart = hours[i]
+          }
+          prev = hours[i]
+        }
+        blocks.push({ startH: blockStart, endH: prev + 1 })
+
+        const startTime = `${String(blocks[0].startH).padStart(2, "0")}:00:00`
+        const endTime = `${String(blocks[blocks.length - 1].endH).padStart(2, "0")}:00:00`
+
+        let courtAmount: number | null = null
+        if (gridData && block.date === date) {
+          // Only the active block's gridData is in this scope; per-block pricing
+          // is finalized in Task 5 using the query cache. For now, leave amount
+          // null for non-active blocks — the API accepts null.
+          const court = gridData.courts.find((c) => c.id === cId)
+          if (court) {
+            courtAmount = hours.reduce(
+              (sum, h) => sum + (court.schedule?.hourly_rates?.[String(h)] ?? court.price_per_hour),
+              0
+            )
+          }
+        }
+
+        allEntries.push({
+          id: entry?.id,
+          entry_date: block.date,
+          amount: courtAmount,
+          description: description.trim(),
+          notes: notes.trim() || null,
+          court_id: cId,
+          start_time: startTime,
+          end_time: endTime,
+          time_blocks: blocks.length > 1
+            ? blocks.map((b) => ({
+                start_time: `${String(b.startH).padStart(2, "0")}:00:00`,
+                end_time: `${String(b.endH).padStart(2, "0")}:00:00`,
+              }))
+            : undefined,
+        })
+      }
     }
 
     if (allEntries.length === 0) {
-      // No slots selected — submit without court/time
+      // No slots in any block — fall back to today's "notes only" save path.
       onSave({
         id: entry?.id,
         entry_date: date,
@@ -204,12 +240,10 @@ function EntryFormModal({
         start_time: null,
         end_time: null,
       })
-    } else {
-      // Save each court entry
-      for (const entryData of allEntries) {
-        onSave(entryData)
-      }
+      return
     }
+
+    for (const entryData of allEntries) onSave(entryData)
   }
 
   const selectedCount = selectedSlots.length
@@ -251,7 +285,7 @@ function EntryFormModal({
                   type="date"
                   required
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => setActiveDate(e.target.value)}
                   className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
                 />
               </div>
