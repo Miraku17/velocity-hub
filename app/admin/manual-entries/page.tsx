@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useManualEntries,
@@ -255,15 +255,23 @@ function EntryFormModal({
     }
   }
 
-  const stableOnClose = useCallback(onClose, [onClose])
+  function attemptClose() {
+    const hasSelections = dateBlocks.some((b) => b.selectedSlots.length > 0)
+    if (hasSelections) {
+      const ok = window.confirm("Discard unsaved selections?")
+      if (!ok) return
+    }
+    onClose()
+  }
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") stableOnClose()
+      if (e.key === "Escape") attemptClose()
     }
     window.addEventListener("keydown", handleKey)
     return () => window.removeEventListener("keydown", handleKey)
-  }, [stableOnClose])
+    // attemptClose closes over fresh dateBlocks each render — re-bind each render.
+  })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -364,8 +372,8 @@ function EntryFormModal({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={attemptClose} />
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={attemptClose}>
         <form
           onSubmit={handleSubmit}
           className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
@@ -378,7 +386,7 @@ function EntryFormModal({
             </h3>
             <button
               type="button"
-              onClick={onClose}
+              onClick={attemptClose}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -500,7 +508,7 @@ function EntryFormModal({
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={attemptClose}
                 disabled={saving}
                 className="rounded-lg border border-outline-variant/30 bg-transparent px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
               >
