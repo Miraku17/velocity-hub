@@ -99,28 +99,31 @@ function BlockFormModal({
   saving: boolean
 }) {
   const [date, setDate] = useState(todayISO())
-  const [extraDates, setExtraDates] = useState<string[]>([])
+  const [dates, setDates] = useState<string[]>([todayISO()])
   const [courtId, setCourtId] = useState("")
   const [blockType, setBlockType] = useState<"day" | "slots">("day")
 
-  const allDates = useMemo(() => {
-    const set = new Set<string>([date, ...extraDates])
-    return Array.from(set).sort()
-  }, [date, extraDates])
+  const sortedDates = useMemo(
+    () => [...dates].sort((a, b) => a.localeCompare(b)),
+    [dates]
+  )
 
   const addDatePickerRef = useRef<HTMLInputElement>(null)
 
+  function addDate(d: string) {
+    if (dates.includes(d)) return
+    setDates((prev) => [...prev, d])
+    setDate(d)
+  }
+
   function removeDate(d: string) {
-    if (allDates.length <= 1) return
+    if (dates.length <= 1) return
+    const next = dates.filter((x) => x !== d)
+    setDates(next)
     if (d === date) {
-      const remaining = allDates.filter((x) => x !== d)
-      if (remaining.length === 0) return
-      const newPreview = remaining[0]
-      setDate(newPreview)
-      setExtraDates((prev) => prev.filter((x) => x !== d && x !== newPreview))
-      return
+      const ascending = [...next].sort((a, b) => a.localeCompare(b))
+      setDate(ascending[0])
     }
-    setExtraDates((prev) => prev.filter((x) => x !== d))
   }
   const [selectedSlots, setSelectedSlots] = useState<string[]>([])
   const [reason, setReason] = useState("")
@@ -258,7 +261,7 @@ function BlockFormModal({
 
     if (blockType === "day") {
       onSave(
-        allDates.map((d) => ({
+        sortedDates.map((d) => ({
           court_id: courtId || null,
           blocked_date: d,
           start_time: null,
@@ -289,7 +292,7 @@ function BlockFormModal({
     }
     ranges.push({ start: currentStart, end: currentEnd })
 
-    const rows = allDates.flatMap((d) =>
+    const rows = sortedDates.flatMap((d) =>
       ranges.map((r) => ({
         court_id: courtId || null,
         blocked_date: d,
@@ -431,16 +434,16 @@ function BlockFormModal({
               <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                 Dates to block
                 <span className="ml-1 normal-case tracking-normal text-on-surface-variant">
-                  — {allDates.length} {allDates.length === 1 ? "date" : "dates"}
+                  — {sortedDates.length} {sortedDates.length === 1 ? "date" : "dates"}
                 </span>
               </label>
               <div className="flex flex-wrap items-center gap-2">
-                {allDates.map((d) => {
+                {sortedDates.map((d) => {
                   const label = new Date(d + "T00:00:00").toLocaleDateString("en-US", {
                     weekday: "short", month: "short", day: "numeric",
                   })
                   const isPreview = d === date
-                  const canRemove = allDates.length > 1
+                  const canRemove = sortedDates.length > 1
                   return (
                     <span
                       key={d}
@@ -496,8 +499,7 @@ function BlockFormModal({
                     onChange={(e) => {
                       const v = e.target.value
                       if (!v) return
-                      if (allDates.includes(v)) return
-                      setExtraDates((prev) => [...prev, v])
+                      addDate(v)
                       e.target.value = ""
                     }}
                     className="sr-only"
@@ -651,8 +653,8 @@ function BlockFormModal({
             >
               {saving
                 ? "Saving..."
-                : allDates.length > 1
-                  ? `Block ${allDates.length} Dates`
+                : sortedDates.length > 1
+                  ? `Block ${sortedDates.length} Dates`
                   : "Block Slots"
               }
             </button>
