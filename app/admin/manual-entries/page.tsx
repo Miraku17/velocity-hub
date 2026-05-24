@@ -248,11 +248,11 @@ function EntryFormModal({
       const ok = window.confirm(`Remove ${dateLabel} and its ${target.selectedSlots.length} slot${target.selectedSlots.length === 1 ? "" : "s"}?`)
       if (!ok) return
     }
-    setDateBlocks((prev) => {
-      const next = prev.filter((b) => b.id !== id)
-      if (id === activeBlockId && next.length > 0) setActiveBlockId(next[0].id)
-      return next
-    })
+    const next = dateBlocks.filter((b) => b.id !== id)
+    setDateBlocks(next)
+    if (id === activeBlockId && next.length > 0) {
+      setActiveBlockId(next[0].id)
+    }
   }
 
   const stableOnClose = useCallback(onClose, [onClose])
