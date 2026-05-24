@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   useBlockedSlots,
@@ -97,8 +97,25 @@ function BlockFormModal({
   onClearError?: () => void
 }) {
   const [date, setDate] = useState(todayISO())
+  const [extraDates, setExtraDates] = useState<string[]>([])
   const [courtId, setCourtId] = useState("")
   const [blockType, setBlockType] = useState<"day" | "slots">("day")
+
+  const allDates = useMemo(() => {
+    const set = new Set<string>([date, ...extraDates])
+    return Array.from(set).sort()
+  }, [date, extraDates])
+
+  const addDatePickerRef = useRef<HTMLInputElement>(null)
+
+  function removeDate(d: string) {
+    if (allDates.length <= 1) return
+    if (d === date) {
+      const remaining = allDates.filter((x) => x !== d)
+      if (remaining.length > 0) setDate(remaining[0])
+    }
+    setExtraDates((prev) => prev.filter((x) => x !== d))
+  }
   const [selectedSlots, setSelectedSlots] = useState<string[]>([])
   const [reason, setReason] = useState("")
 
@@ -400,6 +417,78 @@ function BlockFormModal({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Multi-date chip strip */}
+            <div>
+              <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                Dates to block
+                <span className="ml-1 normal-case tracking-normal text-on-surface-variant">
+                  — {allDates.length} {allDates.length === 1 ? "date" : "dates"}
+                </span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                {allDates.map((d) => {
+                  const label = new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+                    weekday: "short", month: "short", day: "numeric",
+                  })
+                  const isPreview = d === date
+                  const canRemove = allDates.length > 1
+                  return (
+                    <span
+                      key={d}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-medium ${
+                        isPreview
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setDate(d)}
+                        className="font-semibold"
+                      >
+                        {label}
+                      </button>
+                      {canRemove && (
+                        <button
+                          type="button"
+                          onClick={() => removeDate(d)}
+                          aria-label={`Remove ${label}`}
+                          className="flex h-4 w-4 items-center justify-center rounded-full text-on-surface-variant/60 transition-colors hover:bg-error/10 hover:text-error"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </span>
+                  )
+                })}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => addDatePickerRef.current?.showPicker?.() ?? addDatePickerRef.current?.click()}
+                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-outline-variant/40 px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
+                  >
+                    + Add Date
+                  </button>
+                  <input
+                    ref={addDatePickerRef}
+                    type="date"
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (!v) return
+                      if (allDates.includes(v)) return
+                      setExtraDates((prev) => [...prev, v])
+                      e.target.value = ""
+                    }}
+                    className="sr-only"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Time Slots Grid */}
