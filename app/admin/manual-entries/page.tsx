@@ -68,7 +68,7 @@ function EntryFormModal({
   entry: ManualEntry | null // null = create mode
   courts: Court[]
   onClose: () => void
-  onSave: (data: EntryFormData) => void
+  onSave: (entries: EntryFormData[]) => void
   saving: boolean
 }) {
   const [dateBlocks, setDateBlocks] = useState<DateBlock[]>(() => {
@@ -344,20 +344,22 @@ function EntryFormModal({
 
     if (allEntries.length === 0) {
       // No slots in any block — fall back to today's "notes only" save path.
-      onSave({
-        id: entry?.id,
-        entry_date: date,
-        amount: amount.trim() ? parseFloat(amount) : null,
-        description: description.trim(),
-        notes: notes.trim() || null,
-        court_id: null,
-        start_time: null,
-        end_time: null,
-      })
+      onSave([
+        {
+          id: entry?.id,
+          entry_date: date,
+          amount: amount.trim() ? parseFloat(amount) : null,
+          description: description.trim(),
+          notes: notes.trim() || null,
+          court_id: null,
+          start_time: null,
+          end_time: null,
+        },
+      ])
       return
     }
 
-    for (const entryData of allEntries) onSave(entryData)
+    onSave(allEntries)
   }
 
   return (
@@ -592,6 +594,8 @@ export default function ManualEntriesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editEntry, setEditEntry] = useState<ManualEntry | null>(null)
   const [deleteEntry, setDeleteEntry] = useState<ManualEntry | null>(null)
+  const [batchSaving, setBatchSaving] = useState(false)
+  const queryClient = useQueryClient()
 
   const filters = {
     date: dateFilter || undefined,
@@ -609,19 +613,20 @@ export default function ManualEntriesPage() {
   const updateMutation = useUpdateManualEntry()
   const deleteMutation = useDeleteManualEntry()
 
-  function handleSave(data: EntryFormData) {
-    if (data.id) {
-      // Update: single entry
+  async function handleSave(entries: EntryFormData[]) {
+    // Edit path: there's always exactly one entry, with an id.
+    if (entries[0]?.id) {
+      const e = entries[0]
       updateMutation.mutate(
         {
-          id: data.id,
-          entry_date: data.entry_date,
-          amount: data.amount,
-          description: data.description,
-          notes: data.notes,
-          court_id: data.court_id,
-          start_time: data.start_time,
-          end_time: data.end_time,
+          id: e.id!,
+          entry_date: e.entry_date,
+          amount: e.amount,
+          description: e.description,
+          notes: e.notes,
+          court_id: e.court_id,
+          start_time: e.start_time,
+          end_time: e.end_time,
         },
         {
           onSuccess: () => {
@@ -629,63 +634,92 @@ export default function ManualEntriesPage() {
             setEditEntry(null)
             setShowForm(false)
           },
-          onError: (err) => {
-            toast.error(err.message || "Failed to update entry")
-          },
+          onError: (err) => toast.error(err.message || "Failed to update entry"),
         }
       )
-    } else if (data.time_blocks && data.time_blocks.length > 1) {
-      // Create: multiple non-contiguous blocks — one entry per block
-      const blocks = data.time_blocks
-      const amountPerBlock = data.amount != null ? data.amount / blocks.length : null
-      let completed = 0
-      for (const block of blocks) {
-        createMutation.mutate(
-          {
-            entry_date: data.entry_date,
+      return
+    }
+
+    // Create path: may be multiple entries across multiple dates.
+    // Expand any time_blocks into individual create payloads.
+    const payloads: Array<{
+      entry_date: string
+      amount: number | null
+      description: string
+      notes: string | null
+      court_id: string | null
+      start_time: string | null
+      end_time: string | null
+    }> = []
+
+    for (const e of entries) {
+      if (e.time_blocks && e.time_blocks.length > 1) {
+        const amountPerBlock = e.amount != null ? e.amount / e.time_blocks.length : null
+        for (const block of e.time_blocks) {
+          payloads.push({
+            entry_date: e.entry_date,
             amount: amountPerBlock,
-            description: data.description,
-            notes: data.notes,
-            court_id: data.court_id,
+            description: e.description,
+            notes: e.notes,
+            court_id: e.court_id,
             start_time: block.start_time,
             end_time: block.end_time,
-          },
-          {
-            onSuccess: () => {
-              completed++
-              if (completed === blocks.length) {
-                toast.success("Entry added successfully")
-                setShowForm(false)
-              }
-            },
-            onError: (err) => {
-              toast.error(err.message || "Failed to add entry")
-            },
-          }
-        )
-      }
-    } else {
-      // Create: single block
-      createMutation.mutate(
-        {
-          entry_date: data.entry_date,
-          amount: data.amount,
-          description: data.description,
-          notes: data.notes,
-          court_id: data.court_id,
-          start_time: data.start_time,
-          end_time: data.end_time,
-        },
-        {
-          onSuccess: () => {
-            toast.success("Entry added successfully")
-            setShowForm(false)
-          },
-          onError: (err) => {
-            toast.error(err.message || "Failed to add entry")
-          },
+          })
         }
+      } else {
+        payloads.push({
+          entry_date: e.entry_date,
+          amount: e.amount,
+          description: e.description,
+          notes: e.notes,
+          court_id: e.court_id,
+          start_time: e.start_time,
+          end_time: e.end_time,
+        })
+      }
+    }
+
+    setBatchSaving(true)
+    try {
+      const results = await Promise.allSettled(
+        payloads.map((p) => createMutation.mutateAsync(p))
       )
+
+      const failures = results
+        .map((r, i) => ({ r, p: payloads[i] }))
+        .filter(({ r }) => r.status === "rejected") as Array<{
+          r: PromiseRejectedResult
+          p: (typeof payloads)[number]
+        }>
+
+      const successCount = results.length - failures.length
+      const dateCount = new Set(payloads.filter((_, i) => results[i].status === "fulfilled").map((p) => p.entry_date)).size
+
+      if (failures.length > 0) {
+        const failedDateSet = Array.from(new Set(failures.map((f) => f.p.entry_date)))
+        for (const d of failedDateSet) {
+          queryClient.invalidateQueries({ queryKey: ["grid-availability", d] })
+        }
+      }
+
+      if (failures.length === 0) {
+        toast.success(
+          `Added ${successCount} ${successCount === 1 ? "entry" : "entries"}${dateCount > 1 ? ` across ${dateCount} dates` : ""}`
+        )
+        setShowForm(false)
+        return
+      }
+
+      // Partial failure — keep modal open with what's left.
+      const firstErr = (failures[0].r.reason as Error)?.message || "Failed to add entry"
+      const failedDates = Array.from(new Set(failures.map((f) => f.p.entry_date))).join(", ")
+      toast.error(
+        successCount > 0
+          ? `Saved ${successCount}, failed on ${failedDates}: ${firstErr}`
+          : `Failed: ${firstErr}`
+      )
+    } finally {
+      setBatchSaving(false)
     }
   }
 
@@ -711,7 +745,7 @@ export default function ManualEntriesPage() {
           courts={courts}
           onClose={() => { setShowForm(false); setEditEntry(null) }}
           onSave={handleSave}
-          saving={createMutation.isPending || updateMutation.isPending}
+          saving={createMutation.isPending || updateMutation.isPending || batchSaving}
         />
       )}
 
