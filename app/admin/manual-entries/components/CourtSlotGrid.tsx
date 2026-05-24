@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, Fragment } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, keepPreviousData } from "@tanstack/react-query"
 import type { SelectedSlot, GridAvailData } from "./types"
 
 function hour24ToLabel(hour: number): string {
@@ -37,6 +37,7 @@ export function CourtSlotGrid({ date, selectedSlots, onToggleSlot }: Props) {
     },
     staleTime: 60_000,
     enabled: !!date,
+    placeholderData: keepPreviousData,
   })
 
   const timeRows = useMemo(() => {
