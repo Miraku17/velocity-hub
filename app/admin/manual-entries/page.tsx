@@ -239,6 +239,15 @@ function EntryFormModal({
   }
 
   function removeBlock(id: string) {
+    const target = dateBlocks.find((b) => b.id === id)
+    if (!target) return
+    if (target.selectedSlots.length > 0) {
+      const dateLabel = new Date(target.date + "T00:00:00").toLocaleDateString("en-US", {
+        month: "short", day: "numeric",
+      })
+      const ok = window.confirm(`Remove ${dateLabel} and its ${target.selectedSlots.length} slot${target.selectedSlots.length === 1 ? "" : "s"}?`)
+      if (!ok) return
+    }
     setDateBlocks((prev) => {
       const next = prev.filter((b) => b.id !== id)
       if (id === activeBlockId && next.length > 0) setActiveBlockId(next[0].id)
@@ -258,6 +267,16 @@ function EntryFormModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
+    if (dateBlocks.length > 1) {
+      const empty = dateBlocks.find((b) => b.selectedSlots.length === 0)
+      if (empty) {
+        const label = new Date(empty.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        toast.error(`Pick slots for ${label} or remove that date`)
+        setActiveBlockId(empty.id)
+        return
+      }
+    }
 
     const allEntries: EntryFormData[] = []
 
@@ -440,26 +459,28 @@ function EntryFormModal({
                   />
                 </div>
 
-                {/* Amount input — single-block only; hidden once Task 7 introduces multi-block */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                      Amount (PHP) <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-bold text-on-surface-variant">₱</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
-                        className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-                      />
+                {/* Amount input — single-block only; hidden when ≥2 blocks exist */}
+                {dateBlocks.length === 1 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                        Amount (PHP) <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-bold text-on-surface-variant">₱</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

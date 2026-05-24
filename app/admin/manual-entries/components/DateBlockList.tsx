@@ -58,15 +58,19 @@ export function DateBlockList({
       <div className="space-y-2 mb-3">
         {blocks.map((b) => {
           const isActive = b.id === activeBlockId
+          const isEmpty = b.selectedSlots.length === 0 && blocks.length > 1
           const subtotal = subtotals[b.id] ?? 0
+          const cardClasses = `group rounded-md border p-2 transition-colors ${
+            isActive
+              ? "border-primary bg-primary/10"
+              : isEmpty
+                ? "border-error/50 bg-error/5 hover:border-error"
+                : "border-outline-variant/20 bg-surface-container-lowest hover:border-primary/40"
+          }`
           return (
             <div
               key={b.id}
-              className={`group rounded-md border p-2 transition-colors ${
-                isActive
-                  ? "border-primary bg-primary/10"
-                  : "border-outline-variant/20 bg-surface-container-lowest hover:border-primary/40"
-              }`}
+              className={cardClasses}
             >
               <div className="flex items-start justify-between gap-2">
                 <button
