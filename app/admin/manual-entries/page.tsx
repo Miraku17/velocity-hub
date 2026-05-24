@@ -14,6 +14,7 @@ import { LoadingPage } from "@/components/ui/loading"
 import { toast } from "sonner"
 import { Portal } from "@/components/ui/portal"
 import { CourtSlotGrid } from "./components/CourtSlotGrid"
+import { DateBlockList } from "./components/DateBlockList"
 import type { DateBlock, SelectedSlot, GridAvailData } from "./components/types"
 
 function newBlockId() {
@@ -149,6 +150,34 @@ function EntryFormModal({
         b.id === activeBlockId ? { ...b, date: newDate, selectedSlots: [] } : b
       )
     )
+  }
+
+  function addDate(newDate: string) {
+    setDateBlocks((blocks) => {
+      if (blocks.some((b) => b.date === newDate)) return blocks
+      const created: DateBlock = { id: newBlockId(), date: newDate, selectedSlots: [] }
+      const next = [...blocks, created].sort((a, b) => a.date.localeCompare(b.date))
+      return next
+    })
+    // Auto-activate the newly added block on the next render.
+    queueMicrotask(() => {
+      setDateBlocks((blocks) => {
+        const target = blocks.find((b) => b.date === newDate)
+        if (target) setActiveBlockId(target.id)
+        return blocks
+      })
+    })
+  }
+
+  function removeBlock(id: string) {
+    // Confirm logic lands in Task 6.
+    setDateBlocks((blocks) => blocks.filter((b) => b.id !== id))
+    if (id === activeBlockId) {
+      setDateBlocks((blocks) => {
+        if (blocks.length > 0) setActiveBlockId(blocks[0].id)
+        return blocks
+      })
+    }
   }
 
   const stableOnClose = useCallback(onClose, [onClose])
@@ -304,31 +333,17 @@ function EntryFormModal({
 
             {/* Two-pane: date list + slot grid */}
             <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4">
-              {/* LEFT PANE — placeholder (DateBlockList lands in Task 4) */}
-              <div className="rounded-lg border border-outline-variant/15 bg-surface-container-low/40 p-3">
-                <div className="font-label text-[10px] font-bold uppercase tracking-widest text-outline mb-2">
-                  Dates in this booking
-                </div>
-                {dateBlocks.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => setActiveBlockId(b.id)}
-                    className={`w-full text-left rounded-md border p-2 mb-2 transition-colors ${
-                      b.id === activeBlockId
-                        ? "border-primary bg-primary/10"
-                        : "border-outline-variant/20 bg-surface-container-lowest hover:border-primary/40"
-                    }`}
-                  >
-                    <div className="font-body text-sm font-semibold text-on-surface">
-                      {formatDate(b.date)}
-                    </div>
-                    <div className="font-body text-[10px] text-on-surface-variant">
-                      {b.selectedSlots.length} slot{b.selectedSlots.length === 1 ? "" : "s"}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {/* LEFT PANE — DateBlockList */}
+              <DateBlockList
+                blocks={dateBlocks}
+                activeBlockId={activeBlockId}
+                subtotals={{}}
+                onSelectBlock={setActiveBlockId}
+                onRemoveBlock={removeBlock}
+                onAddDate={addDate}
+                canRemove={dateBlocks.length > 1}
+                canAdd={!entry}
+              />
 
               {/* RIGHT PANE — date input + grid for active block */}
               <div className="space-y-3">
