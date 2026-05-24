@@ -54,6 +54,7 @@ types/                # Shared TypeScript types
 - **Never use `pointer-events-none` + `pointer-events-auto` for modal overlays.** Android browsers don't reliably propagate touch events through `pointer-events: none` ancestors. Instead, use `onClick` on the overlay container with `e.stopPropagation()` on the inner card.
 - **Use `onClick` instead of `onMouseDown`** for modal dismiss handlers — `onMouseDown` doesn't reliably fire on touch devices.
 - **Use the `<Portal>` component (`@/components/ui/portal`) for all modals** in admin pages. Modals rendered inside `<main class="overflow-y-auto">` can have broken `fixed` positioning on Android. Portal renders them at `document.body`.
+- **Never use the browser's native `window.confirm`, `window.alert`, or `window.prompt`.** They render as ugly system dialogs (e.g. "localhost:3000 says") that don't match the app's design. Instead, render an in-app modal styled like the existing `DeleteModal`/`ConfirmModal` patterns (Portal + `bg-black/40` backdrop + `bg-surface-container-lowest` card). For confirmations, drive it from a `useState` flag and pass an `onConfirm` callback.
 
 ## Supabase
 - Store the Supabase URL and anon key in `.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.

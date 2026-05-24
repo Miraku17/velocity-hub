@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useEffect, useMemo } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useManualEntries,
   useCreateManualEntry,
@@ -13,6 +13,15 @@ import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
 import { toast } from "sonner"
 import { Portal } from "@/components/ui/portal"
+import { CourtSlotGrid } from "./components/CourtSlotGrid"
+import { DateBlockList } from "./components/DateBlockList"
+import type { DateBlock, SelectedSlot, GridAvailData } from "./components/types"
+
+function newBlockId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `b_${Math.random().toString(36).slice(2)}`
+}
 /* ── Helpers ── */
 
 function formatDate(dateStr: string) {
@@ -25,7 +34,12 @@ function formatDate(dateStr: string) {
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date())
 }
 
 function formatTime(t: string) {
@@ -37,12 +51,6 @@ function formatTime(t: string) {
 
 /* ── Entry Form Modal ── */
 
-interface SelectedSlot {
-  court_id: string
-  court_name: string
-  hour: number
-}
-
 interface EntryFormData {
   entry_date: string
   amount: number | null
@@ -51,37 +59,8 @@ interface EntryFormData {
   court_id: string | null
   start_time: string | null
   end_time: string | null
-  time_blocks?: { start_time: string; end_time: string }[]
+  time_blocks?: { start_time: string; end_time: string; amount: number | null }[]
   id?: string
-}
-
-function hour24ToLabel(hour: number): string {
-  const startH = hour % 24
-  const endH = (hour + 1) % 24
-  const to12 = (h: number) => (h === 0 ? 12 : h > 12 ? h - 12 : h)
-  const period = (h: number) => (h < 12 ? "AM" : "PM")
-  const startPeriod = period(startH)
-  const endPeriod = period(endH)
-  if (startPeriod === endPeriod) {
-    return `${to12(startH)}:00 – ${to12(endH)}:00 ${endPeriod}`
-  }
-  return `${to12(startH)}:00 ${startPeriod} – ${to12(endH)}:00 ${endPeriod}`
-}
-
-function formatCurrency(amount: number) {
-  return `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-}
-
-interface GridAvailData {
-  courts: {
-    id: string
-    name: string
-    court_type: "indoor" | "outdoor"
-    price_per_hour: number
-    schedule: { open_time: string; close_time: string; is_closed: boolean; hourly_rates: Record<string, number> | null } | null
-  }[]
-  time_range: { earliest_open: number; latest_close: number }
-  slots: Record<string, Record<string, "open" | "booked" | "pending" | "blocked">>
 }
 
 function EntryFormModal({
@@ -94,28 +73,40 @@ function EntryFormModal({
   entry: ManualEntry | null // null = create mode
   courts: Court[]
   onClose: () => void
-  onSave: (data: EntryFormData) => void
+  onSave: (entries: EntryFormData[]) => void
   saving: boolean
 }) {
-  const [date, setDate] = useState(entry?.entry_date ?? todayISO())
+  const [dateBlocks, setDateBlocks] = useState<DateBlock[]>(() => {
+    if (entry?.entry_date) {
+      const slots: SelectedSlot[] = []
+      if (entry.court_id && entry.start_time && entry.end_time) {
+        const court = courts.find((c) => c.id === entry.court_id)
+        if (court) {
+          const startH = parseInt(entry.start_time.split(":")[0], 10)
+          const endH = parseInt(entry.end_time.split(":")[0], 10)
+          for (let h = startH; h < endH; h++) {
+            slots.push({ court_id: court.id, court_name: court.name, hour: h })
+          }
+        }
+      }
+      return [{ id: newBlockId(), date: entry.entry_date, selectedSlots: slots }]
+    }
+    return [{ id: newBlockId(), date: todayISO(), selectedSlots: [] }]
+  })
+  const [activeBlockId, setActiveBlockId] = useState<string>(() => dateBlocks[0].id)
+
+  const activeBlock = dateBlocks.find((b) => b.id === activeBlockId) ?? dateBlocks[0]
+  const date = activeBlock.date
+  const selectedSlots = activeBlock.selectedSlots
+
   const [amount, setAmount] = useState(entry?.amount?.toString() ?? "")
   const [description, setDescription] = useState(entry?.description ?? "")
   const [notes, setNotes] = useState(entry?.notes ?? "")
-  const [selectedSlots, setSelectedSlots] = useState<SelectedSlot[]>(() => {
-    if (!entry?.court_id || !entry?.start_time || !entry?.end_time) return []
-    const court = courts.find((c) => c.id === entry.court_id)
-    if (!court) return []
-    const startH = parseInt(entry.start_time.split(":")[0], 10)
-    const endH = parseInt(entry.end_time.split(":")[0], 10)
-    const slots: SelectedSlot[] = []
-    for (let h = startH; h < endH; h++) {
-      slots.push({ court_id: court.id, court_name: court.name, hour: h })
-    }
-    return slots
-  })
 
-  // Fetch grid availability for the selected date
-  const { data: gridData, isLoading: gridLoading } = useQuery<GridAvailData>({
+  const queryClient = useQueryClient()
+
+  // Fetch grid availability for the active block's date
+  const { data: gridData } = useQuery<GridAvailData>({
     queryKey: ["grid-availability", date],
     queryFn: async () => {
       const res = await fetch(`/api/grid-availability?date=${date}`)
@@ -126,8 +117,72 @@ function EntryFormModal({
     enabled: !!date,
   })
 
-  // Clear selected slots when date changes
-  useEffect(() => { setSelectedSlots([]) }, [date])
+  // Tick state that bumps whenever a grid-availability query updates.
+  const [cacheTick, setCacheTick] = useState(0)
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      const key = event.query.queryKey
+      if (Array.isArray(key) && key[0] === "grid-availability") {
+        setCacheTick((t) => t + 1)
+      }
+    })
+    return unsubscribe
+  }, [queryClient])
+
+  // Eager-load availability for every block so subtotals populate
+  useEffect(() => {
+    for (const b of dateBlocks) {
+      queryClient.prefetchQuery({
+        queryKey: ["grid-availability", b.date],
+        queryFn: async () => {
+          const res = await fetch(`/api/grid-availability?date=${b.date}`)
+          if (!res.ok) throw new Error("Failed to fetch")
+          return res.json()
+        },
+        staleTime: 60_000,
+      })
+    }
+  }, [dateBlocks, queryClient])
+
+  // Per-block subtotals from the TanStack Query cache
+  const subtotals = useMemo(() => {
+    const result: Record<string, number> = {}
+    for (const block of dateBlocks) {
+      const cached = queryClient.getQueryData<GridAvailData>(["grid-availability", block.date])
+      if (!cached) {
+        result[block.id] = 0
+        continue
+      }
+      let sum = 0
+      for (const s of block.selectedSlots) {
+        const court = cached.courts.find((c) => c.id === s.court_id)
+        if (!court) continue
+        sum += court.schedule?.hourly_rates?.[String(s.hour)] ?? court.price_per_hour
+      }
+      result[block.id] = sum
+    }
+    return result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateBlocks, gridData, queryClient, cacheTick])
+
+  const overallTotal = useMemo(
+    () => Object.values(subtotals).reduce((a, b) => a + b, 0),
+    [subtotals]
+  )
+
+  const totalSlots = useMemo(
+    () => dateBlocks.reduce((sum, b) => sum + b.selectedSlots.length, 0),
+    [dateBlocks]
+  )
+
+  const entriesToCreate = useMemo(() => {
+    let count = 0
+    for (const b of dateBlocks) {
+      const courtIds = new Set(b.selectedSlots.map((s) => s.court_id))
+      count += courtIds.size
+    }
+    return count
+  }, [dateBlocks])
 
   // Auto-fill amount based on selected slots
   const computedTotal = useMemo(() => {
@@ -149,133 +204,223 @@ function EntryFormModal({
     }
   }, [computedTotal, selectedSlots.length])
 
-  const timeRows = useMemo(() => {
-    if (!gridData) return []
-    const rows: number[] = []
-    for (let h = gridData.time_range.earliest_open; h < gridData.time_range.latest_close; h++) {
-      rows.push(h % 24)
-    }
-    return rows
-  }, [gridData])
-
-  const openCourts = useMemo(
-    () => gridData?.courts.filter((c) => c.schedule && !c.schedule.is_closed) ?? [],
-    [gridData]
-  )
-
-  const selectedSet = useMemo(() => {
-    const set = new Set<string>()
-    for (const s of selectedSlots) {
-      set.add(`${s.court_id}:${s.hour}`)
-    }
-    return set
-  }, [selectedSlots])
-
   function toggleSlot(courtId: string, courtName: string, hour: number) {
-    const key = `${courtId}:${hour}`
-    setSelectedSlots((prev) => {
-      const exists = prev.some((s) => `${s.court_id}:${s.hour}` === key)
-      if (exists) return prev.filter((s) => `${s.court_id}:${s.hour}` !== key)
-      return [...prev, { court_id: courtId, court_name: courtName, hour }]
+    setDateBlocks((blocks) =>
+      blocks.map((b) => {
+        if (b.id !== activeBlockId) return b
+        const key = `${courtId}:${hour}`
+        const exists = b.selectedSlots.some((s) => `${s.court_id}:${s.hour}` === key)
+        if (exists) {
+          return { ...b, selectedSlots: b.selectedSlots.filter((s) => `${s.court_id}:${s.hour}` !== key) }
+        }
+        return { ...b, selectedSlots: [...b.selectedSlots, { court_id: courtId, court_name: courtName, hour }] }
+      })
+    )
+  }
+
+  function setActiveDate(newDate: string) {
+    setDateBlocks((blocks) =>
+      blocks.map((b) =>
+        b.id === activeBlockId ? { ...b, date: newDate, selectedSlots: [] } : b
+      )
+    )
+  }
+
+  function addDate(newDate: string) {
+    setDateBlocks((blocks) => {
+      if (blocks.some((b) => b.date === newDate)) return blocks
+      const created: DateBlock = { id: newBlockId(), date: newDate, selectedSlots: [] }
+      const next = [...blocks, created].sort((a, b) => a.date.localeCompare(b.date))
+      return next
+    })
+    // Auto-activate the newly added block on the next render.
+    queueMicrotask(() => {
+      setDateBlocks((blocks) => {
+        const target = blocks.find((b) => b.date === newDate)
+        if (target) setActiveBlockId(target.id)
+        return blocks
+      })
     })
   }
 
-  const stableOnClose = useCallback(onClose, [onClose])
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    variant: "danger" | "default"
+    onConfirm: () => void
+  } | null>(null)
+
+  function performRemoveBlock(id: string) {
+    const next = dateBlocks.filter((b) => b.id !== id)
+    setDateBlocks(next)
+    if (id === activeBlockId && next.length > 0) {
+      setActiveBlockId(next[0].id)
+    }
+  }
+
+  function removeBlock(id: string) {
+    const target = dateBlocks.find((b) => b.id === id)
+    if (!target) return
+    if (target.selectedSlots.length === 0) {
+      performRemoveBlock(id)
+      return
+    }
+    const dateLabel = new Date(target.date + "T00:00:00").toLocaleDateString("en-US", {
+      month: "short", day: "numeric",
+    })
+    const slotWord = target.selectedSlots.length === 1 ? "slot" : "slots"
+    setConfirmDialog({
+      title: "Remove Date",
+      message: `Remove ${dateLabel} and its ${target.selectedSlots.length} ${slotWord}?`,
+      confirmLabel: "Remove",
+      variant: "danger",
+      onConfirm: () => performRemoveBlock(id),
+    })
+  }
+
+  function attemptClose() {
+    const hasSelections = dateBlocks.some((b) => b.selectedSlots.length > 0)
+    if (!hasSelections) {
+      onClose()
+      return
+    }
+    setConfirmDialog({
+      title: "Discard Changes",
+      message: "Discard unsaved selections?",
+      confirmLabel: "Discard",
+      variant: "danger",
+      onConfirm: () => onClose(),
+    })
+  }
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") stableOnClose()
+      if (e.key === "Escape") attemptClose()
     }
     window.addEventListener("keydown", handleKey)
     return () => window.removeEventListener("keydown", handleKey)
-  }, [stableOnClose])
+    // attemptClose closes over fresh dateBlocks each render — re-bind each render.
+  })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    // Group selected slots by court_id, then merge contiguous hours into blocks
-    const byCourt = new Map<string, number[]>()
-    for (const s of selectedSlots) {
-      if (!byCourt.has(s.court_id)) byCourt.set(s.court_id, [])
-      byCourt.get(s.court_id)!.push(s.hour)
+    if (dateBlocks.length > 1) {
+      const empty = dateBlocks.find((b) => b.selectedSlots.length === 0)
+      if (empty) {
+        const label = new Date(empty.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        toast.error(`Pick slots for ${label} or remove that date`)
+        setActiveBlockId(empty.id)
+        return
+      }
     }
 
-    // For manual entries, we create one entry per court
-    // If only one court is selected, use the simple path
     const allEntries: EntryFormData[] = []
-    for (const [cId, hours] of byCourt) {
-      hours.sort((a, b) => a - b)
-      const blocks: { startH: number; endH: number }[] = []
-      let blockStart = hours[0]
-      let prev = hours[0]
-      for (let i = 1; i < hours.length; i++) {
-        if (hours[i] !== prev + 1) {
-          blocks.push({ startH: blockStart, endH: prev + 1 })
-          blockStart = hours[i]
-        }
-        prev = hours[i]
-      }
-      blocks.push({ startH: blockStart, endH: prev + 1 })
 
-      const startTime = `${String(blocks[0].startH).padStart(2, "0")}:00:00`
-      const endTime = `${String(blocks[blocks.length - 1].endH).padStart(2, "0")}:00:00`
-
-      // Calculate amount for this court's slots from hourly rates
-      let courtAmount: number | null = null
-      if (gridData) {
-        const court = gridData.courts.find((c) => c.id === cId)
-        if (court) {
-          courtAmount = hours.reduce((sum, h) => {
-            return sum + (court.schedule?.hourly_rates?.[String(h)] ?? court.price_per_hour)
-          }, 0)
-        }
+    for (const block of dateBlocks) {
+      if (block.selectedSlots.length === 0) {
+        // Empty block — skip in submission (validation in a later task will block this case).
+        continue
       }
 
-      allEntries.push({
-        id: entry?.id,
-        entry_date: date,
-        amount: courtAmount,
-        description: description.trim(),
-        notes: notes.trim() || null,
-        court_id: cId,
-        start_time: startTime,
-        end_time: endTime,
-        time_blocks: blocks.length > 1 ? blocks.map((b) => ({
-          start_time: `${String(b.startH).padStart(2, "0")}:00:00`,
-          end_time: `${String(b.endH).padStart(2, "0")}:00:00`,
-        })) : undefined,
-      })
+      const byCourt = new Map<string, number[]>()
+      for (const s of block.selectedSlots) {
+        if (!byCourt.has(s.court_id)) byCourt.set(s.court_id, [])
+        byCourt.get(s.court_id)!.push(s.hour)
+      }
+
+      for (const [cId, hours] of byCourt) {
+        hours.sort((a, b) => a - b)
+
+        const blockGrid = queryClient.getQueryData<GridAvailData>(["grid-availability", block.date])
+
+        function priceFor(h: number): number {
+          if (!blockGrid) return 0
+          const court = blockGrid.courts.find((c) => c.id === cId)
+          if (!court) return 0
+          return court.schedule?.hourly_rates?.[String(h)] ?? court.price_per_hour
+        }
+        function amountFor(startH: number, endH: number): number | null {
+          if (!blockGrid) return null
+          let sum = 0
+          for (let h = startH; h < endH; h++) sum += priceFor(h)
+          return sum
+        }
+
+        const blocks: { startH: number; endH: number; amount: number | null }[] = []
+        let blockStart = hours[0]
+        let prev = hours[0]
+        for (let i = 1; i < hours.length; i++) {
+          if (hours[i] !== prev + 1) {
+            blocks.push({ startH: blockStart, endH: prev + 1, amount: amountFor(blockStart, prev + 1) })
+            blockStart = hours[i]
+          }
+          prev = hours[i]
+        }
+        blocks.push({ startH: blockStart, endH: prev + 1, amount: amountFor(blockStart, prev + 1) })
+
+        const startTime = `${String(blocks[0].startH).padStart(2, "0")}:00:00`
+        const endTime = `${String(blocks[blocks.length - 1].endH).padStart(2, "0")}:00:00`
+
+        let courtAmount: number | null = null
+        if (blockGrid) {
+          const court = blockGrid.courts.find((c) => c.id === cId)
+          if (court) {
+            courtAmount = hours.reduce(
+              (sum, h) => sum + (court.schedule?.hourly_rates?.[String(h)] ?? court.price_per_hour),
+              0
+            )
+          }
+        }
+
+        allEntries.push({
+          id: entry?.id,
+          entry_date: block.date,
+          amount: courtAmount,
+          description: description.trim(),
+          notes: notes.trim() || null,
+          court_id: cId,
+          start_time: startTime,
+          end_time: endTime,
+          time_blocks: blocks.length > 1
+            ? blocks.map((b) => ({
+                start_time: `${String(b.startH).padStart(2, "0")}:00:00`,
+                end_time: `${String(b.endH).padStart(2, "0")}:00:00`,
+                amount: b.amount,
+              }))
+            : undefined,
+        })
+      }
     }
 
     if (allEntries.length === 0) {
-      // No slots selected — submit without court/time
-      onSave({
-        id: entry?.id,
-        entry_date: date,
-        amount: amount.trim() ? parseFloat(amount) : null,
-        description: description.trim(),
-        notes: notes.trim() || null,
-        court_id: null,
-        start_time: null,
-        end_time: null,
-      })
-    } else {
-      // Save each court entry
-      for (const entryData of allEntries) {
-        onSave(entryData)
-      }
+      // No slots in any block — fall back to today's "notes only" save path.
+      onSave([
+        {
+          id: entry?.id,
+          entry_date: date,
+          amount: amount.trim() ? parseFloat(amount) : null,
+          description: description.trim(),
+          notes: notes.trim() || null,
+          court_id: null,
+          start_time: null,
+          end_time: null,
+        },
+      ])
+      return
     }
-  }
 
-  const selectedCount = selectedSlots.length
+    onSave(allEntries)
+  }
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={attemptClose} />
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={attemptClose}>
         <form
           onSubmit={handleSubmit}
-          className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+          className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -285,7 +430,7 @@ function EntryFormModal({
             </h3>
             <button
               type="button"
-              onClick={onClose}
+              onClick={attemptClose}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -296,20 +441,8 @@ function EntryFormModal({
           </div>
 
           <div className="space-y-4 p-6">
-            {/* Date + Description row */}
+            {/* Description + Notes (full width, shared across all dates) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-                />
-              </div>
               <div>
                 <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                   Description / Customer Name <span className="text-error">*</span>
@@ -322,154 +455,6 @@ function EntryFormModal({
                   placeholder="e.g. Walk-in customer"
                   className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary placeholder:text-on-surface-variant/40"
                 />
-              </div>
-            </div>
-
-            {/* Court Availability Grid */}
-            <div>
-              <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                Select Court & Time Slots
-                {selectedCount > 0 && (
-                  <span className="normal-case tracking-normal text-primary"> — {selectedCount} selected</span>
-                )}
-              </label>
-
-              {gridLoading ? (
-                <div className="flex items-center justify-center rounded-lg border border-outline-variant/20 bg-surface-container py-10">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    <span className="font-body text-xs text-on-surface-variant">Loading availability...</span>
-                  </div>
-                </div>
-              ) : !gridData || openCourts.length === 0 ? (
-                <div className="flex items-center justify-center rounded-lg border border-outline-variant/20 bg-surface-container py-10">
-                  <p className="font-body text-xs text-on-surface-variant">No courts available on this day</p>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-outline-variant/15 overflow-hidden">
-                  {/* Legend */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 bg-surface-container-low/50 border-b border-outline-variant/10">
-                    {[
-                      { cls: "bg-emerald-100 border-emerald-300", label: "Open" },
-                      { cls: "bg-primary", label: "Selected" },
-                      { cls: "bg-gray-200 border-gray-300", label: "Booked" },
-                      { cls: "bg-amber-100 border-amber-300", label: "Pending" },
-                      { cls: "bg-slate-200 border-slate-300", label: "Blocked" },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-center gap-1">
-                        <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${item.cls}`} />
-                        <span className="font-body text-[9px] text-on-surface-variant">{item.label}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <div
-                      className="grid gap-px min-w-max"
-                      style={{ gridTemplateColumns: `auto repeat(${openCourts.length}, minmax(72px, 1fr))` }}
-                    >
-                      {/* Header row */}
-                      <div className="sticky left-0 z-20 bg-surface-container-lowest flex items-center justify-center px-2 py-2.5 border-b-2 border-outline-variant/15">
-                        <span className="font-label text-[9px] font-bold uppercase tracking-widest text-outline">Time</span>
-                      </div>
-                      {openCourts.map((court) => (
-                        <div key={court.id} className="flex flex-col items-center justify-center px-1 py-2.5 border-b-2 border-outline-variant/15">
-                          <span className="font-headline text-xs font-bold text-on-surface leading-tight">{court.name}</span>
-                          <span className="font-label text-[8px] font-medium uppercase tracking-wider text-on-surface-variant">
-                            {court.court_type === "indoor" ? "Covered" : "Outdoor"}
-                          </span>
-                        </div>
-                      ))}
-
-                      {/* Time rows */}
-                      {timeRows.map((hour) => (
-                        <Fragment key={`row-${hour}`}>
-                          <div
-                            className="sticky left-0 z-10 bg-surface-container-lowest flex items-center justify-center px-2 py-0.5 border-b border-outline-variant/8"
-                          >
-                            <span className="font-body text-[10px] font-semibold text-on-surface-variant whitespace-nowrap">
-                              {hour24ToLabel(hour)}
-                            </span>
-                          </div>
-
-                          {openCourts.map((court) => {
-                            const slotStatus = gridData.slots[court.id]?.[String(hour)]
-                            const isClosed = !slotStatus
-                            const isSelected = selectedSet.has(`${court.id}:${hour}`)
-                            const isInteractive = slotStatus === "open"
-                            const price = court.schedule?.hourly_rates?.[String(hour)] ?? court.price_per_hour
-
-                            if (isClosed) {
-                              return <div key={`${court.id}-${hour}`} className="min-h-[40px] border-b border-outline-variant/8" />
-                            }
-
-                            return (
-                              <div key={`${court.id}-${hour}`} className="p-0.5 border-b border-outline-variant/8">
-                                <button
-                                  type="button"
-                                  onClick={isInteractive ? () => toggleSlot(court.id, court.name, hour) : undefined}
-                                  disabled={!isInteractive}
-                                  className={`
-                                    w-full min-h-[40px] rounded-md text-center transition-all text-[10px] font-body font-semibold
-                                    flex flex-col items-center justify-center gap-0.5 px-1 py-1
-                                    ${isSelected
-                                      ? "bg-primary text-on-primary ring-2 ring-primary ring-offset-1"
-                                      : slotStatus === "open"
-                                        ? "bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 active:scale-[0.96] cursor-pointer"
-                                        : slotStatus === "booked"
-                                          ? "bg-gray-100 text-gray-400 cursor-default"
-                                          : slotStatus === "pending"
-                                            ? "bg-amber-50 text-amber-600 cursor-default"
-                                            : "bg-slate-100 text-slate-400 cursor-default"
-                                    }
-                                  `}
-                                >
-                                  {isSelected ? (
-                                    <>
-                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="20 6 9 17 4 12" />
-                                      </svg>
-                                      <span>{formatCurrency(price)}</span>
-                                    </>
-                                  ) : slotStatus === "open" ? (
-                                    <span>{formatCurrency(price)}</span>
-                                  ) : (
-                                    <span className="uppercase tracking-wider text-[8px]">
-                                      {slotStatus === "booked" ? "Booked" : slotStatus === "pending" ? "Pending" : "Blocked"}
-                                    </span>
-                                  )}
-                                </button>
-                              </div>
-                            )
-                          })}
-                        </Fragment>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Amount + Notes row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                  Amount (PHP) <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-bold text-on-surface-variant">
-                    ₱
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-                  />
-                </div>
               </div>
               <div>
                 <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -484,27 +469,204 @@ function EntryFormModal({
                 />
               </div>
             </div>
+
+            {/* Two-pane: date list + slot grid */}
+            <div className={`grid grid-cols-1 ${entry ? "" : "md:grid-cols-[260px_1fr]"} gap-4`}>
+              {/* LEFT PANE — DateBlockList (hidden in edit mode) */}
+              {!entry && (
+                <DateBlockList
+                  blocks={dateBlocks}
+                  activeBlockId={activeBlockId}
+                  subtotals={subtotals}
+                  onSelectBlock={setActiveBlockId}
+                  onRemoveBlock={removeBlock}
+                  onAddDate={addDate}
+                  canRemove={dateBlocks.length > 1}
+                  canAdd={!entry}
+                />
+              )}
+
+              {/* RIGHT PANE — date input + grid for active block */}
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={date}
+                    onChange={(e) => setActiveDate(e.target.value)}
+                    className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Select Court & Time Slots
+                    {selectedSlots.length > 0 && (
+                      <span className="normal-case tracking-normal text-primary"> — {selectedSlots.length} selected</span>
+                    )}
+                  </label>
+                  <CourtSlotGrid
+                    date={date}
+                    selectedSlots={selectedSlots}
+                    onToggleSlot={toggleSlot}
+                  />
+                </div>
+
+                {/* Amount input — single-block only; hidden when ≥2 blocks exist */}
+                {dateBlocks.length === 1 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                        Amount (PHP) <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-bold text-on-surface-variant">₱</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 border-t border-outline-variant/15 px-6 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-outline-variant/15 px-6 py-4">
+            <div className="font-body text-xs text-on-surface-variant">
+              <span className="font-headline text-base font-bold text-[#16A34A]">
+                ₱{overallTotal.toLocaleString()}
+              </span>
+              <span className="ml-2">
+                {dateBlocks.length} date{dateBlocks.length === 1 ? "" : "s"} · {totalSlots} slot{totalSlots === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={attemptClose}
+                disabled={saving}
+                className="rounded-lg border border-outline-variant/30 bg-transparent px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !description.trim()}
+                className="rounded-lg bg-primary px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-60"
+              >
+                {saving
+                  ? "Saving..."
+                  : entry
+                    ? "Update"
+                    : entriesToCreate > 0
+                      ? `Save ${entriesToCreate} ${entriesToCreate === 1 ? "Entry" : "Entries"}`
+                      : "Add Entry"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+      {confirmDialog && (
+        <ConfirmModal
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={() => {
+            const { onConfirm } = confirmDialog
+            setConfirmDialog(null)
+            onConfirm()
+          }}
+        />
+      )}
+    </Portal>
+  )
+}
+
+/* ── Generic Confirmation Modal ── */
+
+function ConfirmModal({
+  title,
+  message,
+  confirmLabel,
+  variant,
+  onCancel,
+  onConfirm,
+}: {
+  title: string
+  message: string
+  confirmLabel: string
+  variant: "danger" | "default"
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel()
+      if (e.key === "Enter") onConfirm()
+    }
+    window.addEventListener("keydown", handleKey)
+    return () => window.removeEventListener("keydown", handleKey)
+  })
+
+  const confirmClasses =
+    variant === "danger"
+      ? "bg-error text-on-error hover:bg-error/90"
+      : "bg-primary text-on-primary hover:bg-primary/90"
+  const iconClasses =
+    variant === "danger" ? "bg-error/10 text-error" : "bg-primary/10 text-primary"
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="fixed inset-0 z-[111] flex items-center justify-center p-4" onClick={onCancel}>
+        <div
+          className="w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-center">
+            <div className={`flex h-14 w-14 items-center justify-center rounded-full ${iconClasses}`}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+          </div>
+          <div className="mt-4 text-center">
+            <h3 className="font-headline text-lg font-semibold text-on-surface">{title}</h3>
+            <p className="mt-2 font-body text-sm text-on-surface-variant">{message}</p>
+          </div>
+          <div className="mt-6 flex gap-3">
             <button
               type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="rounded-lg border border-outline-variant/30 bg-transparent px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
+              onClick={onCancel}
+              className="flex-1 rounded-lg border border-outline-variant/30 bg-transparent px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
             >
               Cancel
             </button>
             <button
-              type="submit"
-              disabled={saving || !description.trim()}
-              className="rounded-lg bg-primary px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-60"
+              type="button"
+              onClick={onConfirm}
+              autoFocus
+              className={`flex-1 rounded-lg px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${confirmClasses}`}
             >
-              {saving ? "Saving..." : entry ? "Update" : "Add Entry"}
+              {confirmLabel}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </Portal>
   )
@@ -577,6 +739,8 @@ export default function ManualEntriesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editEntry, setEditEntry] = useState<ManualEntry | null>(null)
   const [deleteEntry, setDeleteEntry] = useState<ManualEntry | null>(null)
+  const [batchSaving, setBatchSaving] = useState(false)
+  const queryClient = useQueryClient()
 
   const filters = {
     date: dateFilter || undefined,
@@ -594,19 +758,20 @@ export default function ManualEntriesPage() {
   const updateMutation = useUpdateManualEntry()
   const deleteMutation = useDeleteManualEntry()
 
-  function handleSave(data: EntryFormData) {
-    if (data.id) {
-      // Update: single entry
+  async function handleSave(entries: EntryFormData[]) {
+    // Edit path: there's always exactly one entry, with an id.
+    if (entries[0]?.id) {
+      const e = entries[0]
       updateMutation.mutate(
         {
-          id: data.id,
-          entry_date: data.entry_date,
-          amount: data.amount,
-          description: data.description,
-          notes: data.notes,
-          court_id: data.court_id,
-          start_time: data.start_time,
-          end_time: data.end_time,
+          id: e.id!,
+          entry_date: e.entry_date,
+          amount: e.amount,
+          description: e.description,
+          notes: e.notes,
+          court_id: e.court_id,
+          start_time: e.start_time,
+          end_time: e.end_time,
         },
         {
           onSuccess: () => {
@@ -614,63 +779,91 @@ export default function ManualEntriesPage() {
             setEditEntry(null)
             setShowForm(false)
           },
-          onError: (err) => {
-            toast.error(err.message || "Failed to update entry")
-          },
+          onError: (err) => toast.error(err.message || "Failed to update entry"),
         }
       )
-    } else if (data.time_blocks && data.time_blocks.length > 1) {
-      // Create: multiple non-contiguous blocks — one entry per block
-      const blocks = data.time_blocks
-      const amountPerBlock = data.amount != null ? data.amount / blocks.length : null
-      let completed = 0
-      for (const block of blocks) {
-        createMutation.mutate(
-          {
-            entry_date: data.entry_date,
-            amount: amountPerBlock,
-            description: data.description,
-            notes: data.notes,
-            court_id: data.court_id,
+      return
+    }
+
+    // Create path: may be multiple entries across multiple dates.
+    // Expand any time_blocks into individual create payloads.
+    const payloads: Array<{
+      entry_date: string
+      amount: number | null
+      description: string
+      notes: string | null
+      court_id: string | null
+      start_time: string | null
+      end_time: string | null
+    }> = []
+
+    for (const e of entries) {
+      if (e.time_blocks && e.time_blocks.length > 1) {
+        for (const block of e.time_blocks) {
+          payloads.push({
+            entry_date: e.entry_date,
+            amount: block.amount,
+            description: e.description,
+            notes: e.notes,
+            court_id: e.court_id,
             start_time: block.start_time,
             end_time: block.end_time,
-          },
-          {
-            onSuccess: () => {
-              completed++
-              if (completed === blocks.length) {
-                toast.success("Entry added successfully")
-                setShowForm(false)
-              }
-            },
-            onError: (err) => {
-              toast.error(err.message || "Failed to add entry")
-            },
-          }
-        )
-      }
-    } else {
-      // Create: single block
-      createMutation.mutate(
-        {
-          entry_date: data.entry_date,
-          amount: data.amount,
-          description: data.description,
-          notes: data.notes,
-          court_id: data.court_id,
-          start_time: data.start_time,
-          end_time: data.end_time,
-        },
-        {
-          onSuccess: () => {
-            toast.success("Entry added successfully")
-            setShowForm(false)
-          },
-          onError: (err) => {
-            toast.error(err.message || "Failed to add entry")
-          },
+          })
         }
+      } else {
+        payloads.push({
+          entry_date: e.entry_date,
+          amount: e.amount,
+          description: e.description,
+          notes: e.notes,
+          court_id: e.court_id,
+          start_time: e.start_time,
+          end_time: e.end_time,
+        })
+      }
+    }
+
+    setBatchSaving(true)
+    try {
+      const results = await Promise.allSettled(
+        payloads.map((p) => createMutation.mutateAsync(p))
       )
+
+      const failures = results
+        .map((r, i) => ({ r, p: payloads[i] }))
+        .filter(({ r }) => r.status === "rejected") as Array<{
+          r: PromiseRejectedResult
+          p: (typeof payloads)[number]
+        }>
+
+      const successCount = results.length - failures.length
+      const dateCount = new Set(payloads.filter((_, i) => results[i].status === "fulfilled").map((p) => p.entry_date)).size
+
+      if (failures.length > 0) {
+        const failedDateSet = Array.from(new Set(failures.map((f) => f.p.entry_date)))
+        for (const d of failedDateSet) {
+          queryClient.invalidateQueries({ queryKey: ["grid-availability", d] })
+        }
+      }
+
+      if (failures.length === 0) {
+        toast.success(
+          `Added ${successCount} ${successCount === 1 ? "entry" : "entries"}${dateCount > 1 ? ` across ${dateCount} dates` : ""}`
+        )
+        setShowForm(false)
+        return
+      }
+
+      // Partial failure — keep modal open with what's left.
+      const firstErr = (failures[0].r.reason as Error)?.message || "Failed to add entry"
+      const failedDates = Array.from(new Set(failures.map((f) => f.p.entry_date))).join(", ")
+      toast.error(
+        successCount > 0
+          ? `Saved ${successCount}, failed on ${failedDates}: ${firstErr}`
+          : `Failed: ${firstErr}`
+      )
+    } finally {
+      setBatchSaving(false)
     }
   }
 
@@ -696,7 +889,7 @@ export default function ManualEntriesPage() {
           courts={courts}
           onClose={() => { setShowForm(false); setEditEntry(null) }}
           onSave={handleSave}
-          saving={createMutation.isPending || updateMutation.isPending}
+          saving={createMutation.isPending || updateMutation.isPending || batchSaving}
         />
       )}
 
