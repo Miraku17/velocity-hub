@@ -246,8 +246,6 @@ function EntryFormModal({
     for (const entryData of allEntries) onSave(entryData)
   }
 
-  const selectedCount = selectedSlots.length
-
   return (
     <Portal>
       <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -275,20 +273,8 @@ function EntryFormModal({
           </div>
 
           <div className="space-y-4 p-6">
-            {/* Date + Description row */}
+            {/* Description + Notes (full width, shared across all dates) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={date}
-                  onChange={(e) => setActiveDate(e.target.value)}
-                  className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-                />
-              </div>
               <div>
                 <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                   Description / Customer Name <span className="text-error">*</span>
@@ -302,45 +288,6 @@ function EntryFormModal({
                   className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary placeholder:text-on-surface-variant/40"
                 />
               </div>
-            </div>
-
-            {/* Court Availability Grid */}
-            <div>
-              <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                Select Court & Time Slots
-                {selectedCount > 0 && (
-                  <span className="normal-case tracking-normal text-primary"> — {selectedCount} selected</span>
-                )}
-              </label>
-
-              <CourtSlotGrid
-                date={date}
-                selectedSlots={selectedSlots}
-                onToggleSlot={toggleSlot}
-              />
-            </div>
-
-            {/* Amount + Notes row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                  Amount (PHP) <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-bold text-on-surface-variant">
-                    ₱
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
-                  />
-                </div>
-              </div>
               <div>
                 <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
                   Notes <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
@@ -352,6 +299,86 @@ function EntryFormModal({
                   placeholder="Additional notes..."
                   className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary placeholder:text-on-surface-variant/40"
                 />
+              </div>
+            </div>
+
+            {/* Two-pane: date list + slot grid */}
+            <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4">
+              {/* LEFT PANE — placeholder (DateBlockList lands in Task 4) */}
+              <div className="rounded-lg border border-outline-variant/15 bg-surface-container-low/40 p-3">
+                <div className="font-label text-[10px] font-bold uppercase tracking-widest text-outline mb-2">
+                  Dates in this booking
+                </div>
+                {dateBlocks.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setActiveBlockId(b.id)}
+                    className={`w-full text-left rounded-md border p-2 mb-2 transition-colors ${
+                      b.id === activeBlockId
+                        ? "border-primary bg-primary/10"
+                        : "border-outline-variant/20 bg-surface-container-lowest hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="font-body text-sm font-semibold text-on-surface">
+                      {formatDate(b.date)}
+                    </div>
+                    <div className="font-body text-[10px] text-on-surface-variant">
+                      {b.selectedSlots.length} slot{b.selectedSlots.length === 1 ? "" : "s"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* RIGHT PANE — date input + grid for active block */}
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={date}
+                    onChange={(e) => setActiveDate(e.target.value)}
+                    className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Select Court & Time Slots
+                    {selectedSlots.length > 0 && (
+                      <span className="normal-case tracking-normal text-primary"> — {selectedSlots.length} selected</span>
+                    )}
+                  </label>
+                  <CourtSlotGrid
+                    date={date}
+                    selectedSlots={selectedSlots}
+                    onToggleSlot={toggleSlot}
+                  />
+                </div>
+
+                {/* Amount input — single-block only; hidden once Task 7 introduces multi-block */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Amount (PHP) <span className="normal-case tracking-normal text-on-surface-variant">— optional</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-bold text-on-surface-variant">₱</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
