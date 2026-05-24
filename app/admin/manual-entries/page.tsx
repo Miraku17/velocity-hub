@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useManualEntries,
   useCreateManualEntry,
@@ -98,6 +98,8 @@ function EntryFormModal({
   const [description, setDescription] = useState(entry?.description ?? "")
   const [notes, setNotes] = useState(entry?.notes ?? "")
 
+  const queryClient = useQueryClient()
+
   // Fetch grid availability for the active block's date
   const { data: gridData } = useQuery<GridAvailData>({
     queryKey: ["grid-availability", date],
@@ -109,6 +111,73 @@ function EntryFormModal({
     staleTime: 60_000,
     enabled: !!date,
   })
+
+  // Tick state that bumps whenever a grid-availability query updates.
+  const [cacheTick, setCacheTick] = useState(0)
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      const key = event.query.queryKey
+      if (Array.isArray(key) && key[0] === "grid-availability") {
+        setCacheTick((t) => t + 1)
+      }
+    })
+    return unsubscribe
+  }, [queryClient])
+
+  // Eager-load availability for every block so subtotals populate
+  useEffect(() => {
+    for (const b of dateBlocks) {
+      queryClient.prefetchQuery({
+        queryKey: ["grid-availability", b.date],
+        queryFn: async () => {
+          const res = await fetch(`/api/grid-availability?date=${b.date}`)
+          if (!res.ok) throw new Error("Failed to fetch")
+          return res.json()
+        },
+        staleTime: 60_000,
+      })
+    }
+  }, [dateBlocks, queryClient])
+
+  // Per-block subtotals from the TanStack Query cache
+  const subtotals = useMemo(() => {
+    const result: Record<string, number> = {}
+    for (const block of dateBlocks) {
+      const cached = queryClient.getQueryData<GridAvailData>(["grid-availability", block.date])
+      if (!cached) {
+        result[block.id] = 0
+        continue
+      }
+      let sum = 0
+      for (const s of block.selectedSlots) {
+        const court = cached.courts.find((c) => c.id === s.court_id)
+        if (!court) continue
+        sum += court.schedule?.hourly_rates?.[String(s.hour)] ?? court.price_per_hour
+      }
+      result[block.id] = sum
+    }
+    return result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateBlocks, gridData, queryClient, cacheTick])
+
+  const overallTotal = useMemo(
+    () => Object.values(subtotals).reduce((a, b) => a + b, 0),
+    [subtotals]
+  )
+
+  const totalSlots = useMemo(
+    () => dateBlocks.reduce((sum, b) => sum + b.selectedSlots.length, 0),
+    [dateBlocks]
+  )
+
+  const entriesToCreate = useMemo(() => {
+    let count = 0
+    for (const b of dateBlocks) {
+      const courtIds = new Set(b.selectedSlots.map((s) => s.court_id))
+      count += courtIds.size
+    }
+    return count
+  }, [dateBlocks])
 
   // Auto-fill amount based on selected slots
   const computedTotal = useMemo(() => {
@@ -334,7 +403,7 @@ function EntryFormModal({
               <DateBlockList
                 blocks={dateBlocks}
                 activeBlockId={activeBlockId}
-                subtotals={{}}
+                subtotals={subtotals}
                 onSelectBlock={setActiveBlockId}
                 onRemoveBlock={removeBlock}
                 onAddDate={addDate}
@@ -396,22 +465,38 @@ function EntryFormModal({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 border-t border-outline-variant/15 px-6 py-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="rounded-lg border border-outline-variant/30 bg-transparent px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !description.trim()}
-              className="rounded-lg bg-primary px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-60"
-            >
-              {saving ? "Saving..." : entry ? "Update" : "Add Entry"}
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-outline-variant/15 px-6 py-4">
+            <div className="font-body text-xs text-on-surface-variant">
+              <span className="font-headline text-base font-bold text-[#16A34A]">
+                ₱{overallTotal.toLocaleString()}
+              </span>
+              <span className="ml-2">
+                {dateBlocks.length} date{dateBlocks.length === 1 ? "" : "s"} · {totalSlots} slot{totalSlots === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="rounded-lg border border-outline-variant/30 bg-transparent px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !description.trim()}
+                className="rounded-lg bg-primary px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-60"
+              >
+                {saving
+                  ? "Saving..."
+                  : entry
+                    ? "Update"
+                    : entriesToCreate > 0
+                      ? `Save ${entriesToCreate} ${entriesToCreate === 1 ? "Entry" : "Entries"}`
+                      : "Add Entry"}
+              </button>
+            </div>
           </div>
         </form>
       </div>
