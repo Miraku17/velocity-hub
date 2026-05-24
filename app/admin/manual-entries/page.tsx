@@ -427,18 +427,20 @@ function EntryFormModal({
             </div>
 
             {/* Two-pane: date list + slot grid */}
-            <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4">
-              {/* LEFT PANE — DateBlockList */}
-              <DateBlockList
-                blocks={dateBlocks}
-                activeBlockId={activeBlockId}
-                subtotals={subtotals}
-                onSelectBlock={setActiveBlockId}
-                onRemoveBlock={removeBlock}
-                onAddDate={addDate}
-                canRemove={dateBlocks.length > 1}
-                canAdd={!entry}
-              />
+            <div className={`grid grid-cols-1 ${entry ? "" : "md:grid-cols-[260px_1fr]"} gap-4`}>
+              {/* LEFT PANE — DateBlockList (hidden in edit mode) */}
+              {!entry && (
+                <DateBlockList
+                  blocks={dateBlocks}
+                  activeBlockId={activeBlockId}
+                  subtotals={subtotals}
+                  onSelectBlock={setActiveBlockId}
+                  onRemoveBlock={removeBlock}
+                  onAddDate={addDate}
+                  canRemove={dateBlocks.length > 1}
+                  canAdd={!entry}
+                />
+              )}
 
               {/* RIGHT PANE — date input + grid for active block */}
               <div className="space-y-3">
