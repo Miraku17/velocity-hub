@@ -108,7 +108,7 @@ function BlockFormModal({
   saving: boolean
 }) {
   const [date, setDate] = useState(todayISO())
-  const [dates, setDates] = useState<string[]>([todayISO()])
+  const [dates, setDates] = useState<string[]>([])
   const [courtId, setCourtId] = useState("")
   const [blockType, setBlockType] = useState<"day" | "slots">("day")
 
@@ -164,7 +164,7 @@ function BlockFormModal({
   }
 
   function removeDate(d: string) {
-    if (dates.length <= 1) return
+    if (dates.length === 0) return
     const next = dates.filter((x) => x !== d)
     setDates(next)
     if (d === date) {
@@ -352,7 +352,7 @@ function BlockFormModal({
     onSave(rows)
   }
 
-  const canSubmit = blockType === "day" || selectedSlots.length > 0
+  const canSubmit = dates.length > 0 && (blockType === "day" || selectedSlots.length > 0)
 
   return (
     <Portal>
@@ -490,7 +490,7 @@ function BlockFormModal({
                     weekday: "short", month: "short", day: "numeric",
                   })
                   const isPreview = d === date
-                  const canRemove = sortedDates.length > 1
+                  const canRemove = true
                   return (
                     <span
                       key={d}
