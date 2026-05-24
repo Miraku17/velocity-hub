@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useBlockedSlots,
   useCreateBlockedSlot,
@@ -18,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ConfirmModal } from "@/components/admin/ConfirmModal"
+import { toast } from "sonner"
 
 /* ── Helpers ── */
 
@@ -39,7 +41,12 @@ function formatTime(time: string) {
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date())
 }
 
 /** Format a 24h hour number to 12h string */
@@ -79,8 +86,6 @@ function BlockFormModal({
   onClose,
   onSave,
   saving,
-  conflictError,
-  onClearError,
 }: {
   courts: Court[]
   onClose: () => void
@@ -92,12 +97,31 @@ function BlockFormModal({
     reason: string
   }[]) => void
   saving: boolean
-  conflictError?: string | null
-  onClearError?: () => void
 }) {
   const [date, setDate] = useState(todayISO())
+  const [extraDates, setExtraDates] = useState<string[]>([])
   const [courtId, setCourtId] = useState("")
   const [blockType, setBlockType] = useState<"day" | "slots">("day")
+
+  const allDates = useMemo(() => {
+    const set = new Set<string>([date, ...extraDates])
+    return Array.from(set).sort()
+  }, [date, extraDates])
+
+  const addDatePickerRef = useRef<HTMLInputElement>(null)
+
+  function removeDate(d: string) {
+    if (allDates.length <= 1) return
+    if (d === date) {
+      const remaining = allDates.filter((x) => x !== d)
+      if (remaining.length === 0) return
+      const newPreview = remaining[0]
+      setDate(newPreview)
+      setExtraDates((prev) => prev.filter((x) => x !== d && x !== newPreview))
+      return
+    }
+    setExtraDates((prev) => prev.filter((x) => x !== d))
+  }
   const [selectedSlots, setSelectedSlots] = useState<string[]>([])
   const [reason, setReason] = useState("")
 
@@ -108,7 +132,7 @@ function BlockFormModal({
     }
   }, [blockType, courtId, courts])
 
-  const stableOnClose = useCallback(onClose, [onClose])
+  const stableOnClose = useCallback(() => onClose(), [onClose])
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -117,12 +141,6 @@ function BlockFormModal({
     window.addEventListener("keydown", handleKey)
     return () => window.removeEventListener("keydown", handleKey)
   }, [stableOnClose])
-
-  useEffect(() => {
-    if (!conflictError) return
-    const timer = setTimeout(() => onClearError?.(), 4000)
-    return () => clearTimeout(timer)
-  }, [conflictError, onClearError])
 
   // Get selected court and its schedule for the selected date
   const selectedCourt = courts.find((c) => c.id === courtId)
@@ -239,42 +257,49 @@ function BlockFormModal({
     e.preventDefault()
 
     if (blockType === "day") {
-      onSave([{
-        court_id: courtId || null,
-        blocked_date: date,
-        start_time: null,
-        end_time: null,
-        reason: reason.trim(),
-      }])
-    } else {
-      if (selectedSlots.length === 0) return
-      const sorted = [...selectedSlots].sort((a, b) => parse12Hour(a) - parse12Hour(b))
-      const ranges: { start: number; end: number }[] = []
-      let currentStart = parse12Hour(sorted[0])
-      let currentEnd = currentStart + 1
-
-      for (let i = 1; i < sorted.length; i++) {
-        const hour = parse12Hour(sorted[i])
-        if (hour === currentEnd) {
-          currentEnd = hour + 1
-        } else {
-          ranges.push({ start: currentStart, end: currentEnd })
-          currentStart = hour
-          currentEnd = hour + 1
-        }
-      }
-      ranges.push({ start: currentStart, end: currentEnd })
-
       onSave(
-        ranges.map((r) => ({
+        allDates.map((d) => ({
           court_id: courtId || null,
-          blocked_date: date,
-          start_time: `${String(r.start % 24).padStart(2, "0")}:00:00`,
-          end_time: `${String(r.end % 24).padStart(2, "0")}:00:00`,
+          blocked_date: d,
+          start_time: null,
+          end_time: null,
           reason: reason.trim(),
         }))
       )
+      return
     }
+
+    if (selectedSlots.length === 0) return
+
+    // Existing contiguous-range grouping (unchanged):
+    const sorted = [...selectedSlots].sort((a, b) => parse12Hour(a) - parse12Hour(b))
+    const ranges: { start: number; end: number }[] = []
+    let currentStart = parse12Hour(sorted[0])
+    let currentEnd = currentStart + 1
+
+    for (let i = 1; i < sorted.length; i++) {
+      const hour = parse12Hour(sorted[i])
+      if (hour === currentEnd) {
+        currentEnd = hour + 1
+      } else {
+        ranges.push({ start: currentStart, end: currentEnd })
+        currentStart = hour
+        currentEnd = hour + 1
+      }
+    }
+    ranges.push({ start: currentStart, end: currentEnd })
+
+    const rows = allDates.flatMap((d) =>
+      ranges.map((r) => ({
+        court_id: courtId || null,
+        blocked_date: d,
+        start_time: `${String(r.start % 24).padStart(2, "0")}:00:00`,
+        end_time: `${String(r.end % 24).padStart(2, "0")}:00:00`,
+        reason: reason.trim(),
+      }))
+    )
+
+    onSave(rows)
   }
 
   const canSubmit = blockType === "day" || selectedSlots.length > 0
@@ -399,6 +424,86 @@ function BlockFormModal({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Multi-date chip strip */}
+            <div>
+              <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
+                Dates to block
+                <span className="ml-1 normal-case tracking-normal text-on-surface-variant">
+                  — {allDates.length} {allDates.length === 1 ? "date" : "dates"}
+                </span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                {allDates.map((d) => {
+                  const label = new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+                    weekday: "short", month: "short", day: "numeric",
+                  })
+                  const isPreview = d === date
+                  const canRemove = allDates.length > 1
+                  return (
+                    <span
+                      key={d}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-medium ${
+                        isPreview
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setDate(d)}
+                        className="font-semibold"
+                      >
+                        {label}
+                      </button>
+                      {canRemove && (
+                        <button
+                          type="button"
+                          onClick={() => removeDate(d)}
+                          aria-label={`Remove ${label}`}
+                          className="flex h-4 w-4 items-center justify-center rounded-full text-on-surface-variant/60 transition-colors hover:bg-error/10 hover:text-error"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </span>
+                  )
+                })}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = addDatePickerRef.current
+                      if (!el) return
+                      if (typeof el.showPicker === "function") {
+                        try { el.showPicker() } catch { el.click() }
+                      } else {
+                        el.click()
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-outline-variant/40 px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
+                  >
+                    + Add Date
+                  </button>
+                  <input
+                    ref={addDatePickerRef}
+                    type="date"
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (!v) return
+                      if (allDates.includes(v)) return
+                      setExtraDates((prev) => [...prev, v])
+                      e.target.value = ""
+                    }}
+                    className="sr-only"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Time Slots Grid */}
@@ -529,18 +634,6 @@ function BlockFormModal({
             </div>
           </div>
 
-          {/* Conflict Error */}
-          {conflictError && (
-            <div className="mx-6 mb-2 flex gap-3 rounded-lg border border-error/30 bg-error/8 px-4 py-3">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-error">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <p className="font-body text-xs text-error">{conflictError}</p>
-            </div>
-          )}
-
           {/* Footer */}
           <div className="flex justify-end gap-3 border-t border-outline-variant/15 px-6 py-4 shrink-0">
             <button
@@ -556,9 +649,11 @@ function BlockFormModal({
               disabled={saving || !canSubmit}
               className="rounded-lg bg-error px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
             >
-              {saving ? "Blocking..." : blockType === "slots" && selectedSlots.length > 0
-                ? `Block ${selectedSlots.length} Slot${selectedSlots.length > 1 ? "s" : ""}`
-                : "Block"
+              {saving
+                ? "Saving..."
+                : allDates.length > 1
+                  ? `Block ${allDates.length} Dates`
+                  : "Block Slots"
               }
             </button>
           </div>
@@ -568,78 +663,21 @@ function BlockFormModal({
   )
 }
 
-/* ── Delete Confirmation ── */
-
-function UnblockModal({
-  block,
-  courts,
-  onClose,
-  onConfirm,
-  deleting,
-}: {
-  block: BlockedSlot
-  courts: Court[]
-  onClose: () => void
-  onConfirm: () => void
-  deleting: boolean
-}) {
-  const courtName = block.court_id
-    ? courts.find((c) => c.id === block.court_id)?.name ?? "Unknown"
-    : "All Courts"
-
-  return (
-    <Portal>
-      <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4" onClick={onClose}>
-        <div
-          className="w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex justify-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#16A34A]/10 text-[#16A34A]">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-4 text-center">
-            <h3 className="font-headline text-lg font-semibold text-on-surface">Unblock</h3>
-            <p className="mt-2 font-body text-sm text-on-surface-variant">
-              Remove this block for <span className="font-semibold text-on-surface">{courtName}</span> on{" "}
-              <span className="font-semibold text-on-surface">{formatDate(block.blocked_date)}</span>?
-            </p>
-          </div>
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={onClose}
-              disabled={deleting}
-              className="flex-1 rounded-lg border border-outline-variant/30 bg-transparent px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={deleting}
-              className="flex-1 rounded-lg bg-[#16A34A] px-4 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:bg-[#16A34A]/90 disabled:opacity-60"
-            >
-              {deleting ? "Unblocking..." : "Unblock"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Portal>
-  )
-}
-
 /* ── Page ── */
 
 export default function BlockedSlotsPage() {
+  const queryClient = useQueryClient()
   const [dateFilter, setDateFilter] = useState("")
   const [monthFilter, setMonthFilter] = useState("")
   const [showForm, setShowForm] = useState(false)
-  const [unblockItem, setUnblockItem] = useState<BlockedSlot | null>(null)
-  const [conflictError, setConflictError] = useState<string | null>(null)
+  const [batchSaving, setBatchSaving] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string
+    message: string
+    confirmLabel: string
+    variant: "danger" | "default"
+    onConfirm: () => void
+  } | null>(null)
 
   const filters = {
     date: dateFilter || undefined,
@@ -658,30 +696,64 @@ export default function BlockedSlotsPage() {
     return map
   }, [courts])
 
-  function handleSave(blocks: {
+  async function handleSave(rows: Array<{
     court_id: string | null
     blocked_date: string
     start_time: string | null
     end_time: string | null
     reason: string
-  }[]) {
-    setConflictError(null)
-    setShowForm(false)
-    for (const block of blocks) {
-      createMutation.mutate(block, {
-        onError: (err) => {
-          setShowForm(true)
-          setConflictError(err.message)
-        },
-      })
+  }>) {
+    setBatchSaving(true)
+    try {
+      const results = await Promise.allSettled(
+        rows.map((r) => createMutation.mutateAsync(r))
+      )
+
+      const failures = results
+        .map((r, i) => ({ r, row: rows[i] }))
+        .filter(({ r }) => r.status === "rejected") as Array<{
+          r: PromiseRejectedResult
+          row: typeof rows[number]
+        }>
+
+      queryClient.invalidateQueries({ queryKey: ["blocked-slots"] })
+
+      const successCount = results.length - failures.length
+      const uniqueDates = new Set(rows.map((r) => r.blocked_date)).size
+
+      if (failures.length === 0) {
+        toast.success(
+          uniqueDates > 1
+            ? `Blocked ${uniqueDates} dates (${successCount} slot${successCount === 1 ? "" : "s"})`
+            : `Blocked ${successCount} slot${successCount === 1 ? "" : "s"}`
+        )
+        setShowForm(false)
+        return
+      }
+
+      const firstErr = (failures[0].r.reason as Error)?.message || "Failed to create block"
+      const failedDates = Array.from(new Set(failures.map((f) => f.row.blocked_date))).join(", ")
+      toast.error(
+        successCount > 0
+          ? `Saved ${successCount}, failed on ${failedDates}: ${firstErr}`
+          : `Failed: ${firstErr}`
+      )
+    } finally {
+      setBatchSaving(false)
     }
   }
 
-  function handleUnblock() {
-    if (!unblockItem) return
-    const id = unblockItem.id
-    setUnblockItem(null)
-    deleteMutation.mutate(id)
+  function handleUnblock(block: BlockedSlot) {
+    const courtName = block.court_id
+      ? (courts.find((c) => c.id === block.court_id)?.name ?? "Unknown")
+      : "All Courts"
+    setConfirmDialog({
+      title: "Delete Block",
+      message: `Remove the block for ${courtName} on ${formatDate(block.blocked_date)}?`,
+      confirmLabel: "Delete",
+      variant: "danger",
+      onConfirm: () => deleteMutation.mutate(block.id),
+    })
   }
 
   return (
@@ -690,22 +762,25 @@ export default function BlockedSlotsPage() {
       {showForm && (
         <BlockFormModal
           courts={courts}
-          onClose={() => { setShowForm(false); setConflictError(null) }}
+          onClose={() => setShowForm(false)}
           onSave={handleSave}
-          saving={createMutation.isPending}
-          conflictError={conflictError}
-          onClearError={() => setConflictError(null)}
+          saving={createMutation.isPending || batchSaving}
         />
       )}
 
-      {/* Unblock Modal */}
-      {unblockItem && (
-        <UnblockModal
-          block={unblockItem}
-          courts={courts}
-          onClose={() => setUnblockItem(null)}
-          onConfirm={handleUnblock}
-          deleting={deleteMutation.isPending}
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <ConfirmModal
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={() => {
+            const { onConfirm } = confirmDialog
+            setConfirmDialog(null)
+            onConfirm()
+          }}
         />
       )}
 
@@ -871,7 +946,7 @@ export default function BlockedSlotsPage() {
                     <td className="px-6 py-5">
                       <div className="flex justify-end">
                         <button
-                          onClick={() => setUnblockItem(block)}
+                          onClick={() => handleUnblock(block)}
                           className="flex h-8 items-center gap-1.5 rounded-lg px-3 font-nav text-[10px] font-semibold uppercase tracking-wider text-[#16A34A] transition-colors hover:bg-[#16A34A]/10"
                           title="Unblock"
                         >
