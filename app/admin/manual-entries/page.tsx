@@ -34,7 +34,12 @@ function formatDate(dateStr: string) {
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date())
 }
 
 function formatTime(t: string) {
@@ -54,7 +59,7 @@ interface EntryFormData {
   court_id: string | null
   start_time: string | null
   end_time: string | null
-  time_blocks?: { start_time: string; end_time: string }[]
+  time_blocks?: { start_time: string; end_time: string; amount: number | null }[]
   id?: string
 }
 
@@ -302,27 +307,40 @@ function EntryFormModal({
 
       for (const [cId, hours] of byCourt) {
         hours.sort((a, b) => a - b)
-        const blocks: { startH: number; endH: number }[] = []
+
+        const blockGrid = queryClient.getQueryData<GridAvailData>(["grid-availability", block.date])
+
+        function priceFor(h: number): number {
+          if (!blockGrid) return 0
+          const court = blockGrid.courts.find((c) => c.id === cId)
+          if (!court) return 0
+          return court.schedule?.hourly_rates?.[String(h)] ?? court.price_per_hour
+        }
+        function amountFor(startH: number, endH: number): number | null {
+          if (!blockGrid) return null
+          let sum = 0
+          for (let h = startH; h < endH; h++) sum += priceFor(h)
+          return sum
+        }
+
+        const blocks: { startH: number; endH: number; amount: number | null }[] = []
         let blockStart = hours[0]
         let prev = hours[0]
         for (let i = 1; i < hours.length; i++) {
           if (hours[i] !== prev + 1) {
-            blocks.push({ startH: blockStart, endH: prev + 1 })
+            blocks.push({ startH: blockStart, endH: prev + 1, amount: amountFor(blockStart, prev + 1) })
             blockStart = hours[i]
           }
           prev = hours[i]
         }
-        blocks.push({ startH: blockStart, endH: prev + 1 })
+        blocks.push({ startH: blockStart, endH: prev + 1, amount: amountFor(blockStart, prev + 1) })
 
         const startTime = `${String(blocks[0].startH).padStart(2, "0")}:00:00`
         const endTime = `${String(blocks[blocks.length - 1].endH).padStart(2, "0")}:00:00`
 
         let courtAmount: number | null = null
-        if (gridData && block.date === date) {
-          // Only the active block's gridData is in this scope; per-block pricing
-          // is finalized in Task 5 using the query cache. For now, leave amount
-          // null for non-active blocks — the API accepts null.
-          const court = gridData.courts.find((c) => c.id === cId)
+        if (blockGrid) {
+          const court = blockGrid.courts.find((c) => c.id === cId)
           if (court) {
             courtAmount = hours.reduce(
               (sum, h) => sum + (court.schedule?.hourly_rates?.[String(h)] ?? court.price_per_hour),
@@ -344,6 +362,7 @@ function EntryFormModal({
             ? blocks.map((b) => ({
                 start_time: `${String(b.startH).padStart(2, "0")}:00:00`,
                 end_time: `${String(b.endH).padStart(2, "0")}:00:00`,
+                amount: b.amount,
               }))
             : undefined,
         })
@@ -664,11 +683,10 @@ export default function ManualEntriesPage() {
 
     for (const e of entries) {
       if (e.time_blocks && e.time_blocks.length > 1) {
-        const amountPerBlock = e.amount != null ? e.amount / e.time_blocks.length : null
         for (const block of e.time_blocks) {
           payloads.push({
             entry_date: e.entry_date,
-            amount: amountPerBlock,
+            amount: block.amount,
             description: e.description,
             notes: e.notes,
             court_id: e.court_id,
