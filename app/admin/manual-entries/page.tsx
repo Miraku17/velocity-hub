@@ -170,14 +170,11 @@ function EntryFormModal({
   }
 
   function removeBlock(id: string) {
-    // Confirm logic lands in Task 6.
-    setDateBlocks((blocks) => blocks.filter((b) => b.id !== id))
-    if (id === activeBlockId) {
-      setDateBlocks((blocks) => {
-        if (blocks.length > 0) setActiveBlockId(blocks[0].id)
-        return blocks
-      })
-    }
+    setDateBlocks((prev) => {
+      const next = prev.filter((b) => b.id !== id)
+      if (id === activeBlockId && next.length > 0) setActiveBlockId(next[0].id)
+      return next
+    })
   }
 
   const stableOnClose = useCallback(onClose, [onClose])

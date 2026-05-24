@@ -119,7 +119,7 @@ export function DateBlockList({
             type="date"
             value={pickerValue}
             onChange={handleAddChange}
-            className="absolute inset-0 opacity-0 pointer-events-none"
+            className="sr-only"
           />
         </div>
       )}
