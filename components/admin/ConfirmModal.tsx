@@ -25,7 +25,7 @@ export function ConfirmModal({
     }
     window.addEventListener("keydown", handleKey)
     return () => window.removeEventListener("keydown", handleKey)
-  })
+  }, [onCancel, onConfirm])
 
   const confirmClasses =
     variant === "danger"

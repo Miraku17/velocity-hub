@@ -41,7 +41,12 @@ function formatTime(time: string) {
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date())
 }
 
 /** Format a 24h hour number to 12h string */
@@ -81,8 +86,6 @@ function BlockFormModal({
   onClose,
   onSave,
   saving,
-  conflictError,
-  onClearError,
 }: {
   courts: Court[]
   onClose: () => void
@@ -94,8 +97,6 @@ function BlockFormModal({
     reason: string
   }[]) => void
   saving: boolean
-  conflictError?: string | null
-  onClearError?: () => void
 }) {
   const [date, setDate] = useState(todayISO())
   const [extraDates, setExtraDates] = useState<string[]>([])
@@ -113,7 +114,11 @@ function BlockFormModal({
     if (allDates.length <= 1) return
     if (d === date) {
       const remaining = allDates.filter((x) => x !== d)
-      if (remaining.length > 0) setDate(remaining[0])
+      if (remaining.length === 0) return
+      const newPreview = remaining[0]
+      setDate(newPreview)
+      setExtraDates((prev) => prev.filter((x) => x !== d && x !== newPreview))
+      return
     }
     setExtraDates((prev) => prev.filter((x) => x !== d))
   }
@@ -127,7 +132,7 @@ function BlockFormModal({
     }
   }, [blockType, courtId, courts])
 
-  const stableOnClose = useCallback(onClose, [onClose])
+  const stableOnClose = useCallback(() => onClose(), [onClose])
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -136,12 +141,6 @@ function BlockFormModal({
     window.addEventListener("keydown", handleKey)
     return () => window.removeEventListener("keydown", handleKey)
   }, [stableOnClose])
-
-  useEffect(() => {
-    if (!conflictError) return
-    const timer = setTimeout(() => onClearError?.(), 4000)
-    return () => clearTimeout(timer)
-  }, [conflictError, onClearError])
 
   // Get selected court and its schedule for the selected date
   const selectedCourt = courts.find((c) => c.id === courtId)
@@ -477,7 +476,15 @@ function BlockFormModal({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => addDatePickerRef.current?.showPicker?.() ?? addDatePickerRef.current?.click()}
+                    onClick={() => {
+                      const el = addDatePickerRef.current
+                      if (!el) return
+                      if (typeof el.showPicker === "function") {
+                        try { el.showPicker() } catch { el.click() }
+                      } else {
+                        el.click()
+                      }
+                    }}
                     className="inline-flex items-center gap-1 rounded-full border border-dashed border-outline-variant/40 px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
                   >
                     + Add Date
@@ -627,18 +634,6 @@ function BlockFormModal({
             </div>
           </div>
 
-          {/* Conflict Error */}
-          {conflictError && (
-            <div className="mx-6 mb-2 flex gap-3 rounded-lg border border-error/30 bg-error/8 px-4 py-3">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-error">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <p className="font-body text-xs text-error">{conflictError}</p>
-            </div>
-          )}
-
           {/* Footer */}
           <div className="flex justify-end gap-3 border-t border-outline-variant/15 px-6 py-4 shrink-0">
             <button
@@ -675,7 +670,6 @@ export default function BlockedSlotsPage() {
   const [dateFilter, setDateFilter] = useState("")
   const [monthFilter, setMonthFilter] = useState("")
   const [showForm, setShowForm] = useState(false)
-  const [conflictError, setConflictError] = useState<string | null>(null)
   const [batchSaving, setBatchSaving] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string
@@ -768,11 +762,9 @@ export default function BlockedSlotsPage() {
       {showForm && (
         <BlockFormModal
           courts={courts}
-          onClose={() => { setShowForm(false); setConflictError(null) }}
+          onClose={() => setShowForm(false)}
           onSave={handleSave}
           saving={createMutation.isPending || batchSaving}
-          conflictError={conflictError}
-          onClearError={() => setConflictError(null)}
         />
       )}
 
