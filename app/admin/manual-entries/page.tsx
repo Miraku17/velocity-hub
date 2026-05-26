@@ -118,10 +118,13 @@ function EntryFormModal({
     enabled: !!date,
   })
 
-  // Tick state that bumps whenever a grid-availability query updates.
+  // Tick state that bumps whenever a grid-availability query's data changes.
+  // Filter to `updated` events only — `observerOptionsUpdated` fires every render
+  // (inline queryFn is a new reference) and would loop setState→render→setState.
   const [cacheTick, setCacheTick] = useState(0)
   useEffect(() => {
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type !== "updated") return
       const key = event.query.queryKey
       if (Array.isArray(key) && key[0] === "grid-availability") {
         setCacheTick((t) => t + 1)
