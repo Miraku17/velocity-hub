@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useBlockedSlots,
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ConfirmModal } from "@/components/admin/ConfirmModal"
-import { Calendar } from "@/components/ui/calendar"
+import { DatePickerPopover } from "@/components/admin/DatePickerPopover"
 import { toast } from "sonner"
 
 function dateToISO(d: Date) {
@@ -116,46 +116,6 @@ function BlockFormModal({
     () => [...dates].sort((a, b) => a.localeCompare(b)),
     [dates]
   )
-
-  const [addDateOpen, setAddDateOpen] = useState(false)
-  const addDateTriggerRef = useRef<HTMLButtonElement>(null)
-  const addDatePopoverRef = useRef<HTMLDivElement>(null)
-  const [addDatePos, setAddDatePos] = useState<{ top: number; left: number; placement: "below" | "above" } | null>(null)
-
-  useEffect(() => {
-    if (!addDateOpen) {
-      setAddDatePos(null)
-      return
-    }
-    function recompute() {
-      const el = addDateTriggerRef.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      const popoverHeight = 340 // approx Calendar height + padding
-      const spaceBelow = window.innerHeight - rect.bottom
-      const placement = spaceBelow < popoverHeight && rect.top > popoverHeight ? "above" : "below"
-      setAddDatePos({
-        top: placement === "below" ? rect.bottom + 6 : rect.top - 6,
-        left: rect.left,
-        placement,
-      })
-    }
-    recompute()
-    function handleClickOutside(e: MouseEvent) {
-      const target = e.target as Node
-      if (addDateTriggerRef.current?.contains(target)) return
-      if (addDatePopoverRef.current?.contains(target)) return
-      setAddDateOpen(false)
-    }
-    window.addEventListener("resize", recompute)
-    window.addEventListener("scroll", recompute, true)
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      window.removeEventListener("resize", recompute)
-      window.removeEventListener("scroll", recompute, true)
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [addDateOpen])
 
   function addDate(d: string) {
     if (dates.includes(d)) return
@@ -523,44 +483,26 @@ function BlockFormModal({
                     </span>
                   )
                 })}
-                <button
-                  ref={addDateTriggerRef}
-                  type="button"
-                  onClick={() => setAddDateOpen((o) => !o)}
-                  className={`inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                    addDateOpen
-                      ? "border-primary text-primary"
-                      : "border-outline-variant/40 text-on-surface-variant hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  + Add Date
-                </button>
-                {addDateOpen && addDatePos && (
-                  <Portal>
-                    <div
-                      ref={addDatePopoverRef}
-                      style={{
-                        position: "fixed",
-                        top: addDatePos.placement === "below" ? addDatePos.top : undefined,
-                        bottom: addDatePos.placement === "above" ? window.innerHeight - addDatePos.top : undefined,
-                        left: addDatePos.left,
-                        zIndex: 200,
-                      }}
-                      className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-xl"
+                <DatePickerPopover
+                  selected={isoToDate(date)}
+                  disabled={(d) => dates.includes(dateToISO(d))}
+                  onSelect={(d) => addDate(dateToISO(d))}
+                  renderTrigger={({ ref, onClick, open, ariaProps }) => (
+                    <button
+                      ref={ref}
+                      type="button"
+                      onClick={onClick}
+                      {...ariaProps}
+                      className={`inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                        open
+                          ? "border-primary text-primary"
+                          : "border-outline-variant/40 text-on-surface-variant hover:border-primary hover:text-primary"
+                      }`}
                     >
-                      <Calendar
-                        mode="single"
-                        selected={isoToDate(date)}
-                        disabled={(d) => dates.includes(dateToISO(d))}
-                        onSelect={(d) => {
-                          if (!d) return
-                          addDate(dateToISO(d))
-                          setAddDateOpen(false)
-                        }}
-                      />
-                    </div>
-                  </Portal>
-                )}
+                      + Add Date
+                    </button>
+                  )}
+                />
               </div>
             </div>
 

@@ -1,9 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
 import type { DateBlock } from "./types"
-import { Calendar } from "@/components/ui/calendar"
-import { Portal } from "@/components/ui/portal"
+import { DatePickerPopover } from "@/components/admin/DatePickerPopover"
 
 function formatDate(dateStr: string) {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
@@ -40,54 +38,6 @@ export function DateBlockList({
   canAdd,
 }: Props) {
   const usedDates = new Set(blocks.map((b) => b.date))
-
-  const [addDateOpen, setAddDateOpen] = useState(false)
-  const addDateTriggerRef = useRef<HTMLButtonElement>(null)
-  const addDatePopoverRef = useRef<HTMLDivElement>(null)
-  const [addDatePos, setAddDatePos] = useState<{
-    top: number
-    left: number
-    placement: "below" | "above"
-  } | null>(null)
-
-  useEffect(() => {
-    if (!addDateOpen) {
-      setAddDatePos(null)
-      return
-    }
-    function recompute() {
-      const el = addDateTriggerRef.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      const popoverHeight = 340 // approx Calendar height + padding
-      const popoverWidth = 280
-      const spaceBelow = window.innerHeight - rect.bottom
-      const placement = spaceBelow < popoverHeight && rect.top > popoverHeight ? "above" : "below"
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - popoverWidth - 8))
-      setAddDatePos({
-        top: placement === "below" ? rect.bottom + 6 : rect.top - 6,
-        left,
-        placement,
-      })
-    }
-    recompute()
-    function handleClickOutside(e: MouseEvent | TouchEvent) {
-      const target = e.target as Node
-      if (addDateTriggerRef.current?.contains(target)) return
-      if (addDatePopoverRef.current?.contains(target)) return
-      setAddDateOpen(false)
-    }
-    window.addEventListener("resize", recompute)
-    window.addEventListener("scroll", recompute, true)
-    document.addEventListener("mousedown", handleClickOutside)
-    document.addEventListener("touchstart", handleClickOutside)
-    return () => {
-      window.removeEventListener("resize", recompute)
-      window.removeEventListener("scroll", recompute, true)
-      document.removeEventListener("mousedown", handleClickOutside)
-      document.removeEventListener("touchstart", handleClickOutside)
-    }
-  }, [addDateOpen])
 
   return (
     <div className="rounded-lg border border-outline-variant/15 bg-surface-container-low/40 p-3">
@@ -150,47 +100,25 @@ export function DateBlockList({
       </div>
 
       {canAdd && (
-        <>
-          <button
-            ref={addDateTriggerRef}
-            type="button"
-            onClick={() => setAddDateOpen((o) => !o)}
-            className={`w-full h-9 rounded-md border border-dashed font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-              addDateOpen
-                ? "border-primary bg-surface-container-lowest text-primary"
-                : "border-outline-variant/40 bg-surface-container-lowest text-on-surface-variant hover:border-primary hover:text-primary"
-            }`}
-          >
-            + Add Date
-          </button>
-          {addDateOpen && addDatePos && (
-            <Portal>
-              <div
-                ref={addDatePopoverRef}
-                style={{
-                  position: "fixed",
-                  top: addDatePos.placement === "below" ? addDatePos.top : undefined,
-                  bottom: addDatePos.placement === "above" ? window.innerHeight - addDatePos.top : undefined,
-                  left: addDatePos.left,
-                  zIndex: 200,
-                }}
-                className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-xl"
-              >
-                <Calendar
-                  mode="single"
-                  disabled={(d) => usedDates.has(dateToISO(d))}
-                  onSelect={(d) => {
-                    if (!d) return
-                    const iso = dateToISO(d)
-                    if (usedDates.has(iso)) return
-                    onAddDate(iso)
-                    setAddDateOpen(false)
-                  }}
-                />
-              </div>
-            </Portal>
+        <DatePickerPopover
+          disabled={(d) => usedDates.has(dateToISO(d))}
+          onSelect={(d) => onAddDate(dateToISO(d))}
+          renderTrigger={({ ref, onClick, open, ariaProps }) => (
+            <button
+              ref={ref}
+              type="button"
+              onClick={onClick}
+              {...ariaProps}
+              className={`w-full h-9 rounded-md border border-dashed font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                open
+                  ? "border-primary bg-surface-container-lowest text-primary"
+                  : "border-outline-variant/40 bg-surface-container-lowest text-on-surface-variant hover:border-primary hover:text-primary"
+              }`}
+            >
+              + Add Date
+            </button>
           )}
-        </>
+        />
       )}
     </div>
   )
