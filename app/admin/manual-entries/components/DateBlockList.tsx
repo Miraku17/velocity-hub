@@ -1,7 +1,9 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { DateBlock } from "./types"
+import { Calendar } from "@/components/ui/calendar"
+import { Portal } from "@/components/ui/portal"
 
 function formatDate(dateStr: string) {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
@@ -10,6 +12,10 @@ function formatDate(dateStr: string) {
     day: "numeric",
     year: "numeric",
   })
+}
+
+function dateToISO(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
 interface Props {
@@ -33,21 +39,55 @@ export function DateBlockList({
   canRemove,
   canAdd,
 }: Props) {
-  const [pickerValue, setPickerValue] = useState("")
-  const pickerRef = useRef<HTMLInputElement>(null)
   const usedDates = new Set(blocks.map((b) => b.date))
 
-  function handleAddChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value
-    if (!value) return
-    if (usedDates.has(value)) {
-      // Browsers don't honor a per-day disable on native date inputs; reject silently.
-      setPickerValue("")
+  const [addDateOpen, setAddDateOpen] = useState(false)
+  const addDateTriggerRef = useRef<HTMLButtonElement>(null)
+  const addDatePopoverRef = useRef<HTMLDivElement>(null)
+  const [addDatePos, setAddDatePos] = useState<{
+    top: number
+    left: number
+    placement: "below" | "above"
+  } | null>(null)
+
+  useEffect(() => {
+    if (!addDateOpen) {
+      setAddDatePos(null)
       return
     }
-    onAddDate(value)
-    setPickerValue("")
-  }
+    function recompute() {
+      const el = addDateTriggerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const popoverHeight = 340 // approx Calendar height + padding
+      const popoverWidth = 280
+      const spaceBelow = window.innerHeight - rect.bottom
+      const placement = spaceBelow < popoverHeight && rect.top > popoverHeight ? "above" : "below"
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - popoverWidth - 8))
+      setAddDatePos({
+        top: placement === "below" ? rect.bottom + 6 : rect.top - 6,
+        left,
+        placement,
+      })
+    }
+    recompute()
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      const target = e.target as Node
+      if (addDateTriggerRef.current?.contains(target)) return
+      if (addDatePopoverRef.current?.contains(target)) return
+      setAddDateOpen(false)
+    }
+    window.addEventListener("resize", recompute)
+    window.addEventListener("scroll", recompute, true)
+    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("touchstart", handleClickOutside)
+    return () => {
+      window.removeEventListener("resize", recompute)
+      window.removeEventListener("scroll", recompute, true)
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("touchstart", handleClickOutside)
+    }
+  }, [addDateOpen])
 
   return (
     <div className="rounded-lg border border-outline-variant/15 bg-surface-container-low/40 p-3">
@@ -110,22 +150,47 @@ export function DateBlockList({
       </div>
 
       {canAdd && (
-        <div className="relative">
+        <>
           <button
+            ref={addDateTriggerRef}
             type="button"
-            onClick={() => pickerRef.current?.showPicker?.() ?? pickerRef.current?.click()}
-            className="w-full h-9 rounded-md border border-dashed border-outline-variant/40 bg-surface-container-lowest font-nav text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
+            onClick={() => setAddDateOpen((o) => !o)}
+            className={`w-full h-9 rounded-md border border-dashed font-nav text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+              addDateOpen
+                ? "border-primary bg-surface-container-lowest text-primary"
+                : "border-outline-variant/40 bg-surface-container-lowest text-on-surface-variant hover:border-primary hover:text-primary"
+            }`}
           >
             + Add Date
           </button>
-          <input
-            ref={pickerRef}
-            type="date"
-            value={pickerValue}
-            onChange={handleAddChange}
-            className="sr-only"
-          />
-        </div>
+          {addDateOpen && addDatePos && (
+            <Portal>
+              <div
+                ref={addDatePopoverRef}
+                style={{
+                  position: "fixed",
+                  top: addDatePos.placement === "below" ? addDatePos.top : undefined,
+                  bottom: addDatePos.placement === "above" ? window.innerHeight - addDatePos.top : undefined,
+                  left: addDatePos.left,
+                  zIndex: 200,
+                }}
+                className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-xl"
+              >
+                <Calendar
+                  mode="single"
+                  disabled={(d) => usedDates.has(dateToISO(d))}
+                  onSelect={(d) => {
+                    if (!d) return
+                    const iso = dateToISO(d)
+                    if (usedDates.has(iso)) return
+                    onAddDate(iso)
+                    setAddDateOpen(false)
+                  }}
+                />
+              </div>
+            </Portal>
+          )}
+        </>
       )}
     </div>
   )
