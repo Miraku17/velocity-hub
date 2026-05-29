@@ -12,6 +12,7 @@ import { useCreateReservation } from "@/lib/hooks/useReservations";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrency, formatTime12, colors, ease, STORAGE_KEY } from "../utils";
+import { compressImage } from "@/lib/compressImage";
 
 declare global {
   interface Window {
@@ -208,13 +209,20 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
     }
   }, [showConfirmModal, TURNSTILE_SITE_KEY]);
 
-  function handleReceiptUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleReceiptUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
-    setReceiptFile(file);
-    const url = URL.createObjectURL(file);
-    setReceiptUrl(url);
     if (receiptInputRef.current) receiptInputRef.current.value = "";
+    if (!file) return;
+    // Shrink large phone photos before upload so they stay under the request
+    // size limit (a too-large body is rejected by the platform with an opaque
+    // error). Falls back to the original file if compression fails.
+    const compressed = await compressImage(file).catch(() => file);
+    setReceiptFile(compressed);
+    const url = URL.createObjectURL(compressed);
+    setReceiptUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
     if (acceptedWaiver) setShowConfirmModal(true);
   }
 
