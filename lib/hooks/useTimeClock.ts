@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { readErrorMessage } from "@/lib/apiError"
 
 /* ── Types ── */
 
@@ -37,8 +38,7 @@ export interface UserProfile {
 async function fetchMe(): Promise<UserProfile> {
   const res = await fetch("/api/me")
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch user")
+    throw new Error(await readErrorMessage(res, "Failed to fetch user"))
   }
   return res.json()
 }
@@ -49,8 +49,7 @@ async function fetchTimeEntries(date?: string): Promise<TimeEntry[]> {
 
   const res = await fetch(url)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch time entries")
+    throw new Error(await readErrorMessage(res, "Failed to fetch time entries"))
   }
   return res.json()
 }
@@ -62,8 +61,7 @@ async function clockIn(notes?: string): Promise<{ id: string; action: string }> 
     body: JSON.stringify({ action: "clock-in", notes }),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to clock in")
+    throw new Error(await readErrorMessage(res, "Failed to clock in"))
   }
   return res.json()
 }
@@ -75,8 +73,7 @@ async function clockOut(notes?: string): Promise<{ id: string; action: string }>
     body: JSON.stringify({ action: "clock-out", notes }),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to clock out")
+    throw new Error(await readErrorMessage(res, "Failed to clock out"))
   }
   return res.json()
 }

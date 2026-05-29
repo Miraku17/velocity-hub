@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { readErrorMessage } from "@/lib/apiError"
 
 /* ── Types ── */
 
@@ -132,28 +133,9 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
 
   const res = await fetch(url)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch bookings")
+    throw new Error(await readErrorMessage(res, "Failed to fetch bookings"))
   }
   return res.json()
-}
-
-/**
- * Read an error message from a failed Response. Error bodies aren't always JSON
- * — e.g. a platform-level 413 (payload too large) returns a non-JSON body, and
- * calling res.json() on it throws an opaque "The string did not match the
- * expected pattern." on iOS Safari. Parse defensively and surface useful text.
- */
-async function readErrorMessage(res: Response, fallback: string): Promise<string> {
-  if (res.status === 413) {
-    return "Your receipt image is too large to upload. Please use a smaller photo and try again."
-  }
-  try {
-    const data = await res.json()
-    return data?.error || fallback
-  } catch {
-    return fallback
-  }
 }
 
 async function createReservation(input: ReservationInput): Promise<{ id: string; booking_code?: string }> {
@@ -188,8 +170,7 @@ async function updateReservation(input: ReservationUpdate): Promise<Booking> {
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to update booking")
+    throw new Error(await readErrorMessage(res, "Failed to update booking"))
   }
   return res.json()
 }

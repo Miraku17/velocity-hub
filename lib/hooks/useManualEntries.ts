@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { readErrorMessage } from "@/lib/apiError"
 
 /* ── Types ── */
 
@@ -78,8 +79,7 @@ async function fetchManualEntries(filters?: ManualEntryFilters): Promise<Paginat
 
   const res = await fetch(url)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch manual entries")
+    throw new Error(await readErrorMessage(res, "Failed to fetch manual entries"))
   }
   return res.json()
 }
@@ -91,8 +91,7 @@ async function createManualEntry(input: ManualEntryInput): Promise<ManualEntry> 
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to create entry")
+    throw new Error(await readErrorMessage(res, "Failed to create entry"))
   }
   return res.json()
 }
@@ -104,8 +103,7 @@ async function updateManualEntry(input: ManualEntryUpdate): Promise<ManualEntry>
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to update entry")
+    throw new Error(await readErrorMessage(res, "Failed to update entry"))
   }
   return res.json()
 }
@@ -113,8 +111,7 @@ async function updateManualEntry(input: ManualEntryUpdate): Promise<ManualEntry>
 async function deleteManualEntry(id: string): Promise<void> {
   const res = await fetch(`/api/manual-entries?id=${id}`, { method: "DELETE" })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to delete entry")
+    throw new Error(await readErrorMessage(res, "Failed to delete entry"))
   }
 }
 

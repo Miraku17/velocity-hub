@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
 import type { GridAvailabilityResponse } from "@/app/api/grid-availability/route"
+import { readErrorMessage } from "@/lib/apiError"
 
 async function fetchGridAvailability(date: string): Promise<GridAvailabilityResponse> {
   const res = await fetch(`/api/grid-availability?date=${date}`)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch grid availability")
+    throw new Error(await readErrorMessage(res, "Failed to fetch grid availability"))
   }
   return res.json()
 }

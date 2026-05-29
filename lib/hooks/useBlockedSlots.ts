@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { readErrorMessage } from "@/lib/apiError"
 
 /* ── Types ── */
 
@@ -45,8 +46,7 @@ async function fetchBlockedSlots(filters?: BlockedSlotFilters): Promise<BlockedS
 
   const res = await fetch(url)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch blocked slots")
+    throw new Error(await readErrorMessage(res, "Failed to fetch blocked slots"))
   }
   return res.json()
 }
@@ -58,8 +58,7 @@ async function createBlockedSlot(input: BlockedSlotInput): Promise<BlockedSlot> 
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to create block")
+    throw new Error(await readErrorMessage(res, "Failed to create block"))
   }
   return res.json()
 }
@@ -67,8 +66,7 @@ async function createBlockedSlot(input: BlockedSlotInput): Promise<BlockedSlot> 
 async function deleteBlockedSlot(id: string): Promise<void> {
   const res = await fetch(`/api/blocked-slots?id=${id}`, { method: "DELETE" })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to delete block")
+    throw new Error(await readErrorMessage(res, "Failed to delete block"))
   }
 }
 
