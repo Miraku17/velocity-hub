@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { readErrorMessage } from "@/lib/apiError"
 
 /* ── Types ── */
 
@@ -63,8 +64,7 @@ async function fetchCourts(params?: {
 
   const res = await fetch(url)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch courts")
+    throw new Error(await readErrorMessage(res, "Failed to fetch courts"))
   }
   return res.json()
 }
@@ -72,8 +72,7 @@ async function fetchCourts(params?: {
 async function fetchCourt(id: string): Promise<Court> {
   const res = await fetch(`/api/courts/${id}`)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch court")
+    throw new Error(await readErrorMessage(res, "Failed to fetch court"))
   }
   return res.json()
 }
@@ -85,8 +84,7 @@ async function createCourt(input: CourtInput): Promise<Court> {
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to create court")
+    throw new Error(await readErrorMessage(res, "Failed to create court"))
   }
   return res.json()
 }
@@ -101,8 +99,7 @@ async function updateCourt({
     body: JSON.stringify(updates),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to update court")
+    throw new Error(await readErrorMessage(res, "Failed to update court"))
   }
   return res.json()
 }
@@ -110,8 +107,7 @@ async function updateCourt({
 async function deleteCourt(id: string): Promise<{ archived: boolean }> {
   const res = await fetch(`/api/courts/${id}`, { method: "DELETE" })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to delete court")
+    throw new Error(await readErrorMessage(res, "Failed to delete court"))
   }
   return res.json()
 }
@@ -123,8 +119,7 @@ async function restoreCourt(id: string): Promise<Court> {
     body: JSON.stringify({ archived: false }),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to restore court")
+    throw new Error(await readErrorMessage(res, "Failed to restore court"))
   }
   return res.json()
 }

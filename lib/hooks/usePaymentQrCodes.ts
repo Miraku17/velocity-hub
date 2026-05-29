@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { readErrorMessage } from "@/lib/apiError"
 
 export interface PaymentQrCode {
   id: string
@@ -41,8 +42,7 @@ export function useCreatePaymentQrCode() {
         body: JSON.stringify(input),
       })
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to create QR code")
+        throw new Error(await readErrorMessage(res, "Failed to create QR code"))
       }
       return res.json()
     },
@@ -60,8 +60,7 @@ export function useUpdatePaymentQrCode() {
         body: JSON.stringify(updates),
       })
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to update QR code")
+        throw new Error(await readErrorMessage(res, "Failed to update QR code"))
       }
       return res.json()
     },
@@ -75,8 +74,7 @@ export function useDeletePaymentQrCode() {
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/payment-qr-codes/${id}`, { method: "DELETE" })
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to delete QR code")
+        throw new Error(await readErrorMessage(res, "Failed to delete QR code"))
       }
       return res.json()
     },

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { readErrorMessage } from "@/lib/apiError"
 
 /* ── Types ── */
 
@@ -45,8 +46,7 @@ export type VenueSettingsUpdate = Partial<Omit<VenueSettings, "id" | "updated_at
 async function fetchVenueSettings(): Promise<VenueSettings> {
   const res = await fetch("/api/venue-settings")
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch venue settings")
+    throw new Error(await readErrorMessage(res, "Failed to fetch venue settings"))
   }
   return res.json()
 }
@@ -58,8 +58,7 @@ async function updateVenueSettings(updates: VenueSettingsUpdate): Promise<VenueS
     body: JSON.stringify(updates),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to update venue settings")
+    throw new Error(await readErrorMessage(res, "Failed to update venue settings"))
   }
   return res.json()
 }

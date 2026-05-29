@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
+import { readErrorMessage } from "@/lib/apiError"
 
 /* ── Types ── */
 
@@ -132,8 +133,7 @@ async function fetchReservations(filters?: ReservationFilters): Promise<Paginate
 
   const res = await fetch(url)
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to fetch bookings")
+    throw new Error(await readErrorMessage(res, "Failed to fetch bookings"))
   }
   return res.json()
 }
@@ -147,8 +147,7 @@ async function createReservation(input: ReservationInput): Promise<{ id: string;
     formData.append("receipt", receipt)
     const res = await fetch("/api/reservations", { method: "POST", body: formData })
     if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.error || "Failed to create booking")
+      throw new Error(await readErrorMessage(res, "Failed to create booking"))
     }
     return res.json()
   }
@@ -159,8 +158,7 @@ async function createReservation(input: ReservationInput): Promise<{ id: string;
     body: JSON.stringify(fields),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to create booking")
+    throw new Error(await readErrorMessage(res, "Failed to create booking"))
   }
   return res.json()
 }
@@ -172,8 +170,7 @@ async function updateReservation(input: ReservationUpdate): Promise<Booking> {
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || "Failed to update booking")
+    throw new Error(await readErrorMessage(res, "Failed to update booking"))
   }
   return res.json()
 }
