@@ -101,6 +101,9 @@ function EntryFormModal({
   const selectedSlots = activeBlock.selectedSlots
 
   const [amount, setAmount] = useState(entry?.amount?.toString() ?? "")
+  // Tracks whether the admin manually typed an amount. Seeded true when editing
+  // an entry that already has a custom amount so we don't recompute over it.
+  const [amountEdited, setAmountEdited] = useState(entry?.amount != null)
   const [description, setDescription] = useState(entry?.description ?? "")
   const [notes, setNotes] = useState(entry?.notes ?? "")
 
@@ -201,12 +204,14 @@ function EntryFormModal({
   }, [selectedSlots, gridData])
 
   useEffect(() => {
+    // Never overwrite a value the admin typed — only auto-fill the computed total.
+    if (amountEdited) return
     if (selectedSlots.length > 0) {
       setAmount(computedTotal > 0 ? computedTotal.toString() : "")
     } else {
       setAmount("")
     }
-  }, [computedTotal, selectedSlots.length])
+  }, [computedTotal, selectedSlots.length, amountEdited])
 
   function toggleSlot(courtId: string, courtName: string, hour: number) {
     setDateBlocks((blocks) =>
@@ -415,6 +420,14 @@ function EntryFormModal({
       return
     }
 
+    // Honor a manually-typed amount: when the selection collapses to a single
+    // simple entry (one court, one contiguous range) use the typed value as its
+    // total instead of the court-computed price. Multi-court / non-contiguous
+    // selections can't map to a single number, so they keep the computed totals.
+    if (amountEdited && amount.trim() && allEntries.length === 1 && !allEntries[0].time_blocks) {
+      allEntries[0].amount = parseFloat(amount)
+    }
+
     onSave(allEntries)
   }
 
@@ -519,8 +532,9 @@ function EntryFormModal({
                   />
                 </div>
 
-                {/* Amount input — single-block only; hidden when ≥2 blocks exist */}
-                {dateBlocks.length === 1 && (
+                {/* Amount input — shown only when the typed value can actually be
+                    applied: a single date block with at most one court selected. */}
+                {dateBlocks.length === 1 && new Set(selectedSlots.map((s) => s.court_id)).size <= 1 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -533,7 +547,11 @@ function EntryFormModal({
                           step="0.01"
                           min="0"
                           value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
+                          onChange={(e) => {
+                            setAmount(e.target.value)
+                            // Empty field resumes auto-fill from the computed total.
+                            setAmountEdited(e.target.value.trim() !== "")
+                          }}
                           placeholder="0.00"
                           className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
                         />

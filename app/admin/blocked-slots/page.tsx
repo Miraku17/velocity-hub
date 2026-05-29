@@ -170,12 +170,17 @@ function BlockFormModal({
       const res = await fetch(`/api/reservations?court_id=${courtId}&date=${date}&fields=start_time,end_time,status&limit=100`)
       if (!res.ok) return []
       const json = await res.json()
-      // Admin response returns booking objects with nested booking_items; flatten them
-      const rows: { start_time?: string; end_time?: string; status?: string; booking_items?: { start_time: string; end_time: string }[] }[] = json.data || []
+      // Admin response returns booking objects with nested booking_items; flatten them.
+      // Bookings can span multiple courts/dates and the endpoint returns ALL their
+      // items, so keep only items for THIS court on THIS date — otherwise other
+      // courts' bookings get shown as "booked" here and can't be blocked.
+      const rows: { start_time?: string; end_time?: string; status?: string; booking_items?: { court_id?: string; booking_date?: string; start_time: string; end_time: string }[] }[] = json.data || []
       const flat: { start_time: string; end_time: string; status: string }[] = []
       for (const r of rows) {
         if (Array.isArray(r.booking_items)) {
           for (const item of r.booking_items) {
+            if (item.court_id && item.court_id !== courtId) continue
+            if (item.booking_date && item.booking_date !== date) continue
             if (item.start_time && item.end_time) {
               flat.push({ start_time: item.start_time, end_time: item.end_time, status: r.status ?? "confirmed" })
             }
