@@ -11,13 +11,6 @@ import {
 import { useCourts, type Court } from "@/lib/hooks/useCourts"
 import { LoadingPage } from "@/components/ui/loading"
 import { Portal } from "@/components/ui/portal"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { ConfirmModal } from "@/components/admin/ConfirmModal"
 import { DatePickerPopover } from "@/components/admin/DatePickerPopover"
 import { toast } from "sonner"
@@ -108,9 +101,22 @@ function BlockFormModal({
   saving: boolean
 }) {
   const [date, setDate] = useState(todayISO())
-  const [dates, setDates] = useState<string[]>([])
-  const [courtId, setCourtId] = useState("")
+  const [dates, setDates] = useState<string[]>([todayISO()])
+  // Courts to block. `allCourts` maps to a single court_id:null row per
+  // date/range (every court, including future ones); otherwise `courtIds` is
+  // the explicit subset.
+  const [allCourts, setAllCourts] = useState(true)
+  const [courtIds, setCourtIds] = useState<string[]>([])
   const [blockType, setBlockType] = useState<"day" | "slots">("day")
+
+  const effectiveCourtIds = useMemo(
+    () => (allCourts ? courts.map((c) => c.id) : courtIds),
+    [allCourts, courtIds, courts]
+  )
+  const effectiveCourts = useMemo(
+    () => courts.filter((c) => effectiveCourtIds.includes(c.id)),
+    [courts, effectiveCourtIds]
+  )
 
   const sortedDates = useMemo(
     () => [...dates].sort((a, b) => a.localeCompare(b)),
@@ -118,29 +124,47 @@ function BlockFormModal({
   )
 
   function addDate(d: string) {
+    setDate(d)
     if (dates.includes(d)) return
     setDates((prev) => [...prev, d])
-    setDate(d)
   }
 
   function removeDate(d: string) {
-    if (dates.length === 0) return
+    // Always keep at least one date in the list.
+    if (dates.length <= 1) return
     const next = dates.filter((x) => x !== d)
     setDates(next)
+    // Drop any per-date slot selections for the removed date.
+    setSlotsByDate((prev) => {
+      const copy = { ...prev }
+      delete copy[d]
+      return copy
+    })
     if (d === date) {
       const ascending = [...next].sort((a, b) => a.localeCompare(b))
       setDate(ascending[0])
     }
   }
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([])
+  // Slots are tracked per-date so each date can have its own time-slot
+  // selection (e.g. May 25 = 11pm-1am, May 26 = 7-9am). The active `date`
+  // determines which set the grid shows and mutates.
+  const [slotsByDate, setSlotsByDate] = useState<Record<string, string[]>>({})
+  const selectedSlots = slotsByDate[date] ?? []
   const [reason, setReason] = useState("")
+  const [confirming, setConfirming] = useState(false)
 
-  // When switching to slots mode, auto-select the first court if none selected
-  useEffect(() => {
-    if (blockType === "slots" && !courtId && courts.length > 0) {
-      setCourtId(courts[0].id)
-    }
-  }, [blockType, courtId, courts])
+  // Changing the SET of courts invalidates slot selections (availability and
+  // open hours differ per court), so clear them whenever courts change.
+  function selectAllCourts() {
+    setAllCourts(true)
+    setCourtIds([])
+    setSlotsByDate({})
+  }
+  function toggleCourt(cid: string) {
+    setAllCourts(false)
+    setCourtIds((prev) => (prev.includes(cid) ? prev.filter((x) => x !== cid) : [...prev, cid]))
+    setSlotsByDate({})
+  }
 
   const stableOnClose = useCallback(() => onClose(), [onClose])
 
@@ -152,46 +176,49 @@ function BlockFormModal({
     return () => window.removeEventListener("keydown", handleKey)
   }, [stableOnClose])
 
-  // Get selected court and its schedule for the selected date
-  const selectedCourt = courts.find((c) => c.id === courtId)
   const dayOfWeek = date ? new Date(date + "T00:00:00").getDay() : -1
-  const courtSchedule = selectedCourt?.court_schedules?.find(
-    (s) => s.day_of_week === dayOfWeek && !s.is_closed
-  )
-  const timeSlots = courtSchedule
-    ? generateTimeSlots(courtSchedule.open_time, courtSchedule.close_time)
-    : []
 
-  // Fetch existing reservations for selected court + date (to show as unavailable)
-  const { data: existingReservations = [], isLoading: loadingReservations } = useQuery<{ start_time: string; end_time: string }[]>({
-    queryKey: ["admin-block-reservations", courtId, date],
+  // Open hours (as hour-label slots) for one court on the active date.
+  function courtSlots(c: Court): string[] {
+    const sched = c.court_schedules?.find((s) => s.day_of_week === dayOfWeek && !s.is_closed)
+    return sched ? generateTimeSlots(sched.open_time, sched.close_time) : []
+  }
+
+  // Expand a start/end time into hour-label slots (handles overnight ranges).
+  function hoursToLabels(start: string, end: string): string[] {
+    const startH = parseInt(start.split(":")[0], 10)
+    let endH = parseInt(end.split(":")[0], 10)
+    if (endH === 0) endH = 24
+    if (endH <= startH) endH += 24
+    const out: string[] = []
+    for (let h = startH; h < endH; h++) out.push(`${hourTo12(h)} – ${hourTo12(h + 1)}`)
+    return out
+  }
+
+  // Fetch reservations for ALL courts on the active date (slots mode only).
+  const { data: reservationsByDate = [], isLoading: loadingReservations } = useQuery<{ court_id: string | null; start_time: string; end_time: string }[]>({
+    queryKey: ["admin-block-reservations", date],
     queryFn: async () => {
-      if (!courtId || !date) return []
-      const res = await fetch(`/api/reservations?court_id=${courtId}&date=${date}&fields=start_time,end_time,status&limit=100`)
+      if (!date) return []
+      const res = await fetch(`/api/reservations?date=${date}&fields=start_time,end_time,status&limit=500`)
       if (!res.ok) return []
       const json = await res.json()
-      // Admin response returns booking objects with nested booking_items; flatten them.
-      // Bookings can span multiple courts/dates and the endpoint returns ALL their
-      // items, so keep only items for THIS court on THIS date — otherwise other
-      // courts' bookings get shown as "booked" here and can't be blocked.
-      const rows: { start_time?: string; end_time?: string; status?: string; booking_items?: { court_id?: string; booking_date?: string; start_time: string; end_time: string }[] }[] = json.data || []
-      const flat: { start_time: string; end_time: string; status: string }[] = []
+      // Admin response returns booking objects with nested booking_items; flatten
+      // them, keeping each item's court so we can map availability per court.
+      const rows: { status?: string; booking_items?: { court_id?: string; booking_date?: string; start_time: string; end_time: string }[] }[] = json.data || []
+      const flat: { court_id: string | null; start_time: string; end_time: string; status: string }[] = []
       for (const r of rows) {
-        if (Array.isArray(r.booking_items)) {
-          for (const item of r.booking_items) {
-            if (item.court_id && item.court_id !== courtId) continue
-            if (item.booking_date && item.booking_date !== date) continue
-            if (item.start_time && item.end_time) {
-              flat.push({ start_time: item.start_time, end_time: item.end_time, status: r.status ?? "confirmed" })
-            }
+        if (!Array.isArray(r.booking_items)) continue
+        for (const item of r.booking_items) {
+          if (item.booking_date && item.booking_date !== date) continue
+          if (item.start_time && item.end_time) {
+            flat.push({ court_id: item.court_id ?? null, start_time: item.start_time, end_time: item.end_time, status: r.status ?? "confirmed" })
           }
-        } else if (r.start_time && r.end_time) {
-          flat.push({ start_time: r.start_time, end_time: r.end_time, status: r.status ?? "confirmed" })
         }
       }
-      return flat.filter(r => r.status !== "cancelled")
+      return flat.filter((r) => r.status !== "cancelled")
     },
-    enabled: !!courtId && !!date && blockType === "slots",
+    enabled: !!date && blockType === "slots",
     staleTime: 60_000,
   })
 
@@ -200,98 +227,88 @@ function BlockFormModal({
     date ? { date } : undefined
   )
 
-  const slotsLoading = (loadingReservations && !!courtId && !!date && blockType === "slots") || loadingBlocks
+  const slotsLoading = (loadingReservations && !!date && blockType === "slots") || loadingBlocks
 
-  // Check if there's a full-day block for this date (matching court or all-courts)
-  const fullDayBlock = useMemo(() => {
-    return existingBlocks.find(
-      (b) =>
-        !b.start_time &&
-        !b.end_time &&
-        (b.court_id === null || b.court_id === courtId)
-    )
-  }, [existingBlocks, courtId])
-
-  // Map already-blocked hours from existing blocked slots
-  const alreadyBlockedSlots = useMemo(() => {
-    const blocked = new Set<string>()
+  // Per-court availability for the active date: which hours are booked vs
+  // already blocked, plus whether the whole day is blocked. A court_id:null
+  // existing block affects every court.
+  const courtAvail = useMemo(() => {
+    const map = new Map<string, { booked: Set<string>; blocked: Set<string>; fullDay: boolean }>()
+    for (const c of courts) map.set(c.id, { booked: new Set(), blocked: new Set(), fullDay: false })
+    for (const r of reservationsByDate) {
+      if (!r.court_id || !r.start_time || !r.end_time) continue
+      const entry = map.get(r.court_id)
+      if (entry) hoursToLabels(r.start_time, r.end_time).forEach((l) => entry.booked.add(l))
+    }
     for (const b of existingBlocks) {
-      // Skip full-day blocks (handled separately) and blocks for other courts
-      if (!b.start_time || !b.end_time) continue
-      if (b.court_id !== null && b.court_id !== courtId) continue
-
-      const startH = parseInt(b.start_time.split(":")[0], 10)
-      let endH = parseInt(b.end_time.split(":")[0], 10)
-      if (endH <= startH) endH += 24
-      for (let h = startH; h < endH; h++) {
-        blocked.add(`${hourTo12(h)} – ${hourTo12(h + 1)}`)
+      const targets = b.court_id === null ? courts.map((c) => c.id) : (map.has(b.court_id) ? [b.court_id] : [])
+      if (!b.start_time || !b.end_time) {
+        for (const t of targets) map.get(t)!.fullDay = true
+      } else {
+        const labels = hoursToLabels(b.start_time, b.end_time)
+        for (const t of targets) labels.forEach((l) => map.get(t)!.blocked.add(l))
       }
     }
-    return blocked
-  }, [existingBlocks, courtId])
+    return map
+  }, [courts, reservationsByDate, existingBlocks])
 
-  // Map booked hours from existing reservations
-  const bookedSlots = useMemo(() => {
-    const booked = new Set<string>()
-    const toHour = (t: string) => {
-      const [h] = t.split(":").map(Number)
-      return h === 0 ? 24 : h
-    }
-    for (const r of existingReservations) {
-      if (!r.start_time || !r.end_time) continue
-      const startH = parseInt(r.start_time.split(":")[0], 10)
-      let endH = toHour(r.end_time)
-      if (endH <= startH) endH += 24
-      for (let h = startH; h < endH; h++) {
-        booked.add(`${hourTo12(h)} – ${hourTo12(h + 1)}`)
-      }
-    }
-    return booked
-  }, [existingReservations])
+  // Grid rows = union of open hours across the selected courts, sorted by hour.
+  const timeSlots = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of effectiveCourts) courtSlots(c).forEach((s) => set.add(s))
+    return [...set].sort((a, b) => parse12Hour(a) - parse12Hour(b))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveCourts, dayOfWeek])
 
-  // Reset selected slots when court or date changes
-  useEffect(() => {
-    setSelectedSlots([])
-  }, [courtId, date])
+  // Effective courts that are fully blocked on the active date.
+  const fullDayCourts = effectiveCourts.filter((c) => courtAvail.get(c.id)?.fullDay)
+
+  // A slot is blockable only if it is open AND free on EVERY selected court.
+  // Returns the reason it isn't ("closed" | "booked" | "blocked") or "open".
+  function slotStatus(slot: string): "open" | "closed" | "booked" | "blocked" {
+    if (effectiveCourts.length === 0) return "closed"
+    for (const c of effectiveCourts) {
+      if (!courtSlots(c).includes(slot)) return "closed"
+    }
+    for (const c of effectiveCourts) {
+      const av = courtAvail.get(c.id)
+      if (av?.fullDay || av?.blocked.has(slot)) return "blocked"
+    }
+    for (const c of effectiveCourts) {
+      if (courtAvail.get(c.id)?.booked.has(slot)) return "booked"
+    }
+    return "open"
+  }
+
+  // Note: switching the active date does NOT clear selections — each date keeps
+  // its own. Court-set changes clear them (handled in the court toggle handlers).
+
+  function setActiveSlots(next: string[]) {
+    setSlotsByDate((prev) => ({ ...prev, [date]: next }))
+  }
 
   function toggleSlot(slot: string) {
-    setSelectedSlots((prev) =>
-      prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]
+    setActiveSlots(
+      selectedSlots.includes(slot)
+        ? selectedSlots.filter((s) => s !== slot)
+        : [...selectedSlots, slot]
     )
   }
 
   function selectAllSlots() {
-    setSelectedSlots(timeSlots.filter((s) => !bookedSlots.has(s) && !alreadyBlockedSlots.has(s)))
+    setActiveSlots(timeSlots.filter((s) => slotStatus(s) === "open"))
   }
 
   function clearAllSlots() {
-    setSelectedSlots([])
+    setActiveSlots([])
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (blockType === "day") {
-      onSave(
-        sortedDates.map((d) => ({
-          court_id: courtId || null,
-          blocked_date: d,
-          start_time: null,
-          end_time: null,
-          reason: reason.trim(),
-        }))
-      )
-      return
-    }
-
-    if (selectedSlots.length === 0) return
-
-    // Existing contiguous-range grouping (unchanged):
-    const sorted = [...selectedSlots].sort((a, b) => parse12Hour(a) - parse12Hour(b))
+  // Group a date's selected hour-slots into contiguous ranges.
+  function computeRanges(slots: string[]): { start: number; end: number }[] {
+    const sorted = [...slots].sort((a, b) => parse12Hour(a) - parse12Hour(b))
     const ranges: { start: number; end: number }[] = []
     let currentStart = parse12Hour(sorted[0])
     let currentEnd = currentStart + 1
-
     for (let i = 1; i < sorted.length; i++) {
       const hour = parse12Hour(sorted[i])
       if (hour === currentEnd) {
@@ -303,21 +320,71 @@ function BlockFormModal({
       }
     }
     ranges.push({ start: currentStart, end: currentEnd })
-
-    const rows = sortedDates.flatMap((d) =>
-      ranges.map((r) => ({
-        court_id: courtId || null,
-        blocked_date: d,
-        start_time: `${String(r.start % 24).padStart(2, "0")}:00:00`,
-        end_time: `${String(r.end % 24).padStart(2, "0")}:00:00`,
-        reason: reason.trim(),
-      }))
-    )
-
-    onSave(rows)
+    return ranges
   }
 
-  const canSubmit = dates.length > 0 && (blockType === "day" || selectedSlots.length > 0)
+  // Court targets for the rows: "All Courts" collapses to a single null-court
+  // row (covers every court incl. future ones); otherwise one row per court.
+  const courtTargets: (string | null)[] = allCourts ? [null] : courtIds
+
+  // Build the rows to persist + a human-readable summary, from current state.
+  // For "day" mode every selected date is a full-day block. For "slots" mode
+  // each date uses its OWN selection; dates with no slots are skipped. Both
+  // fan out across every selected court.
+  function buildBlocks() {
+    if (blockType === "day") {
+      const rows = sortedDates.flatMap((d) =>
+        courtTargets.map((court_id) => ({
+          court_id,
+          blocked_date: d,
+          start_time: null as string | null,
+          end_time: null as string | null,
+          reason: reason.trim(),
+        }))
+      )
+      const summary = sortedDates.map((d) => ({ date: d, ranges: null as { start: number; end: number }[] | null }))
+      return { rows, summary }
+    }
+
+    const rows: Array<{ court_id: string | null; blocked_date: string; start_time: string | null; end_time: string | null; reason: string }> = []
+    const summary: Array<{ date: string; ranges: { start: number; end: number }[] | null }> = []
+    for (const d of sortedDates) {
+      const slots = slotsByDate[d] ?? []
+      if (slots.length === 0) continue
+      const ranges = computeRanges(slots)
+      summary.push({ date: d, ranges })
+      for (const r of ranges) {
+        for (const court_id of courtTargets) {
+          rows.push({
+            court_id,
+            blocked_date: d,
+            start_time: `${String(r.start % 24).padStart(2, "0")}:00:00`,
+            end_time: `${String(r.end % 24).padStart(2, "0")}:00:00`,
+            reason: reason.trim(),
+          })
+        }
+      }
+    }
+    return { rows, summary }
+  }
+
+  // Slots-mode validity: at least one date must have at least one slot picked.
+  const hasAnySlots = sortedDates.some((d) => (slotsByDate[d]?.length ?? 0) > 0)
+  const hasCourt = allCourts || courtIds.length > 0
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!canSubmit) return
+    // Show a confirmation summary of exactly what will be blocked before saving.
+    setConfirming(true)
+  }
+
+  function confirmAndSave() {
+    setConfirming(false)
+    onSave(buildBlocks().rows)
+  }
+
+  const canSubmit = dates.length > 0 && hasCourt && (blockType === "day" || hasAnySlots)
 
   return (
     <Portal>
@@ -375,36 +442,47 @@ function BlockFormModal({
               </div>
             </div>
 
-            {/* Court — optional for "day" mode, required for "slots" mode */}
+            {/* Courts — multi-select chips ("All Courts" or a subset) */}
             <div>
               <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-outline">
-                Court
-                {blockType === "day" && (
-                  <span className="normal-case tracking-normal text-on-surface-variant"> — optional</span>
-                )}
+                Courts
+                <span className="ml-1 normal-case tracking-normal text-on-surface-variant">
+                  — {allCourts ? "all courts" : `${courtIds.length} selected`}
+                </span>
               </label>
-              <Select value={courtId} onValueChange={(v) => setCourtId(v ?? "")}>
-                <SelectTrigger className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface">
-                  <SelectValue placeholder={blockType === "day" ? "All Courts" : "Select a court"}>
-                    {courtId
-                      ? (() => { const c = courts.find((c) => c.id === courtId); return c ? `${c.name} — ${c.court_type}` : courtId })()
-                      : (blockType === "day" ? "All Courts" : "Select a court")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {blockType === "day" && (
-                    <SelectItem value="">All Courts</SelectItem>
-                  )}
-                  {courts.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} — {c.court_type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {blockType === "day" && !courtId && (
-                <p className="mt-1 font-body text-[10px] text-on-surface-variant">
-                  Blocks all courts on this date
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllCourts}
+                  className={`rounded-full border px-3 py-1.5 font-body text-xs font-semibold transition-colors ${
+                    allCourts
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50"
+                  }`}
+                >
+                  All Courts
+                </button>
+                {courts.map((c) => {
+                  const active = !allCourts && courtIds.includes(c.id)
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleCourt(c.id)}
+                      className={`rounded-full border px-3 py-1.5 font-body text-xs font-medium transition-colors ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  )
+                })}
+              </div>
+              {!hasCourt && (
+                <p className="mt-1 font-body text-[10px] text-error">
+                  Select at least one court
                 </p>
               )}
             </div>
@@ -418,7 +496,7 @@ function BlockFormModal({
                 type="date"
                 required
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => e.target.value && addDate(e.target.value)}
                 className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
               />
               {/* Existing blocks info for selected date */}
@@ -431,10 +509,7 @@ function BlockFormModal({
                   </svg>
                   <div>
                     <p className="font-body text-[11px] font-semibold text-[#D97706]">
-                      {fullDayBlock
-                        ? `This date already has a full-day block${fullDayBlock.court_id === null ? " (all courts)" : ""}`
-                        : `${existingBlocks.filter((b) => b.court_id === null || b.court_id === courtId || !courtId).length} existing block(s) on this date`
-                      }
+                      {existingBlocks.length} existing block{existingBlocks.length === 1 ? "" : "s"} on this date
                     </p>
                   </div>
                 </div>
@@ -455,7 +530,8 @@ function BlockFormModal({
                     weekday: "short", month: "short", day: "numeric",
                   })
                   const isPreview = d === date
-                  const canRemove = true
+                  const canRemove = dates.length > 1
+                  const slotCount = blockType === "slots" ? (slotsByDate[d]?.length ?? 0) : 0
                   return (
                     <span
                       key={d}
@@ -471,6 +547,11 @@ function BlockFormModal({
                         className="font-semibold"
                       >
                         {label}
+                        {blockType === "slots" && (
+                          <span className={`ml-1 font-normal ${slotCount > 0 ? "" : "text-on-surface-variant/50"}`}>
+                            ({slotCount})
+                          </span>
+                        )}
                       </button>
                       {canRemove && (
                         <button
@@ -545,8 +626,8 @@ function BlockFormModal({
                   )}
                 </div>
 
-                {/* Full-day block warning */}
-                {fullDayBlock && (
+                {/* Full-day block warning — any selected court fully blocked */}
+                {fullDayCourts.length > 0 && (
                   <div className="flex gap-3 rounded-lg border border-error/30 bg-error/8 px-4 py-3 mb-2">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-error">
                       <circle cx="12" cy="12" r="10" />
@@ -554,13 +635,10 @@ function BlockFormModal({
                     </svg>
                     <div>
                       <p className="font-body text-xs font-semibold text-error">
-                        This date is fully blocked{fullDayBlock.court_id === null ? " (all courts)" : ""}
+                        {allCourts || fullDayCourts.length === effectiveCourts.length
+                          ? "This date is fully blocked"
+                          : `Fully blocked on ${fullDayCourts.map((c) => c.name).join(", ")}`}
                       </p>
-                      {fullDayBlock.reason && (
-                        <p className="font-body text-[11px] text-error/70 mt-0.5">
-                          Reason: {fullDayBlock.reason}
-                        </p>
-                      )}
                     </div>
                   </div>
                 )}
@@ -575,7 +653,7 @@ function BlockFormModal({
                       Loading slots...
                     </p>
                   </div>
-                ) : !courtSchedule ? (
+                ) : timeSlots.length === 0 ? (
                   <div className="flex flex-col items-center rounded-lg bg-surface-container-low py-8">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-outline/40 mb-2">
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -584,16 +662,18 @@ function BlockFormModal({
                       <line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
                     <p className="font-body text-xs text-on-surface-variant">
-                      Court is closed on this day
+                      {effectiveCourts.length === 0 ? "Select a court above" : "Selected court(s) are closed on this day"}
                     </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {timeSlots.map((slot) => {
                       const isSelected = selectedSlots.includes(slot)
-                      const isBooked = bookedSlots.has(slot)
-                      const isAlreadyBlocked = alreadyBlockedSlots.has(slot) || !!fullDayBlock
-                      const isDisabled = isBooked || isAlreadyBlocked
+                      const status = slotStatus(slot)
+                      const isDisabled = status !== "open"
+                      const isBlocked = status === "blocked"
+                      const isBooked = status === "booked"
+                      const isClosed = status === "closed"
                       return (
                         <button
                           key={slot}
@@ -601,20 +681,20 @@ function BlockFormModal({
                           disabled={isDisabled}
                           onClick={() => !isDisabled && toggleSlot(slot)}
                           className={`rounded-lg border py-2.5 px-2 text-center transition-all ${
-                            isAlreadyBlocked
+                            isBlocked
                               ? "cursor-not-allowed border-error/20 bg-error/5 opacity-60"
-                              : isBooked
+                              : isBooked || isClosed
                               ? "cursor-not-allowed border-outline-variant/10 bg-surface-container-low opacity-50"
                               : isSelected
                               ? "border-error bg-error/10 text-error"
                               : "border-outline-variant/20 text-on-surface-variant hover:border-error/40 hover:bg-error/5"
                           }`}
                         >
-                          <span className="block font-body text-[11px] font-bold" style={{ textDecoration: isBooked || isAlreadyBlocked ? "line-through" : "none" }}>{slot}</span>
+                          <span className="block font-body text-[11px] font-bold" style={{ textDecoration: isDisabled && !isClosed ? "line-through" : "none" }}>{slot}</span>
                           <span className={`block font-label text-[8px] font-extrabold uppercase tracking-widest mt-0.5 ${
-                            isAlreadyBlocked ? "text-error" : ""
+                            isBlocked ? "text-error" : ""
                           }`}>
-                            {isAlreadyBlocked ? "Already Blocked" : isBooked ? "Booked" : isSelected ? "Blocked" : ""}
+                            {isBlocked ? "Already Blocked" : isBooked ? "Booked" : isClosed ? "Closed" : isSelected ? "Blocked" : ""}
                           </span>
                         </button>
                       )
@@ -654,16 +734,82 @@ function BlockFormModal({
               disabled={saving || !canSubmit}
               className="rounded-lg bg-error px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
             >
-              {saving
-                ? "Saving..."
-                : sortedDates.length > 1
-                  ? `Block ${sortedDates.length} Dates`
-                  : "Block Slots"
-              }
+              {saving ? "Saving..." : "Review & Block"}
             </button>
           </div>
         </form>
       </div>
+
+      {/* Confirmation summary — review exactly what will be blocked before saving */}
+      {confirming && (() => {
+        const { summary } = buildBlocks()
+        const courtLabel = allCourts
+          ? "All Courts"
+          : courts.filter((c) => courtIds.includes(c.id)).map((c) => c.name).join(", ")
+        return (
+          <>
+            <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm" onClick={() => setConfirming(false)} />
+            <div className="fixed inset-0 z-[121] flex items-center justify-center p-4" onClick={() => setConfirming(false)}>
+              <div
+                className="w-full max-w-md max-h-[85vh] flex flex-col rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="border-b border-outline-variant/15 px-6 py-5 shrink-0">
+                  <h3 className="font-headline text-lg font-bold text-on-surface">Confirm Block</h3>
+                  <p className="mt-1 font-body text-xs text-on-surface-variant">
+                    Review what will be blocked for <span className="font-semibold text-on-surface">{courtLabel}</span> before confirming.
+                  </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2.5">
+                  {summary.map((s) => (
+                    <div key={s.date} className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-3.5 py-2.5">
+                      <p className="font-body text-sm font-semibold text-on-surface">{formatDate(s.date)}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {s.ranges === null ? (
+                          <span className="inline-flex rounded-md bg-error/10 px-2 py-0.5 font-body text-[11px] font-semibold text-error">
+                            Full day
+                          </span>
+                        ) : (
+                          s.ranges.map((r, i) => (
+                            <span key={i} className="inline-flex rounded-md bg-error/10 px-2 py-0.5 font-body text-[11px] font-semibold text-error">
+                              {hourTo12(r.start)} – {hourTo12(r.end)}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {reason.trim() && (
+                    <p className="pt-1 font-body text-xs text-on-surface-variant">
+                      Reason: <span className="text-on-surface">{reason.trim()}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-outline-variant/15 px-6 py-4 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(false)}
+                    disabled={saving}
+                    className="rounded-lg border border-outline-variant/30 bg-transparent px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-surface-variant transition-colors hover:bg-surface-container"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmAndSave}
+                    disabled={saving}
+                    className="rounded-lg bg-error px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-[0.1em] text-on-error transition-colors hover:bg-error/90 disabled:opacity-60"
+                  >
+                    {saving ? "Saving..." : `Confirm & Block ${summary.length} ${summary.length === 1 ? "Date" : "Dates"}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </Portal>
   )
 }
