@@ -549,8 +549,10 @@ function EntryFormModal({
                           value={amount}
                           onChange={(e) => {
                             setAmount(e.target.value)
-                            // Empty field resumes auto-fill from the computed total.
-                            setAmountEdited(e.target.value.trim() !== "")
+                            // Once the admin touches the field, stop auto-filling so they
+                            // can clear it and type a custom amount without it snapping back.
+                            // An empty field falls back to the computed total at submit time.
+                            setAmountEdited(true)
                           }}
                           placeholder="0.00"
                           className="h-[42px] w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest pl-7 pr-3 font-body text-sm text-on-surface outline-none transition-colors focus:border-primary"
