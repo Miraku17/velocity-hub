@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createPublicClient } from "@/lib/supabase/public"
 
 /**
  * GET /api/calendar-availability?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&court_id=UUID
@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server"
  * Response: { [date: string]: { total: number, booked: number, available: number } }
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createPublicClient()
   const params = request.nextUrl.searchParams
 
   const dateFrom = params.get("date_from")
