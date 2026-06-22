@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Calendar } from "@/components/ui/calendar";
-import { useGridAvailability } from "@/lib/hooks/useGridAvailability";
+import { useGridAvailability, usePrefetchAdjacentDays } from "@/lib/hooks/useGridAvailability";
 import { useQuery } from "@tanstack/react-query";
 import { formatLocalDate, hour24ToLabel, formatCurrency, getHourRate, colors } from "@/app/booking/utils";
 import type { GridAvailabilityResponse, SlotStatus } from "@/app/api/grid-availability/route";
@@ -35,6 +35,7 @@ export default function SchedulesPage() {
   const dateStr = useMemo(() => formatLocalDate(selectedDate), [selectedDate]);
 
   const { data: gridData, isLoading, isFetching } = useGridAvailability(dateStr);
+  usePrefetchAdjacentDays(dateStr);
 
   // Calendar availability for dot indicators
   const todayStr = useMemo(() => formatLocalDate(today), [today]);

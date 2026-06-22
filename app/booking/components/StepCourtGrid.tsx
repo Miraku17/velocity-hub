@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
-import { useGridAvailability } from "@/lib/hooks/useGridAvailability";
+import { useGridAvailability, usePrefetchAdjacentDays } from "@/lib/hooks/useGridAvailability";
 import { useBookingCart } from "@/lib/stores/bookingCartStore";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -55,6 +55,7 @@ export function StepCourtGrid({ onNext, onBack }: StepCourtGridProps) {
 
   // Fetch grid availability for the selected date
   const { data: gridData, isLoading, isFetching } = useGridAvailability(dateStr);
+  usePrefetchAdjacentDays(dateStr);
 
   // Refetch availability data on mount to pick up any bookings made in prior steps
   useEffect(() => {
