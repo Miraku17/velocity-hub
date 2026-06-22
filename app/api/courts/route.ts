@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createPublicClient } from "@/lib/supabase/public"
 import {
   getAuthenticatedUser,
   checkPermission,
@@ -9,7 +10,7 @@ import {
 
 // GET /api/courts — list all courts with schedules (public)
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createPublicClient()
 
   const type = request.nextUrl.searchParams.get("type")
   const status = request.nextUrl.searchParams.get("status")
@@ -30,7 +31,11 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 
-  return Response.json(data)
+  // Courts + schedules change rarely (admin edits only), so cache aggressively
+  // at the edge. Cookieless client (above) keeps this CDN-cacheable.
+  return Response.json(data, {
+    headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+  })
 }
 
 // POST /api/courts — create a court with schedules (requires courts.create permission)
