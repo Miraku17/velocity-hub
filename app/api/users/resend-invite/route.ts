@@ -30,7 +30,11 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+  // The user already exists (they were invited previously), so
+  // admin.inviteUserByEmail() fails with "email already registered".
+  // Send a recovery link instead — it works for existing, not-yet-activated
+  // users and lands on the same /auth/set-password page.
+  const { error } = await admin.auth.resetPasswordForEmail(email, {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/callback?next=/auth/set-password`,
   })
 
