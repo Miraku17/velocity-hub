@@ -7,7 +7,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { BookingFooter } from "./BookingFooter";
 import { LoadingPage } from "@/components/ui/loading";
-import { useCourts } from "@/lib/hooks/useCourts";
 import { useBookingCart } from "@/lib/stores/bookingCartStore";
 import { colors, ease, STEPS } from "./utils";
 import { StepCustomerDetails } from "./components/StepCustomerDetails";
@@ -23,7 +22,6 @@ export default function BookingPageWrapper() {
 }
 
 function BookingPage() {
-  const { isLoading } = useCourts({ status: "available" });
   const { step, setStep: setCartStep, items, customer } = useBookingCart();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -213,47 +211,43 @@ function BookingPage() {
 
       {/* Form */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-6 sm:py-10">
-        {isLoading ? (
-          <LoadingPage message="Loading courts..." />
-        ) : (
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.div
-                key="s1"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.35, ease }}
-              >
-                <StepCustomerDetails onNext={() => setStep(2)} />
-              </motion.div>
-            )}
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div
+              key="s1"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.35, ease }}
+            >
+              <StepCustomerDetails onNext={() => setStep(2)} />
+            </motion.div>
+          )}
 
-            {step === 2 && (
-              <motion.div
-                key="s2"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.35, ease }}
-              >
-                <StepCourtGrid onNext={() => setStep(3)} onBack={() => setStep(1)} />
-              </motion.div>
-            )}
+          {step === 2 && (
+            <motion.div
+              key="s2"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.35, ease }}
+            >
+              <StepCourtGrid onNext={() => setStep(3)} onBack={() => setStep(1)} />
+            </motion.div>
+          )}
 
-            {step === 3 && (
-              <motion.div
-                key="s3"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.35, ease }}
-              >
-                <StepReviewConfirm onBack={() => setStep(2)} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
+          {step === 3 && (
+            <motion.div
+              key="s3"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.35, ease }}
+            >
+              <StepReviewConfirm onBack={() => setStep(2)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Footer */}
