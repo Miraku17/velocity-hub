@@ -283,6 +283,113 @@ function DeleteConfirmModal({
   )
 }
 
+/* ── Resend Invite Confirm Modal ── */
+
+function ResendInviteModal({
+  open,
+  onClose,
+  user,
+}: {
+  open: boolean
+  onClose: () => void
+  user: UserProfile
+}) {
+  const resend = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/users/resend-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to resend invite")
+      return data
+    },
+  })
+
+  useEffect(() => {
+    if (open) resend.reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !resend.isPending) onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open, resend.isPending, onClose])
+
+  if (!open) return null
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !resend.isPending && onClose()} />
+        <div className="relative z-10 w-full max-w-sm rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl">
+          {resend.isSuccess ? (
+            <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-headline text-base font-semibold text-on-surface">Invite Resent!</p>
+                <p className="mt-1 font-body text-xs text-on-surface-variant">
+                  <span className="font-medium text-on-surface">{user.email}</span> will receive a new link to set up their account.
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="mt-2 rounded-lg bg-primary px-6 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="px-6 py-5">
+                <h3 className="font-headline text-base font-semibold text-on-surface">Resend Invite</h3>
+                <p className="mt-2 font-body text-sm text-on-surface-variant">
+                  Send a new account setup link to{" "}
+                  <span className="font-semibold text-on-surface">{user.full_name}</span>{" "}
+                  (<span className="text-on-surface">{user.email}</span>)?
+                </p>
+                {resend.isError && (
+                  <p className="mt-3 font-body text-xs text-error">
+                    {(resend.error as Error)?.message ?? "Something went wrong"}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-3 border-t border-outline-variant/15 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={resend.isPending}
+                  className="flex-1 rounded-lg border border-outline-variant/30 py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => resend.mutate()}
+                  disabled={resend.isPending}
+                  className="flex-1 rounded-lg bg-primary py-2.5 font-nav text-xs font-semibold uppercase tracking-wider text-on-primary transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {resend.isPending ? "Sending..." : "Resend Invite"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Portal>
+  )
+}
+
 /* ── User Actions Dropdown ── */
 
 function UserActions({
@@ -294,6 +401,7 @@ function UserActions({
 }) {
   const queryClient = useQueryClient()
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [resendOpen, setResendOpen] = useState(false)
 
   const isSelf = currentUserId === user.id
 
@@ -310,19 +418,6 @@ function UserActions({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] })
-    },
-  })
-
-  const resendInvite = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/users/resend-invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to resend invite")
-      return data
     },
   })
 
@@ -368,15 +463,12 @@ function UserActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
           {!user.last_sign_in && (
-            <DropdownMenuItem
-              disabled={resendInvite.isPending}
-              onClick={() => resendInvite.mutate()}
-            >
+            <DropdownMenuItem onClick={() => setResendOpen(true)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
-              {resendInvite.isPending ? "Sending..." : resendInvite.isSuccess ? "Invite Sent!" : "Resend Invite"}
+              Resend Invite
             </DropdownMenuItem>
           )}
           {user.last_sign_in && (
@@ -425,6 +517,12 @@ function UserActions({
         onConfirm={() => deleteUser.mutate()}
         userName={user.full_name}
         loading={deleteUser.isPending}
+      />
+
+      <ResendInviteModal
+        open={resendOpen}
+        onClose={() => setResendOpen(false)}
+        user={user}
       />
     </>
   )

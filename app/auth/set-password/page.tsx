@@ -47,7 +47,7 @@ export default function SetPasswordPage() {
       const refreshToken = params.get("refresh_token")
       const type = params.get("type")
 
-      if (type === "invite" && accessToken && refreshToken) {
+      if ((type === "invite" || type === "recovery") && accessToken && refreshToken) {
         supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
           .then(({ data: sessionData, error }) => {
             if (error || !sessionData.session) {
