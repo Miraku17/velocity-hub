@@ -179,32 +179,66 @@ function BookingPage() {
 
       {/* Booking Policy */}
       <div className="relative z-10 w-full" style={{ backgroundColor: bg }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-6 sm:py-8 flex items-start gap-4 sm:gap-5">
-          <div
-            className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full mt-0.5"
-            style={{ backgroundColor: "#ff4d4d18", border: "1px solid #ff4d4d40" }}
-          >
-            <span
-              className="material-symbols-outlined text-lg sm:text-xl"
-              style={{ color: "#ff6b6b", fontVariationSettings: "'FILL' 1" }}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-10 py-6 sm:py-8 space-y-5 sm:space-y-6">
+          <div className="flex items-start gap-4 sm:gap-5">
+            <div
+              className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full mt-0.5"
+              style={{ backgroundColor: "#ff4d4d18", border: "1px solid #ff4d4d40" }}
             >
-              warning
-            </span>
+              <span
+                className="material-symbols-outlined text-lg sm:text-xl"
+                style={{ color: "#ff6b6b", fontVariationSettings: "'FILL' 1" }}
+              >
+                warning
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p
+                className="font-['Clash_Display'] text-base sm:text-lg md:text-xl font-extrabold uppercase tracking-[0.2em] mb-1.5"
+                style={{ color: "#ff6b6b" }}
+              >
+                No Cancellation Policy
+              </p>
+              <p
+                className="font-[Poppins] text-sm sm:text-base md:text-lg leading-relaxed"
+                style={{ color: "#d3e9cb99" }}
+              >
+                Once confirmed, no cancellations or refunds. Can&apos;t make it? Find someone to take
+                your slot and settle payment directly.
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p
-              className="font-['Clash_Display'] text-base sm:text-lg md:text-xl font-extrabold uppercase tracking-[0.2em] mb-1.5"
-              style={{ color: "#ff6b6b" }}
+
+          <div className="h-px" style={{ backgroundColor: "#ff4d4d26" }} />
+
+          <div className="flex items-start gap-4 sm:gap-5">
+            <div
+              className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full mt-0.5"
+              style={{ backgroundColor: "#ff4d4d18", border: "1px solid #ff4d4d40" }}
             >
-              No Cancellation Policy
-            </p>
-            <p
-              className="font-[Poppins] text-sm sm:text-base md:text-lg leading-relaxed"
-              style={{ color: "#d3e9cb99" }}
-            >
-              Once confirmed, no cancellations or refunds. Can&apos;t make it? Find someone to take
-              your slot and settle payment directly.
-            </p>
+              <span
+                className="material-symbols-outlined text-lg sm:text-xl"
+                style={{ color: "#ff6b6b", fontVariationSettings: "'FILL' 1" }}
+              >
+                touch_app
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p
+                className="font-['Clash_Display'] text-base sm:text-lg md:text-xl font-extrabold uppercase tracking-[0.2em] mb-1.5"
+                style={{ color: "#ff6b6b" }}
+              >
+                Confirm Your Booking
+              </p>
+              <p
+                className="font-[Poppins] text-sm sm:text-base md:text-lg leading-relaxed"
+                style={{ color: "#d3e9cb99" }}
+              >
+                Paying is not enough. After you pay, upload your receipt and tap{" "}
+                <span className="font-semibold" style={{ color: "#ff6b6b" }}>Confirm Reservation</span>{" "}
+                on the last step — your slot is not reserved until you do.
+              </p>
+            </div>
           </div>
         </div>
       </div>

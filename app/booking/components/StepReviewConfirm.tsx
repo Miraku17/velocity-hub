@@ -291,6 +291,16 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
     />;
   }
 
+  // Step numbers for the action cards — the QR card is conditional, so the
+  // rest shift up when the venue has no payment QR configured.
+  const hasQr = paymentQrCodes.length > 0;
+  const stepNo = {
+    qr: 1,
+    receipt: hasQr ? 2 : 1,
+    waiver: hasQr ? 3 : 2,
+    confirm: hasQr ? 4 : 3,
+  };
+
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-8">
@@ -299,7 +309,13 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
           {/* Payment QR Codes */}
           {paymentQrCodes.length > 0 && (
             <div className="rounded-2xl bg-white p-5 sm:p-6 shadow-sm" style={{ border: `1px solid ${colors.bg}08` }}>
-              <h3 className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em] mb-4" style={{ color: `${colors.bg}60` }}>
+              <h3 className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em] mb-4 flex items-center gap-2" style={{ color: `${colors.bg}60` }}>
+                <span
+                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{ backgroundColor: colors.bg, color: colors.accent }}
+                >
+                  {stepNo.qr}
+                </span>
                 Scan to Pay
               </h3>
               {paymentQrCodes.length > 1 && (
@@ -337,6 +353,22 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                 {paymentQrCodes[selectedQrIndex]?.name}
                 <span className="block mt-1 text-[9px] font-normal" style={{ color: `${colors.bg}30` }}>Tap to enlarge</span>
               </p>
+              <div
+                className="mt-4 flex items-start gap-2.5 rounded-xl p-3"
+                style={{ backgroundColor: "#ff4d4d10", border: "1px solid #ff4d4d33" }}
+              >
+                <span
+                  className="material-symbols-outlined text-[18px] shrink-0"
+                  style={{ color: "#c92a2a", fontVariationSettings: "'FILL' 1" }}
+                >
+                  warning
+                </span>
+                <p className="font-[Poppins] text-[11px] leading-relaxed" style={{ color: "#c92a2a" }}>
+                  Paying is not enough. Your slot is <span className="font-bold">not reserved</span> until
+                  you finish step {stepNo.confirm} and tap{" "}
+                  <span className="font-bold uppercase">Confirm Reservation</span> below.
+                </p>
+              </div>
             </div>
           )}
 
@@ -371,7 +403,13 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
 
           {/* Receipt upload */}
           <div className="rounded-2xl bg-white p-5 sm:p-6 shadow-sm" style={{ border: `1px solid ${colors.bg}08` }}>
-            <h3 className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em] mb-1" style={{ color: `${colors.bg}60` }}>
+            <h3 className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em] mb-1 flex items-center gap-2" style={{ color: `${colors.bg}60` }}>
+              <span
+                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                style={{ backgroundColor: colors.bg, color: colors.accent }}
+              >
+                {stepNo.receipt}
+              </span>
               Upload Payment Receipt
             </h3>
             <p className="font-[Poppins] text-[11px] mb-4" style={{ color: `${colors.bg}40` }}>
@@ -419,8 +457,14 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
 
           {/* Waiver summary card */}
           <div className="rounded-2xl bg-white p-5 sm:p-6 shadow-sm" style={{ border: `1px solid ${colors.bg}08` }}>
-            <h3 className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em] mb-1" style={{ color: `${colors.bg}60` }}>
-              Waiver & Release of Liability
+            <h3 className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em] mb-1 flex items-center gap-2" style={{ color: `${colors.bg}60` }}>
+              <span
+                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                style={{ backgroundColor: colors.bg, color: colors.accent }}
+              >
+                {stepNo.waiver}
+              </span>
+              Waiver &amp; Release of Liability
             </h3>
             <p className="font-[Poppins] text-[11px] mb-4" style={{ color: `${colors.bg}40` }}>
               Read the full waiver and confirm you agree before booking.
@@ -474,6 +518,17 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
           <div className="rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden" style={{ backgroundColor: colors.bg }}>
             <div className="absolute inset-0 grain-overlay opacity-15 pointer-events-none" />
             <div className="relative z-10">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <span
+                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{ backgroundColor: colors.accent, color: colors.bg }}
+                >
+                  {stepNo.confirm}
+                </span>
+                <span className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: colors.accent }}>
+                  Confirm Reservation
+                </span>
+              </div>
               <span className="material-symbols-outlined text-3xl sm:text-4xl mb-3 sm:mb-4 block" style={{ color: colors.accent, fontVariationSettings: "'FILL' 1" }}>
                 sports_tennis
               </span>
