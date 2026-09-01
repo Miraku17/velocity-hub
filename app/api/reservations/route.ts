@@ -309,7 +309,6 @@ export async function POST(request: NextRequest) {
     end_time,
     reservation_type,
     notes,
-    turnstile_token,
     time_blocks,
     bookings,
   } = body as {
@@ -322,62 +321,14 @@ export async function POST(request: NextRequest) {
     end_time?: string
     reservation_type?: string
     notes?: string
-    turnstile_token?: string
     time_blocks?: { start_time: string; end_time: string }[]
     bookings?: { court_id: string; time_blocks: { start_time: string; end_time: string }[] }[]
   }
 
-  // Verify Cloudflare Turnstile token.
-  // DISABLED 2026-09-01: enforcing this rejected real customers at checkout
-  // ("Human verification is required") during peak booking hours. Re-enable by
-  // setting TURNSTILE_ENFORCE=true once the client reliably sends a token.
-  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
-  const enforceTurnstile = process.env.TURNSTILE_ENFORCE === "true"
-  if (turnstileSecret && enforceTurnstile) {
-    if (!turnstile_token) {
-      await logBlockedAttempt(request, ip, "turnstile_missing", {
-        customer_email: typeof customer_email === "string" ? customer_email : null,
-      })
-      return Response.json(
-        { error: "Human verification is required. Please complete the CAPTCHA." },
-        { status: 400 }
-      )
-    }
-
-    let turnstileSuccess = false
-    try {
-      const verifyRes = await fetch(
-        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            secret: turnstileSecret,
-            response: turnstile_token,
-            remoteip: ip,
-          }),
-        }
-      )
-
-      const verification = (await verifyRes.json()) as { success: boolean }
-      turnstileSuccess = verification.success
-    } catch {
-      return Response.json(
-        { error: "Unable to verify human check. Please try again." },
-        { status: 503 }
-      )
-    }
-
-    if (!turnstileSuccess) {
-      await logBlockedAttempt(request, ip, "turnstile_failed", {
-        customer_email: typeof customer_email === "string" ? customer_email : null,
-      })
-      return Response.json(
-        { error: "Human verification failed. Please try again." },
-        { status: 403 }
-      )
-    }
-  }
+  // Turnstile verification removed 2026-09-01: enforcing it rejected real
+  // customers at checkout ("Human verification is required") during peak
+  // booking hours. The client is not reliably attaching turnstile_token to the
+  // submit payload. Restore from git history (PR #63) once that is fixed.
 
   const isMultiCourt = Array.isArray(bookings) && bookings.length > 0
   const legacyBlocks = time_blocks && time_blocks.length > 0
