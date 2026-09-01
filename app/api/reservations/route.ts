@@ -219,6 +219,43 @@ export async function GET(request: NextRequest) {
   })
 }
 
+/**
+ * Record a rejected booking attempt with its origin, so automated traffic can be
+ * traced after the fact. Vercel runtime logs do not expose the client IP and age
+ * out quickly; this keeps a durable record in the database. Never throws.
+ */
+async function logBlockedAttempt(
+  request: NextRequest,
+  ip: string,
+  reason: string,
+  details: Record<string, unknown> = {}
+) {
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin")
+    await createAdminClient()
+      .from("audit_logs")
+      .insert({
+        actor_name: "Anonymous",
+        actor_role: "public",
+        action: "blocked",
+        table_name: "bookings",
+        description: `Blocked booking attempt (${reason}) from ${ip}`,
+        new_data: {
+          reason,
+          ip,
+          forwarded_for: request.headers.get("x-forwarded-for"),
+          user_agent: request.headers.get("user-agent"),
+          referer: request.headers.get("referer"),
+          vercel_region: request.headers.get("x-vercel-id"),
+          country: request.headers.get("x-vercel-ip-country"),
+          ...details,
+        },
+      })
+  } catch {
+    // Logging must never block the response.
+  }
+}
+
 // POST /api/reservations — create a booking (public, no auth required)
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -231,6 +268,7 @@ export async function POST(request: NextRequest) {
   })
 
   if (limited) {
+    await logBlockedAttempt(request, ip, "rate_limited")
     return Response.json(
       { error: "Too many booking attempts. Please try again later." },
       { status: 429, headers: { "Retry-After": String(retryAfter) } }
@@ -293,6 +331,9 @@ export async function POST(request: NextRequest) {
   const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
   if (turnstileSecret) {
     if (!turnstile_token) {
+      await logBlockedAttempt(request, ip, "turnstile_missing", {
+        customer_email: typeof customer_email === "string" ? customer_email : null,
+      })
       return Response.json(
         { error: "Human verification is required. Please complete the CAPTCHA." },
         { status: 400 }
@@ -324,6 +365,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!turnstileSuccess) {
+      await logBlockedAttempt(request, ip, "turnstile_failed", {
+        customer_email: typeof customer_email === "string" ? customer_email : null,
+      })
       return Response.json(
         { error: "Human verification failed. Please try again." },
         { status: 403 }
@@ -348,6 +392,9 @@ export async function POST(request: NextRequest) {
   // Reject RFC 2606 / 6761 reserved domains — these can never receive mail, so a
   // booking using one is automated traffic, not a customer.
   if (RESERVED_EMAIL_DOMAIN.test(customer_email.trim())) {
+    await logBlockedAttempt(request, ip, "reserved_email_domain", {
+      customer_email,
+    })
     return Response.json(
       { error: "Please use a real email address we can send your confirmation to." },
       { status: 400 }
