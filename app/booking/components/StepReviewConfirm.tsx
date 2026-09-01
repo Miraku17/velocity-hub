@@ -25,7 +25,8 @@ declare global {
           "expired-callback"?: () => void;
           "error-callback"?: () => void;
           theme?: "light" | "dark" | "auto";
-          size?: "normal" | "compact";
+          size?: "normal" | "compact" | "flexible";
+          appearance?: "always" | "execute" | "interaction-only";
         }
       ) => string;
       reset: (widgetId: string) => void;
@@ -190,7 +191,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
           "expired-callback": () => setTurnstileToken(null),
           "error-callback": () => setTurnstileToken(null),
           theme: "light",
-          size: "normal",
+          size: "flexible",
+          // Stay invisible unless Cloudflare actually needs the visitor to do
+          // something — most visitors pass silently, so the branded widget box
+          // never appears in the confirmation modal.
+          appearance: "interaction-only",
         }
       );
     };
@@ -229,10 +234,10 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
   async function handleConfirmBooking() {
     if (items.length === 0) return;
 
-    // if (TURNSTILE_SITE_KEY && !turnstileToken) {
-    //   toast.error("Please complete the human verification before confirming.");
-    //   return;
-    // }
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      toast.error("Please complete the human verification before confirming.");
+      return;
+    }
 
     // Snapshot cart data now, before any async work or clearCart()
     setConfirmedGroups(groups);
@@ -841,10 +846,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.25, ease }}
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none"
+              className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4"
+              onClick={() => !createReservation.isPending && setShowConfirmModal(false)}
             >
               <div
-                className="relative w-full max-w-md rounded-2xl bg-white p-6 sm:p-8 shadow-2xl pointer-events-auto"
+                className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white p-5 sm:p-8 shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
                 style={{ border: `1px solid ${colors.bg}08` }}
               >
@@ -918,11 +924,11 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                   </div>
                 )}
 
-                {/* {TURNSTILE_SITE_KEY && (
-                  <div className="flex justify-center mb-4">
-                    <div ref={turnstileContainerRef} />
+                {TURNSTILE_SITE_KEY && (
+                  <div className="w-full [&:not(:has(iframe))]:hidden mb-4">
+                    <div ref={turnstileContainerRef} className="w-full" />
                   </div>
-                )} */}
+                )}
 
                 <div className="flex gap-3">
                   {createReservation.isPending ? (
@@ -947,8 +953,8 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                       </button>
                       <button
                         onClick={handleConfirmBooking}
-                        disabled={false}
-                        className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60"
+                        disabled={!!TURNSTILE_SITE_KEY && !turnstileToken}
+                        className="flex-1 py-3 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                         style={{ backgroundColor: colors.bg, color: "white" }}
                       >
                         Confirm
@@ -956,6 +962,13 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                     </>
                   )}
                 </div>
+
+                {TURNSTILE_SITE_KEY && !turnstileToken && !createReservation.isPending && (
+                  <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.bg}55` }}>
+                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                    Verifying you&apos;re human&hellip;
+                  </p>
+                )}
               </div>
             </motion.div>
           </>
