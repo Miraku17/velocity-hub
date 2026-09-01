@@ -23,6 +23,10 @@ function shiftDate(dateStr: string, days: number): string {
 // Overnight-slot cutoff: items with start_time before 06:00 are treated as next-day
 const NEXT_DAY_CUTOFF = "06:00:00"
 
+// Reserved TLDs and example domains (RFC 2606 / RFC 6761) — never deliverable.
+const RESERVED_EMAIL_DOMAIN =
+  /@(?:[\w.-]+\.)?(?:invalid|test|example|localhost)$|@example\.(?:com|net|org)$/i
+
 /**
  * Given a target display date, return booking IDs whose items actually fall on
  * that date because of overnight (next-day) slots stored under the previous
@@ -285,47 +289,47 @@ export async function POST(request: NextRequest) {
     bookings?: { court_id: string; time_blocks: { start_time: string; end_time: string }[] }[]
   }
 
-  // // Verify Cloudflare Turnstile token (temporarily disabled)
-  // const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
-  // if (turnstileSecret) {
-  //   if (!turnstile_token) {
-  //     return Response.json(
-  //       { error: "Human verification is required. Please complete the CAPTCHA." },
-  //       { status: 400 }
-  //     )
-  //   }
+  // Verify Cloudflare Turnstile token
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
+  if (turnstileSecret) {
+    if (!turnstile_token) {
+      return Response.json(
+        { error: "Human verification is required. Please complete the CAPTCHA." },
+        { status: 400 }
+      )
+    }
 
-  //   let turnstileSuccess = false
-  //   try {
-  //     const verifyRes = await fetch(
-  //       "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-  //       {
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  //         body: new URLSearchParams({
-  //           secret: turnstileSecret,
-  //           response: turnstile_token,
-  //           remoteip: ip,
-  //         }),
-  //       }
-  //     )
+    let turnstileSuccess = false
+    try {
+      const verifyRes = await fetch(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            secret: turnstileSecret,
+            response: turnstile_token,
+            remoteip: ip,
+          }),
+        }
+      )
 
-  //     const verification = (await verifyRes.json()) as { success: boolean }
-  //     turnstileSuccess = verification.success
-  //   } catch {
-  //     return Response.json(
-  //       { error: "Unable to verify human check. Please try again." },
-  //       { status: 503 }
-  //     )
-  //   }
+      const verification = (await verifyRes.json()) as { success: boolean }
+      turnstileSuccess = verification.success
+    } catch {
+      return Response.json(
+        { error: "Unable to verify human check. Please try again." },
+        { status: 503 }
+      )
+    }
 
-  //   if (!turnstileSuccess) {
-  //     return Response.json(
-  //       { error: "Human verification failed. Please try again." },
-  //       { status: 403 }
-  //     )
-  //   }
-  // }
+    if (!turnstileSuccess) {
+      return Response.json(
+        { error: "Human verification failed. Please try again." },
+        { status: 403 }
+      )
+    }
+  }
 
   const isMultiCourt = Array.isArray(bookings) && bookings.length > 0
   const legacyBlocks = time_blocks && time_blocks.length > 0
@@ -337,6 +341,15 @@ export async function POST(request: NextRequest) {
   if (!customer_name || !customer_email || !customer_phone || !date) {
     return Response.json(
       { error: "customer_name, customer_email, customer_phone, and date are required" },
+      { status: 400 }
+    )
+  }
+
+  // Reject RFC 2606 / 6761 reserved domains — these can never receive mail, so a
+  // booking using one is automated traffic, not a customer.
+  if (RESERVED_EMAIL_DOMAIN.test(customer_email.trim())) {
+    return Response.json(
+      { error: "Please use a real email address we can send your confirmation to." },
       { status: 400 }
     )
   }
