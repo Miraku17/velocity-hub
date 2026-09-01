@@ -327,9 +327,13 @@ export async function POST(request: NextRequest) {
     bookings?: { court_id: string; time_blocks: { start_time: string; end_time: string }[] }[]
   }
 
-  // Verify Cloudflare Turnstile token
+  // Verify Cloudflare Turnstile token.
+  // DISABLED 2026-09-01: enforcing this rejected real customers at checkout
+  // ("Human verification is required") during peak booking hours. Re-enable by
+  // setting TURNSTILE_ENFORCE=true once the client reliably sends a token.
   const turnstileSecret = process.env.TURNSTILE_SECRET_KEY
-  if (turnstileSecret) {
+  const enforceTurnstile = process.env.TURNSTILE_ENFORCE === "true"
+  if (turnstileSecret && enforceTurnstile) {
     if (!turnstile_token) {
       await logBlockedAttempt(request, ip, "turnstile_missing", {
         customer_email: typeof customer_email === "string" ? customer_email : null,
