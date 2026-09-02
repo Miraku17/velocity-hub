@@ -168,28 +168,60 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
 
   // Turnstile
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileStalled, setTurnstileStalled] = useState(false);
+  const [turnstileAttempt, setTurnstileAttempt] = useState(0);
   const turnstileWidgetId = useRef<string | null>(null);
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
-  // Render Turnstile widget when confirmation modal opens
+  // Render Turnstile widget when confirmation modal opens.
+  //
+  // Both the script and the container can arrive late — the script is loaded
+  // async in the root layout, and the container mounts with the modal's enter
+  // animation. Poll for both instead of trying once, or the widget silently
+  // never renders and the visitor is stuck behind a disabled Confirm button
+  // until they reload the page.
   useEffect(() => {
     if (!showConfirmModal || !TURNSTILE_SITE_KEY) return;
     setTurnstileToken(null);
+    setTurnstileStalled(false);
 
-    const renderWidget = () => {
-      if (!window.turnstile || !turnstileContainerRef.current) return;
+    let cancelled = false;
+
+    const cleanupWidget = () => {
       if (turnstileWidgetId.current) {
-        try { window.turnstile.remove(turnstileWidgetId.current); } catch {}
+        try { window.turnstile?.remove(turnstileWidgetId.current); } catch {}
         turnstileWidgetId.current = null;
       }
+    };
+
+    const tryRender = (): boolean => {
+      if (cancelled) return true;
+      if (!window.turnstile || !turnstileContainerRef.current) return false;
+
+      cleanupWidget();
       turnstileWidgetId.current = window.turnstile.render(
         turnstileContainerRef.current,
         {
           sitekey: TURNSTILE_SITE_KEY,
-          callback: (token: string) => setTurnstileToken(token),
-          "expired-callback": () => setTurnstileToken(null),
-          "error-callback": () => setTurnstileToken(null),
+          callback: (token: string) => {
+            if (cancelled) return;
+            setTurnstileStalled(false);
+            setTurnstileToken(token);
+          },
+          // Tokens expire after a few minutes. Ask for a fresh one rather than
+          // leaving Confirm disabled with no way back.
+          "expired-callback": () => {
+            if (cancelled) return;
+            setTurnstileToken(null);
+            const id = turnstileWidgetId.current;
+            if (id) { try { window.turnstile?.reset(id); } catch { setTurnstileStalled(true); } }
+          },
+          "error-callback": () => {
+            if (cancelled) return;
+            setTurnstileToken(null);
+            setTurnstileStalled(true);
+          },
           theme: "light",
           size: "flexible",
           // Stay invisible unless Cloudflare actually needs the visitor to do
@@ -198,21 +230,27 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
           appearance: "interaction-only",
         }
       );
+      return true;
     };
 
-    if (window.turnstile) {
-      const t = setTimeout(renderWidget, 100);
-      return () => clearTimeout(t);
-    } else {
-      const interval = setInterval(() => {
-        if (window.turnstile) {
-          clearInterval(interval);
-          renderWidget();
-        }
-      }, 200);
-      return () => clearInterval(interval);
+    if (tryRender()) {
+      return () => { cancelled = true; cleanupWidget(); };
     }
-  }, [showConfirmModal, TURNSTILE_SITE_KEY]);
+
+    const interval = setInterval(() => { if (tryRender()) clearInterval(interval); }, 150);
+    // If it never comes up, stop spinning and offer a retry.
+    const giveUp = setTimeout(() => {
+      clearInterval(interval);
+      if (!cancelled) setTurnstileStalled(true);
+    }, 15000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      clearTimeout(giveUp);
+      cleanupWidget();
+    };
+  }, [showConfirmModal, TURNSTILE_SITE_KEY, turnstileAttempt]);
 
   async function handleReceiptUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -925,7 +963,7 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                 )}
 
                 {TURNSTILE_SITE_KEY && (
-                  <div className="w-full [&:not(:has(iframe))]:hidden mb-4">
+                  <div className="w-full">
                     <div ref={turnstileContainerRef} className="w-full" />
                   </div>
                 )}
@@ -964,10 +1002,26 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
                 </div>
 
                 {TURNSTILE_SITE_KEY && !turnstileToken && !createReservation.isPending && (
-                  <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.bg}55` }}>
-                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-                    Verifying you&apos;re human&hellip;
-                  </p>
+                  turnstileStalled ? (
+                    <div className="mt-3 flex flex-col items-center gap-1.5">
+                      <p className="font-[Poppins] text-[11px] text-center" style={{ color: `${colors.bg}70` }}>
+                        Human verification didn&apos;t load.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setTurnstileAttempt((n) => n + 1)}
+                        className="font-[Poppins] text-[11px] font-semibold underline underline-offset-2"
+                        style={{ color: colors.bg }}
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.bg}55` }}>
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                      Verifying you&apos;re human&hellip;
+                    </p>
+                  )
                 )}
               </div>
             </motion.div>
