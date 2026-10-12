@@ -136,6 +136,21 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
   const [confirmedTotal, setConfirmedTotal] = useState(0);
   const [confirmedDate, setConfirmedDate] = useState("");
 
+  // Floating "Confirm Your Booking" reminder (phones only) — visible while the
+  // confirm card is still below the viewport, hidden once it scrolls into view.
+  const confirmCardRef = useRef<HTMLDivElement>(null);
+  const [showConfirmReminder, setShowConfirmReminder] = useState(false);
+
+  useEffect(() => {
+    const el = confirmCardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setShowConfirmReminder(!entry.isIntersecting && entry.boundingClientRect.top > 0);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [bookingConfirmed]);
+
   // Waiver acknowledgment
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [hasScrolledWaiver, setHasScrolledWaiver] = useState(false);
@@ -346,9 +361,9 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-8">
-        {/* Action card — on mobile show first */}
-        <div className="lg:col-span-2 lg:order-2 space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 lg:grid-rows-[auto_1fr] gap-4 sm:gap-8">
+        {/* Action card — on mobile show first, right column on desktop */}
+        <div className="lg:col-span-2 lg:col-start-4 lg:row-start-1 space-y-4 sm:space-y-6">
           {/* Payment QR Codes */}
           {paymentQrCodes.length > 0 && (
             <div className="rounded-2xl bg-white p-5 sm:p-6 shadow-sm" style={{ border: `1px solid ${colors.bg}08` }}>
@@ -557,70 +572,10 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
             )}
           </div>
 
-          {/* Total + confirm */}
-          <div className="rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden" style={{ backgroundColor: colors.bg }}>
-            <div className="absolute inset-0 grain-overlay opacity-15 pointer-events-none" />
-            <div className="relative z-10">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <span
-                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                  style={{ backgroundColor: colors.accent, color: colors.bg }}
-                >
-                  {stepNo.confirm}
-                </span>
-                <span className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: colors.accent }}>
-                  Confirm Reservation
-                </span>
-              </div>
-              <span className="material-symbols-outlined text-3xl sm:text-4xl mb-3 sm:mb-4 block" style={{ color: colors.accent, fontVariationSettings: "'FILL' 1" }}>
-                sports_tennis
-              </span>
-              <p className="font-['Clash_Display'] text-2xl sm:text-3xl font-bold text-white mb-1">
-                {formatCurrency(total)}
-              </p>
-              <p className="font-[Poppins] text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-6 sm:mb-8" style={{ color: `${colors.accentDim}80` }}>
-                {items.length} slot{items.length > 1 ? "s" : ""} · {groups.length} court{groups.length > 1 ? "s" : ""}
-              </p>
-              <button
-                onClick={() => setShowConfirmModal(true)}
-                disabled={createReservation.isPending || !receiptFile || !acceptedWaiver}
-                className="w-full py-3.5 sm:py-4 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{ backgroundColor: colors.accent, color: colors.bg }}
-              >
-                {createReservation.isPending ? "Confirming..." : "Confirm Reservation"}
-              </button>
-              {!receiptFile && (
-                <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.accentDim}90` }}>
-                  <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>upload_file</span>
-                  Please upload your payment receipt above to confirm
-                </p>
-              )}
-              {receiptFile && !acceptedWaiver && (
-                <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.accentDim}90` }}>
-                  <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>description</span>
-                  Please read and accept the waiver to continue
-                </p>
-              )}
-              {createReservation.isError && (
-                <p className="mt-3 font-[Poppins] text-xs text-red-300">
-                  {createReservation.error?.message || "Something went wrong"}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <button
-            onClick={onBack}
-            className="w-full py-3 sm:py-3.5 rounded-xl font-[Poppins] font-semibold text-sm transition-all flex items-center justify-center gap-2"
-            style={{ border: `1px solid ${colors.bg}0d`, color: `${colors.bg}66` }}
-          >
-            <span className="material-symbols-outlined text-base">arrow_back</span>
-            Edit Reservation
-          </button>
         </div>
 
         {/* Summary */}
-        <div className="lg:col-span-3 lg:order-1 bg-white rounded-2xl p-5 sm:p-8 md:p-10 shadow-sm" style={{ border: `1px solid ${colors.bg}08` }}>
+        <div className="lg:col-span-3 lg:col-start-1 lg:row-start-1 lg:row-span-2 bg-white rounded-2xl p-5 sm:p-8 md:p-10 shadow-sm" style={{ border: `1px solid ${colors.bg}08` }}>
           <h2 className="font-['Clash_Display'] text-lg sm:text-xl font-bold mb-4 sm:mb-6" style={{ color: colors.bg }}>
             Booking Summary
           </h2>
@@ -703,7 +658,124 @@ export function StepReviewConfirm({ onBack }: StepReviewConfirmProps) {
             </div>
           </div>
         </div>
+
+        {/* Confirm — sits below the Total on mobile, under the steps on desktop */}
+        <div className="lg:col-span-2 lg:col-start-4 lg:row-start-2 lg:self-start space-y-4 sm:space-y-6">
+          {/* Total + confirm */}
+          <div ref={confirmCardRef} className="rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden" style={{ backgroundColor: colors.bg }}>
+            <div className="absolute inset-0 grain-overlay opacity-15 pointer-events-none" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <span
+                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{ backgroundColor: colors.accent, color: colors.bg }}
+                >
+                  {stepNo.confirm}
+                </span>
+                <span className="font-[Poppins] text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: colors.accent }}>
+                  Confirm Reservation
+                </span>
+              </div>
+              <span className="material-symbols-outlined text-3xl sm:text-4xl mb-3 sm:mb-4 block" style={{ color: colors.accent, fontVariationSettings: "'FILL' 1" }}>
+                sports_tennis
+              </span>
+              <p className="font-['Clash_Display'] text-2xl sm:text-3xl font-bold text-white mb-1">
+                {formatCurrency(total)}
+              </p>
+              <p className="font-[Poppins] text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-6 sm:mb-8" style={{ color: `${colors.accentDim}80` }}>
+                {items.length} slot{items.length > 1 ? "s" : ""} · {groups.length} court{groups.length > 1 ? "s" : ""}
+              </p>
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                disabled={createReservation.isPending || !receiptFile || !acceptedWaiver}
+                className="w-full py-3.5 sm:py-4 rounded-xl font-[Poppins] font-bold text-sm uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ backgroundColor: "#e03131", color: "#ffffff" }}
+              >
+                {createReservation.isPending ? "Confirming..." : "Confirm Reservation"}
+              </button>
+              <p className="mt-3 font-[Poppins] text-[11px] leading-relaxed flex items-start justify-center gap-1.5 text-left" style={{ color: "#ffa8a8" }}>
+                <span className="material-symbols-outlined text-sm shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+                <span>
+                  If you don&apos;t tap <span className="font-bold uppercase">Confirm Reservation</span>, your booking
+                  will <span className="font-bold">not</span> go through.
+                </span>
+              </p>
+              {!receiptFile && (
+                <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.accentDim}90` }}>
+                  <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>upload_file</span>
+                  Please upload your payment receipt above to confirm
+                </p>
+              )}
+              {receiptFile && !acceptedWaiver && (
+                <p className="mt-3 font-[Poppins] text-[11px] flex items-center justify-center gap-1.5" style={{ color: `${colors.accentDim}90` }}>
+                  <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>description</span>
+                  Please read and accept the waiver to continue
+                </p>
+              )}
+              {createReservation.isError && (
+                <p className="mt-3 font-[Poppins] text-xs text-red-300">
+                  {createReservation.error?.message || "Something went wrong"}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={onBack}
+            className="w-full py-3 sm:py-3.5 rounded-xl font-[Poppins] font-semibold text-sm transition-all flex items-center justify-center gap-2"
+            style={{ border: `1px solid ${colors.bg}0d`, color: `${colors.bg}66` }}
+          >
+            <span className="material-symbols-outlined text-base">arrow_back</span>
+            Edit Reservation
+          </button>
+        </div>
       </div>
+
+      {/* Floating confirm reminder — phones only. Portaled because the step's
+          motion wrapper has a transform, which would break `fixed` positioning. */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showConfirmReminder && (
+            <motion.div
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ duration: 0.3, ease }}
+              className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden"
+            >
+              <button
+                type="button"
+                onClick={() => confirmCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                className="w-full flex items-start gap-3 rounded-2xl p-3.5 text-left shadow-lg active:scale-[0.98] transition-transform"
+                style={{ backgroundColor: colors.bg, border: "1px solid #ff4d4d66" }}
+              >
+                <span
+                  className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full"
+                  style={{ backgroundColor: "#ff4d4d18", border: "1px solid #ff4d4d40" }}
+                >
+                  <span className="material-symbols-outlined text-base" style={{ color: "#ff6b6b", fontVariationSettings: "'FILL' 1" }}>
+                    touch_app
+                  </span>
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-['Clash_Display'] text-xs font-extrabold uppercase tracking-[0.2em] mb-0.5" style={{ color: "#ff6b6b" }}>
+                    Confirm Your Booking
+                  </span>
+                  <span className="block font-[Poppins] text-[11px] leading-snug" style={{ color: "#d3e9cbcc" }}>
+                    Paying is not enough. After you pay, upload your receipt and tap{" "}
+                    <span className="font-semibold" style={{ color: "#ff6b6b" }}>Confirm Reservation</span>{" "}
+                    on the last step — your slot is not reserved until you do.
+                  </span>
+                </span>
+                <span className="material-symbols-outlined text-base shrink-0 self-center" style={{ color: "#ff6b6b" }}>
+                  arrow_downward
+                </span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Waiver Modal */}
       {typeof document !== "undefined" && createPortal(
